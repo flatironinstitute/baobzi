@@ -1,6 +1,12 @@
 #ifndef BAOBZI_HPP
 #define BAOBZI_HPP
 
+#include <queue>
+#include <vector>
+
+#include <eigen3/Eigen/Dense>
+#include <eigen3/Eigen/LU>
+
 namespace baobzi {
 
 static std::array<uint64_t, 5> dilate_masks[4] = {
@@ -354,7 +360,6 @@ class LinearTree {
             half_width *= 0.5;
             if ((1 << (DIM * max_depth_)) == q.size())
                 max_full_ = max_depth_;
-            std::cout << max_depth_ << " " << q.size() << " " << max_full_ << std::endl;
         }
     }
 
@@ -392,6 +397,10 @@ class LinearTree {
 
     double operator()(const VEC &x) const { return eval(x); }
 };
+
+template <int D, int ORDER>
+const Eigen::PartialPivLU<typename LinearNode<D, ORDER>::VanderMat> LinearNode<D, ORDER>::VLU_ =
+    Eigen::PartialPivLU<typename LinearNode<D, ORDER>::VanderMat>(LinearNode<D, ORDER>::calc_vandermonde());
 }
 
 #endif
