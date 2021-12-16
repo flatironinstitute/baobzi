@@ -1,0 +1,3 @@
+[submodule "extern/msgpack-c"]
+	path = extern/msgpack-c
+	url = https://github.com/msgpack/msgpack-c
