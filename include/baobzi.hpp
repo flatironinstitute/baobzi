@@ -214,8 +214,9 @@ class LinearNode {
             Tns[0] = VEC::Ones();
             VEC xinterp = (x - box_.center).array() / box_.half_length.array();
             Tns[1] = xinterp;
+            xinterp *= 2.0;
             for (int i = 2; i < ORDER; ++i) {
-                Tns[i] = 2. * xinterp.array() * Tns[i - 1].array() - Tns[i - 2].array();
+                Tns[i] = xinterp.array() * Tns[i - 1].array() - Tns[i - 2].array();
             }
 
             double res = 0.0;
@@ -228,17 +229,16 @@ class LinearNode {
         if constexpr (D == 2) {
             VEC xinterp = (x - box_.center).array() / box_.half_length.array();
             CoeffVec Tnx, Tny;
-            Tnx[0] = Tny[0] = 1.0;
-            Tnx[1] = xinterp[0];
-            Tny[1] = xinterp[1];
-            for (int i = 2; i < ORDER; ++i) {
-                Tnx[i] = 2. * xinterp[0] * Tnx[i - 1] - Tnx[i - 2];
-                Tny[i] = 2. * xinterp[1] * Tny[i - 1] - Tny[i - 2];
-            }
+            Eigen::Matrix<double, 2, ORDER> Tns;
+            Tns.col(0).setOnes();
+            Tns.col(1) = xinterp;
+            xinterp *= 2.0;
+            for (int i = 2; i < ORDER; ++i)
+                Tns.col(i) = xinterp.array() * Tns.col(i-1).array() - Tns.col(i-2).array();
 
             Eigen::Map<const Eigen::Matrix<double, ORDER, ORDER>> coeffs(coeffs_.data());
 
-            return Tnx.dot(coeffs * Tny);
+            return Tns.row(0).transpose().dot(coeffs * Tns.row(1).transpose());
         }
         if constexpr (D == 3) {
             VEC xinterp = (x - box_.center).array() / box_.half_length.array();
@@ -246,8 +246,9 @@ class LinearNode {
             Tn[0][0] = Tn[1][0] = Tn[2][0] = 1.0;
             for (int i = 0; i < 3; ++i) {
                 Tn[i][1] = xinterp[i];
+                xinterp[i] *= 2.0;
                 for (int j = 2; j < ORDER; ++j)
-                    Tn[i][j] = 2. * xinterp[i] * Tn[i][j - 1] - Tn[i][j - 2];
+                    Tn[i][j] = xinterp[i] * Tn[i][j - 1] - Tn[i][j - 2];
             }
 
             double res = 0.0;
@@ -366,7 +367,7 @@ class LinearTree {
         const VEC &center = box_.center;
         const VEC &half_width = box_.half_length;
 
-        const VEC x_scaled = 0.5 * (x - center).array() / box_.half_length.array() + VEC::Ones().array() * 0.5;
+        const VEC x_scaled = 0.5 * (x - center).array() / box_.half_length.array() + VEC::Constant(0.5).array();
         uint64_t m_max = calculate_key(x_scaled, max_depth_);
 
         uint64_t rel_depth = (max_depth_ - max_full_) * DIM;
