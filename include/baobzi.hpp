@@ -50,15 +50,15 @@ class Box {
   public:
     using VEC = Eigen::Vector<double, D>;
     VEC center;
-    double half_length;
+    VEC half_length;
 
     Box<D>() = default;
-    Box<D>(const VEC &x, double hl) : center(x), half_length(hl) {}
+    Box<D>(const VEC &x, const VEC &hl) : center(x), half_length(hl) {}
 
     bool contains(const VEC &x) const {
         VEC dx = (x - center).array().abs();
         for (int i = 0; i < D; ++i)
-            if (dx[i] > half_length)
+            if (dx[i] > half_length[i])
                 return false;
         return true;
     }
@@ -125,9 +125,9 @@ class LinearNode {
         if constexpr (D == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
             CoeffVec xvec =
-                get_chebyshev_nodes<ORDER>(box_.center[0] - box_.half_length, box_.center[0] + box_.half_length);
+                get_chebyshev_nodes<ORDER>(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
             CoeffVec yvec =
-                get_chebyshev_nodes<ORDER>(box_.center[1] - box_.half_length, box_.center[1] + box_.half_length);
+                get_chebyshev_nodes<ORDER>(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
 
             for (int i = 0; i < ORDER; ++i)
                 for (int j = 0; j < ORDER; ++j)
@@ -149,11 +149,11 @@ class LinearNode {
         if constexpr (D == 3) {
             std::vector<double> F(ORDER * ORDER * ORDER);
             CoeffVec xvec =
-                get_chebyshev_nodes<ORDER>(box_.center[0] - box_.half_length, box_.center[0] + box_.half_length);
+                get_chebyshev_nodes<ORDER>(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
             CoeffVec yvec =
-                get_chebyshev_nodes<ORDER>(box_.center[1] - box_.half_length, box_.center[1] + box_.half_length);
+                get_chebyshev_nodes<ORDER>(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
             CoeffVec zvec =
-                get_chebyshev_nodes<ORDER>(box_.center[2] - box_.half_length, box_.center[2] + box_.half_length);
+                get_chebyshev_nodes<ORDER>(box_.center[2] - box_.half_length[2], box_.center[2] + box_.half_length[2]);
 
             for (int i = 0; i < ORDER; ++i)
                 for (int j = 0; j < ORDER; ++j)
@@ -189,9 +189,7 @@ class LinearNode {
             for (int i = 0; i < 8; ++i) {
                 for (int j = 0; j < 8; ++j) {
                     for (int k = 0; k < 8; ++k) {
-                        VEC point;
-                        for (int l = 0; l < 3; ++l)
-                            point[l] = box_.center[l] - box_.half_length + i * box_.half_length / 4.0;
+                        VEC point = box_.center - box_.half_length + 0.25 * i * box_.half_length;
 
                         double test_val = this->eval(point);
                         double actual_val = f(point);
@@ -214,7 +212,7 @@ class LinearNode {
         if constexpr (D == 1) {
             VEC Tns[ORDER];
             Tns[0] = VEC::Ones();
-            VEC xinterp = (x - box_.center) / box_.half_length;
+            VEC xinterp = (x - box_.center).array() / box_.half_length.array();
             Tns[1] = xinterp;
             for (int i = 2; i < ORDER; ++i) {
                 Tns[i] = 2. * xinterp.array() * Tns[i - 1].array() - Tns[i - 2].array();
@@ -228,7 +226,7 @@ class LinearNode {
             return res;
         }
         if constexpr (D == 2) {
-            VEC xinterp = (x - box_.center) / box_.half_length;
+            VEC xinterp = (x - box_.center).array() / box_.half_length.array();
             CoeffVec Tnx, Tny;
             Tnx[0] = Tny[0] = 1.0;
             Tnx[1] = xinterp[0];
@@ -243,7 +241,7 @@ class LinearNode {
             return Tnx.dot(coeffs * Tny);
         }
         if constexpr (D == 3) {
-            VEC xinterp = (x - box_.center) / box_.half_length;
+            VEC xinterp = (x - box_.center).array() / box_.half_length.array();
             CoeffVec Tn[3];
             Tn[0][0] = Tn[1][0] = Tn[2][0] = 1.0;
             for (int i = 0; i < 3; ++i) {
@@ -307,7 +305,7 @@ class LinearTree {
     uint64_t child_idx_base = 0;
     uint16_t max_full_ = 0;
 
-    LinearTree<DIM, ORDER>(const VEC &x, double l, double (*f)(VEC)) : f_(f), box_(x, l) {
+    LinearTree<DIM, ORDER>(const VEC &x, const VEC &l, double (*f)(VEC)) : f_(f), box_(x, l) {
         using key_t = uint64_t;
         std::queue<std::pair<DBox, key_t>> q;
 
@@ -315,7 +313,7 @@ class LinearTree {
         q.push(std::make_pair(DBox(x, l), 1));
 
         // Half-width of next children
-        double half_width = l * 0.5;
+        VEC half_width = l * 0.5;
         while (!q.empty()) {
             int n_next = q.size();
 
@@ -341,14 +339,15 @@ class LinearTree {
 
                     key_t parent = node_key << DIM;
                     VEC &center = box.center;
-                    double signed_hw[2] = {-half_width, half_width};
                     for (key_t child = 0; child < NChild; ++child) {
                         VEC offset;
 
                         // Extract sign of each offset component from the bits of child
                         // Basically: permute all possible offsets
-                        for (int j = 0; j < DIM; ++j)
+                        for (int j = 0; j < DIM; ++j) {
+                            double signed_hw[2] = {-half_width[j], half_width[j]};
                             offset[j] = signed_hw[(child >> j) & 1];
+                        }
 
                         q.push(std::make_pair(DBox(center + offset, half_width), parent + child));
                     }
@@ -364,10 +363,10 @@ class LinearTree {
     }
 
     uint64_t find_node_key(const VEC &x) const {
-        VEC center = box_.center;
-        double half_width = box_.half_length;
+        const VEC &center = box_.center;
+        const VEC &half_width = box_.half_length;
 
-        const VEC x_scaled = 0.5 * (x - center) / box_.half_length + VEC::Ones() * 0.5;
+        const VEC x_scaled = 0.5 * (x - center).array() / box_.half_length.array() + VEC::Ones().array() * 0.5;
         uint64_t m_max = calculate_key(x_scaled, max_depth_);
 
         uint64_t rel_depth = (max_depth_ - max_full_) * DIM;
