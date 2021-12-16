@@ -24,11 +24,11 @@ void time_linear_tree_2d(const LinearTree2d &lineartree2d, const std::vector<dou
     double time = omp_get_wtime();
     double res = 0.0;
     size_t n_el = x.size() / 2;
-    double hl = lineartree2d.nodes_[0].box_.half_length;
+    const auto &hl = lineartree2d.nodes_[0].box_.half_length;
     auto center2d = lineartree2d.nodes_[0].box_.center;
     for (int i_run = 0; i_run < n_runs; ++i_run) {
         for (int i = 0; i < 2 * n_el; i += 2) {
-            Eigen::Vector2d point{hl * (2.0 * x[i] - 1.0) + center2d[0], hl * (2.0 * x[i + 1] - 1.0) + center2d[1]};
+            Eigen::Vector2d point{hl[0] * (2.0 * x[i] - 1.0) + center2d[0], hl[1] * (2.0 * x[i + 1] - 1.0) + center2d[1]};
             res += lineartree2d(point);
         }
     }
@@ -38,7 +38,7 @@ void time_linear_tree_2d(const LinearTree2d &lineartree2d, const std::vector<dou
 
 int main(int argc, char *argv[]) {
     double time = omp_get_wtime();
-    double hl = 1.0;
+    Eigen::Vector2d hl{1.0, 1.0};
     //     Eigen::Vector3d center3d{0.5 + hl, 0.5 + 2 * hl, 0.5 + hl};
     //     LinearTree3d tree3d_test(center3d, hl, testfun_3d);
 
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
 
     //     return 0;
 
-    Eigen::Vector2d center2d{0.5 + hl, 0.5 + 2 * hl};
+    Eigen::Vector2d center2d{0.5 + hl[0], 0.5 + 2 * hl[1]};
     LinearTree2d lineartree2d(center2d, hl, testfun_2d_2);
     std::cout << omp_get_wtime() - time << std::endl;
 
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
     fun.precision(17);
     for (int i = 0; i < 100; ++i) {
         for (int j = 0; j < 100; ++j) {
-            Eigen::Vector<double, 2> point{center2d[0] + hl * (i - 50) / 50.1, center2d[1] + hl * (j - 50) / 50.1};
+            Eigen::Vector<double, 2> point{center2d[0] + hl[0] * (i - 50) / 50.1, center2d[1] + hl[1] * (j - 50) / 50.1};
             auto node2d = lineartree2d.find_node(point);
             assert(node2d.box_.contains(point));
             finterp << point[0] << " " << point[1] << " " << node2d.eval(point) << std::endl;
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
         double res = 0.0;
         for (int i_run = 0; i_run < n_runs; ++i_run) {
             for (int i = 0; i < 2 * n_el; i += 2) {
-                Eigen::Vector2d point{hl * (2.0 * x[i] - 1.0) + center2d[0], hl * (2.0 * x[i + 1] - 1.0) + center2d[1]};
+                Eigen::Vector2d point{hl[0] * (2.0 * x[i] - 1.0) + center2d[0], hl[1] * (2.0 * x[i + 1] - 1.0) + center2d[1]};
                 res += testfun_2d_2(point);
             }
         }
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     double rms_error = 0.0;
     double rms_rel_error = 0.0;
     for (int i = 0; i < 2 * n_el; i += 2) {
-        Eigen::Vector2d point{hl * (2.0 * x[i] - 1.0) + center2d[0], hl * (2.0 * x[i + 1] - 1.0) + center2d[1]};
+        Eigen::Vector2d point{hl[0] * (2.0 * x[i] - 1.0) + center2d[0], hl[1] * (2.0 * x[i + 1] - 1.0) + center2d[1]};
         double actual = testfun_2d_2(point);
         double interp = lineartree2d.eval(point);
         double delta = actual - interp;
