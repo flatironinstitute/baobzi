@@ -74,10 +74,8 @@ inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
         scaling_factor = std::max(scaling_factor, std::abs(coeffs(0, 0)));
     } else {
         int n = coeffs.rows();
-        for (auto i = n - 2; i < n; ++i)
-            maxcoeff = std::max(std::abs(coeffs(n - 1, i)), maxcoeff);
-        for (auto i = n - 2; i < n; ++i)
-            maxcoeff = std::max(std::abs(coeffs(i, n - 1)), maxcoeff);
+        for (auto i = 0; i < n; ++i)
+            maxcoeff = std::max(std::abs(coeffs(i, n - i - 1)), maxcoeff);
 
         scaling_factor = std::max(scaling_factor, std::abs(coeffs(n - 1, 0)));
         scaling_factor = std::max(scaling_factor, std::abs(coeffs(0, n - 1)));
@@ -121,7 +119,7 @@ class LinearNode {
 
     bool is_leaf() const { return coeffs_.size(); }
 
-    bool fit(double (*f)(VEC)) {
+    bool fit(double (*f)(VEC), double tol) {
         if constexpr (D == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
             CoeffVec xvec =
@@ -136,8 +134,7 @@ class LinearNode {
             Eigen::Matrix<double, ORDER, ORDER> coeffs = VLU_.solve(F);
             coeffs = VLU_.solve(coeffs.transpose()).transpose();
 
-            double tol_ = 1E-12;
-            if (standard_error(coeffs) > tol_)
+            if (standard_error(coeffs) > tol)
                 return false;
 
             coeffs_.resize(coeffs.size());
@@ -185,7 +182,6 @@ class LinearNode {
 
             coeffs_ = coeffs_x;
 
-            double tol_ = 1E-10;
             for (int i = 0; i < 8; ++i) {
                 for (int j = 0; j < 8; ++j) {
                     for (int k = 0; k < 8; ++k) {
@@ -195,7 +191,7 @@ class LinearNode {
                         double actual_val = f(point);
                         double rel_error = std::abs(this->eval(point) - f(point));
 
-                        if (fabs(actual_val) > 1E-16 && rel_error > tol_) {
+                        if (fabs(actual_val) > 1E-16 && rel_error > tol) {
                             coeffs_.clear();
                             coeffs_.shrink_to_fit();
                             return false;
@@ -299,6 +295,7 @@ class Function {
 
     std::vector<LinearNode<DIM, ORDER>> nodes_;
     std::vector<uint64_t> flat_map_;
+    const double tol_;
     double (*f_)(VEC);
     DBox box_;
     uint16_t max_depth_;
@@ -306,7 +303,7 @@ class Function {
     uint64_t child_idx_base = 0;
     uint16_t max_full_ = 0;
 
-    Function<DIM, ORDER>(const VEC &x, const VEC &l, double (*f)(VEC)) : f_(f), box_(x, l) {
+    Function<DIM, ORDER>(const VEC &x, const VEC &l, double (*f)(VEC), double tol) : f_(f), box_(x, l), tol_(tol) {
         using key_t = uint64_t;
         std::queue<std::pair<DBox, key_t>> q;
 
@@ -334,7 +331,7 @@ class Function {
                 nodes_.push_back(LinearNode<DIM, ORDER>(box));
 
                 auto &node = nodes_.back();
-                if (!node.fit(f)) {
+                if (!node.fit(f, tol_)) {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
 

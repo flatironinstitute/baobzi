@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
         for (int j = 0; j < 2; ++j)
             x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
-    baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2);
+    baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2, 1E-10);
 
     std::ofstream finterp("funinterp.2d");
     std::ofstream fun("fun.2d");
