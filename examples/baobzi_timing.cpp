@@ -12,23 +12,20 @@ double testfun_3d(Eigen::Vector<double, 3> x) {
     return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
 }
 
-template <typename Function>
+template <int DIM, typename Function>
 void time_function(const Function &function, const std::vector<double> &x, int n_runs) {
-    double time = omp_get_wtime();
+    const double time = omp_get_wtime();
     double res = 0.0;
-    size_t n_el = x.size() / Function::Dim;
-    using VEC = typename Function::VEC;
-    const auto &hl = function.nodes_[0].box_.half_length;
-    const auto &center = function.nodes_[0].box_.center;
+    using VEC = Eigen::Vector<double, DIM>;
     for (int i_run = 0; i_run < n_runs; ++i_run) {
-        for (int i = 0; i < Function::Dim * n_el; i += Function::Dim) {
-            const VEC xvec(&x[i]);
-            const VEC point = hl.array() * (2.0 * xvec.array() - 1.0) + center.array();
+        for (int i = 0; i < x.size(); i += DIM) {
+            const VEC point(&x[i]);
             res += function(point);
         }
     }
-    double dt = omp_get_wtime() - time;
-    std::cout << dt << " " << n_runs * n_el / dt / 1E6 << " " << res << std::endl;
+    const double dt = omp_get_wtime() - time;
+    const long n_eval = n_runs * (x.size() / DIM);
+    std::cout << dt << " " << n_eval / (dt * 1E6) << " " << res << std::endl;
 }
 
 template <typename Function>
@@ -38,13 +35,10 @@ void print_error(const Function &function, const std::vector<double> &x) {
     double rms_error = 0.0;
     double rms_rel_error = 0.0;
     using VEC = typename Function::VEC;
-    const auto &hl = function.nodes_[0].box_.half_length;
-    const auto &center = function.nodes_[0].box_.center;
 
     size_t n_meas = 0;
     for (int i = 0; i < x.size(); i += Function::Dim) {
-        const VEC xvec(&x[i]);
-        const VEC point = hl.array() * (2.0 * xvec.array() - 1.0) + center.array();
+        const VEC point(&x[i]);
 
         double actual = function.f_(point);
         double interp = function.eval(point);
@@ -68,22 +62,26 @@ void print_error(const Function &function, const std::vector<double> &x) {
 }
 
 int main(int argc, char *argv[]) {
-    size_t n_el = 1000000;
+    size_t n_points = 1000000;
     size_t n_runs = 50;
 
     std::random_device rd;
     std::mt19937 gen(1);
     std::uniform_real_distribution<> dis(0, 1);
-    std::vector<double> x(n_el * 2);
-    for (size_t i = 0; i < n_el * 2; ++i)
+    std::vector<double> x(n_points * 3);
+    for (size_t i = 0; i < n_points * 3; ++i)
         x[i] = dis(gen);
 
     double time = omp_get_wtime();
     Eigen::Vector2d hl{1.0, 1.0};
     Eigen::Vector2d center2d = hl + Eigen::Vector2d{0.5, 2.0};
+    std::vector<double> x_2d_transformed(n_points * 2);
+
+    for (int i = 0; i < 2 * n_points; i += 2)
+        for (int j = 0; j < 2; ++j)
+            x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
     baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2);
-    std::cout << omp_get_wtime() - time << std::endl;
 
     std::ofstream finterp("funinterp.2d");
     std::ofstream fun("fun.2d");
@@ -101,22 +99,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    {
-        time = omp_get_wtime();
-        double res = 0.0;
-        for (int i_run = 0; i_run < n_runs; ++i_run) {
-            for (int i = 0; i < 2 * n_el; i += 2) {
-                Eigen::Vector2d point{hl[0] * (2.0 * x[i] - 1.0) + center2d[0],
-                                      hl[1] * (2.0 * x[i + 1] - 1.0) + center2d[1]};
-                res += testfun_2d_2(point);
-            }
-        }
-        double dt = omp_get_wtime() - time;
-        std::cout << dt << " " << n_runs * n_el / dt / 1E6 << " " << res << std::endl;
-    }
-
-    time_function(func_approx_2d, x, n_runs);
-    print_error(func_approx_2d, x);
+    time_function<2>(func_approx_2d.f_, x_2d_transformed, n_runs);
+    time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
+    print_error(func_approx_2d, x_2d_transformed);
 
     return 0;
 }
