@@ -32,8 +32,8 @@ template <typename Function>
 void print_error(const Function &function, const std::vector<double> &x) {
     double max_error = 0.0;
     double max_rel_error = 0.0;
-    double rms_error = 0.0;
-    double rms_rel_error = 0.0;
+    double mean_error = 0.0;
+    double mean_rel_error = 0.0;
     using VEC = typename Function::VEC;
 
     size_t n_meas = 0;
@@ -45,20 +45,21 @@ void print_error(const Function &function, const std::vector<double> &x) {
         double delta = actual - interp;
 
         max_error = std::max(max_error, std::fabs(delta));
+
         if (std::abs(actual) > 1E-15) {
             double rel_error = std::abs(interp / actual - 1.0);
             max_rel_error = std::max(max_rel_error, rel_error);
-            rms_rel_error += rel_error * rel_error;
+            mean_rel_error += std::abs(rel_error);
             n_meas++;
         }
 
-        rms_error += delta * delta;
+        mean_error += std::abs(delta);
     }
-    rms_error = sqrt(rms_error) / n_meas;
-    rms_rel_error = sqrt(rms_rel_error) / n_meas;
+    mean_error = mean_error / n_meas;
+    mean_rel_error = mean_rel_error / n_meas;
 
-    std::cout << max_rel_error << " " << rms_rel_error << std::endl;
-    std::cout << max_error << " " << rms_error << std::endl;
+    std::cout << "rel error max, mean: " << max_rel_error << " " << mean_rel_error << std::endl;
+    std::cout << "abs error max, mean: " << max_error << " " << mean_error << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -81,7 +82,7 @@ int main(int argc, char *argv[]) {
         for (int j = 0; j < 2; ++j)
             x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
-    baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2, 1E-10);
+    baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2, 1E-8);
 
     std::ofstream finterp("funinterp.2d");
     std::ofstream fun("fun.2d");
