@@ -4,8 +4,8 @@
 #include <queue>
 #include <vector>
 
-#include <eigen3/Eigen/Dense>
-#include <eigen3/Eigen/LU>
+#include <Eigen/Dense>
+#include <Eigen/LU>
 
 namespace baobzi {
 
@@ -287,7 +287,7 @@ inline uint64_t calculate_key(const Eigen::Vector<double, DIM> &x_scaled, int de
 }
 
 template <int DIM, int ORDER>
-class LinearTree {
+class Function {
   public:
     static constexpr int NChild = 1 << DIM;
     static constexpr int Dim = DIM;
@@ -306,7 +306,7 @@ class LinearTree {
     uint64_t child_idx_base = 0;
     uint16_t max_full_ = 0;
 
-    LinearTree<DIM, ORDER>(const VEC &x, const VEC &l, double (*f)(VEC)) : f_(f), box_(x, l) {
+    Function<DIM, ORDER>(const VEC &x, const VEC &l, double (*f)(VEC)) : f_(f), box_(x, l) {
         using key_t = uint64_t;
         std::queue<std::pair<DBox, key_t>> q;
 
