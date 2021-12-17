@@ -14,8 +14,8 @@ set(BAOBZI_INCLUDES
   ${EIGEN3_INCLUDE_DIR}
   )
 
-file(GLOB EXAMPLE_SOURCES "examples/tree_test.cpp")
+file(GLOB EXAMPLE_SOURCES "examples/baobzi_timing.cpp")
 
-add_executable(tree_test ${EXAMPLE_SOURCES})
-target_include_directories(tree_test PUBLIC ${BAOBZI_INCLUDES})
-target_link_libraries(tree_test PUBLIC OpenMP::OpenMP_CXX)
+add_executable(baobzi_timing ${EXAMPLE_SOURCES})
+target_include_directories(baobzi_timing PUBLIC ${BAOBZI_INCLUDES})
+target_link_libraries(baobzi_timing PUBLIC OpenMP::OpenMP_CXX)
