@@ -85,7 +85,7 @@ inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
 }
 
 template <int D, int ORDER>
-class LinearNode {
+class Node {
   public:
     using VEC = Eigen::Vector<double, D>;
     using VanderMat = Eigen::Matrix<double, ORDER, ORDER>;
@@ -113,9 +113,9 @@ class LinearNode {
         return V;
     }
 
-    LinearNode<D, ORDER>() = default;
+    Node<D, ORDER>() = default;
 
-    LinearNode<D, ORDER>(const Box<D> &box) : box_(box) {}
+    Node<D, ORDER>(const Box<D> &box) : box_(box) {}
 
     bool is_leaf() const { return coeffs_.size(); }
 
@@ -293,7 +293,7 @@ class Function {
     using CoeffVec = Eigen::Vector<double, ORDER>;
     using DBox = Box<DIM>;
 
-    std::vector<LinearNode<DIM, ORDER>> nodes_;
+    std::vector<Node<DIM, ORDER>> nodes_;
     std::vector<uint64_t> flat_map_;
     const double tol_;
     double (*f_)(VEC);
@@ -325,10 +325,10 @@ class Function {
             for (int i = 0; i < n_next; ++i) {
                 auto [box, node_key] = q.front();
                 q.pop();
-                LinearNode<DIM, ORDER> test_node(box);
+                Node<DIM, ORDER> test_node(box);
                 flat_map_[node_key] = parent_idx++;
                 // node_map_[node_key] = parent_idx++;
-                nodes_.push_back(LinearNode<DIM, ORDER>(box));
+                nodes_.push_back(Node<DIM, ORDER>(box));
 
                 auto &node = nodes_.back();
                 if (!node.fit(f, tol_)) {
@@ -375,9 +375,9 @@ class Function {
         return m_max >> rel_depth;
     }
 
-    const LinearNode<DIM, ORDER> &find_node(const VEC &x) const { return nodes_[flat_map_[find_node_key(x)]]; }
+    const Node<DIM, ORDER> &find_node(const VEC &x) const { return nodes_[flat_map_[find_node_key(x)]]; }
 
-    const LinearNode<DIM, ORDER> &find_node_traverse(const VEC &x) const {
+    const Node<DIM, ORDER> &find_node_traverse(const VEC &x) const {
         auto *node = &nodes_[0];
         while (!node->is_leaf()) {
             uint64_t child_idx = 0;
@@ -396,8 +396,8 @@ class Function {
 };
 
 template <int D, int ORDER>
-const Eigen::PartialPivLU<typename LinearNode<D, ORDER>::VanderMat> LinearNode<D, ORDER>::VLU_ =
-    Eigen::PartialPivLU<typename LinearNode<D, ORDER>::VanderMat>(LinearNode<D, ORDER>::calc_vandermonde());
+const Eigen::PartialPivLU<typename Node<D, ORDER>::VanderMat> Node<D, ORDER>::VLU_ =
+    Eigen::PartialPivLU<typename Node<D, ORDER>::VanderMat>(Node<D, ORDER>::calc_vandermonde());
 }
 
 #endif
