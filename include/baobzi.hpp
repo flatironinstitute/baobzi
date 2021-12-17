@@ -28,26 +28,29 @@ static std::array<uint64_t, 5> dilate_masks[4] = {
     },
 };
 
+
 template <int ORDER>
-Eigen::VectorXd get_chebyshev_nodes(double lb, double ub) {
-    static bool first_call = true;
-    static std::array<double, ORDER> cosarray;
-    if (first_call) {
+struct chebyshev_nodes {
+    using arr_type = Eigen::Vector<double, ORDER>;
+    static const arr_type cosarray;
+
+    static arr_type get_cos_array() {
+        arr_type cosarray(ORDER);
         for (int i = 0; i < ORDER; ++i)
-            cosarray[i] = cos(M_PI * (i + 0.5) / ORDER);
-        first_call = false;
+            cosarray[ORDER - i - 1] = cos(M_PI * (i + 0.5) / ORDER);
+        return cosarray;
     }
 
-    Eigen::VectorXd res(ORDER);
-    for (int i = 0; i < ORDER; ++i)
-        res[ORDER - i - 1] = 0.5 * ((lb + ub) + (ub - lb) * cosarray[i]);
+    static inline arr_type get(double lb, double ub) {
+        return 0.5 * ((lb + ub) + (ub - lb) * cosarray.array());
+    }
+};
 
-    return res;
-}
+template <int ORDER>
+const typename chebyshev_nodes<ORDER>::arr_type chebyshev_nodes<ORDER>::cosarray = chebyshev_nodes<ORDER>::get_cos_array();
 
 template <int D>
-class Box {
-  public:
+struct Box {
     using VEC = Eigen::Vector<double, D>;
     VEC center;
     VEC half_length;
@@ -98,7 +101,7 @@ class Node {
     static VanderMat calc_vandermonde() {
         VanderMat V;
 
-        auto x = get_chebyshev_nodes<ORDER>(-1, 1);
+        auto x = chebyshev_nodes<ORDER>::get_cos_array();
         for (int j = 0; j < ORDER; ++j) {
             V(0, j) = 1;
             V(1, j) = x(j);
@@ -123,9 +126,9 @@ class Node {
         if constexpr (D == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
             CoeffVec xvec =
-                get_chebyshev_nodes<ORDER>(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+                chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
             CoeffVec yvec =
-                get_chebyshev_nodes<ORDER>(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
+                chebyshev_nodes<ORDER>::get(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
 
             for (int i = 0; i < ORDER; ++i)
                 for (int j = 0; j < ORDER; ++j)
@@ -146,11 +149,11 @@ class Node {
         if constexpr (D == 3) {
             std::vector<double> F(ORDER * ORDER * ORDER);
             CoeffVec xvec =
-                get_chebyshev_nodes<ORDER>(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+                chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
             CoeffVec yvec =
-                get_chebyshev_nodes<ORDER>(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
+                chebyshev_nodes<ORDER>::get(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
             CoeffVec zvec =
-                get_chebyshev_nodes<ORDER>(box_.center[2] - box_.half_length[2], box_.center[2] + box_.half_length[2]);
+                chebyshev_nodes<ORDER>::get(box_.center[2] - box_.half_length[2], box_.center[2] + box_.half_length[2]);
 
             for (int i = 0; i < ORDER; ++i)
                 for (int j = 0; j < ORDER; ++j)
@@ -182,10 +185,10 @@ class Node {
 
             coeffs_ = coeffs_x;
 
-            for (int i = 0; i < 8; ++i) {
-                for (int j = 0; j < 8; ++j) {
-                    for (int k = 0; k < 8; ++k) {
-                        VEC point = box_.center - box_.half_length + 0.25 * i * box_.half_length;
+            for (int i = 0; i < ORDER; ++i) {
+                for (int j = 0; j < ORDER; ++j) {
+                    for (int k = 0; k < ORDER; ++k) {
+                        VEC point = box_.center - box_.half_length + i * box_.half_length / ORDER;
 
                         double test_val = this->eval(point);
                         double actual_val = f(point);
@@ -327,7 +330,6 @@ class Function {
                 q.pop();
                 Node<DIM, ORDER> test_node(box);
                 flat_map_[node_key] = parent_idx++;
-                // node_map_[node_key] = parent_idx++;
                 nodes_.push_back(Node<DIM, ORDER>(box));
 
                 auto &node = nodes_.back();
