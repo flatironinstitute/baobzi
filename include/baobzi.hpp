@@ -28,7 +28,6 @@ static std::array<uint64_t, 5> dilate_masks[4] = {
     },
 };
 
-
 template <int ORDER>
 struct chebyshev_nodes {
     using arr_type = Eigen::Vector<double, ORDER>;
@@ -41,13 +40,12 @@ struct chebyshev_nodes {
         return cosarray;
     }
 
-    static inline arr_type get(double lb, double ub) {
-        return 0.5 * ((lb + ub) + (ub - lb) * cosarray.array());
-    }
+    static inline arr_type get(double lb, double ub) { return 0.5 * ((lb + ub) + (ub - lb) * cosarray.array()); }
 };
 
 template <int ORDER>
-const typename chebyshev_nodes<ORDER>::arr_type chebyshev_nodes<ORDER>::cosarray = chebyshev_nodes<ORDER>::get_cos_array();
+const typename chebyshev_nodes<ORDER>::arr_type
+    chebyshev_nodes<ORDER>::cosarray = chebyshev_nodes<ORDER>::get_cos_array();
 
 template <int D>
 struct Box {
@@ -233,7 +231,7 @@ class Node {
             Tns.col(1) = xinterp;
             xinterp *= 2.0;
             for (int i = 2; i < ORDER; ++i)
-                Tns.col(i) = xinterp.array() * Tns.col(i-1).array() - Tns.col(i-2).array();
+                Tns.col(i) = xinterp.array() * Tns.col(i - 1).array() - Tns.col(i - 2).array();
 
             Eigen::Map<const Eigen::Matrix<double, ORDER, ORDER>> coeffs(coeffs_.data());
 
@@ -286,6 +284,95 @@ inline uint64_t calculate_key(const Eigen::Vector<double, DIM> &x_scaled, int de
 }
 
 template <int DIM, int ORDER>
+struct FunctionTree {
+    static constexpr int NChild = 1 << DIM;
+    static constexpr int Dim = DIM;
+    static constexpr int Order = ORDER;
+
+    using VEC = Eigen::Vector<double, DIM>;
+    Box<DIM> box_;
+    std::vector<Node<DIM, ORDER>> nodes_;
+
+    FunctionTree<DIM, ORDER>() : box_(Box<DIM>()){};
+
+    FunctionTree<DIM, ORDER>(const Box<DIM> &box, double (*f)(VEC), double tol) : box_(box) {
+        using key_t = uint64_t;
+        std::queue<std::pair<Box<DIM>, key_t>> q;
+
+        VEC half_width = box.half_length * 0.5;
+
+        q.push(std::make_pair(box, 1));
+
+        uint64_t parent_idx = 0;
+        while (!q.empty()) {
+            int n_next = q.size();
+
+            uint64_t curr_child_idx = parent_idx + q.size();
+
+            for (int i = 0; i < n_next; ++i) {
+                auto [box, node_key] = q.front();
+                q.pop();
+                Node<DIM, ORDER> test_node(box);
+                nodes_.push_back(Node<DIM, ORDER>(box));
+
+                auto &node = nodes_.back();
+                if (!node.fit(f, tol)) {
+                    node.first_child_idx = curr_child_idx;
+                    curr_child_idx += NChild;
+
+                    key_t parent = node_key << DIM;
+                    VEC &center = box.center;
+                    for (key_t child = 0; child < NChild; ++child) {
+                        VEC offset;
+
+                        // Extract sign of each offset component from the bits of child
+                        // Basically: permute all possible offsets
+                        for (int j = 0; j < DIM; ++j) {
+                            double signed_hw[2] = {-half_width[j], half_width[j]};
+                            offset[j] = signed_hw[(child >> j) & 1];
+                        }
+
+                        q.push(std::make_pair(Box<DIM>(center + offset, half_width), parent + child));
+                    }
+                }
+            }
+
+            half_width *= 0.5;
+        }
+    }
+
+    const Node<DIM, ORDER> &find_node_traverse(const VEC &x) const {
+        auto *node = &nodes_[0];
+        while (!node->is_leaf()) {
+            uint64_t child_idx = 0;
+            for (int i = 0; i < DIM; ++i)
+                child_idx = child_idx | ((x[i] > node->box_.center[i]) << i);
+
+            node = &nodes_[node->first_child_idx + child_idx];
+        }
+
+        return *node;
+    }
+
+    double eval(const VEC &x) { return find_node_traverse(x).eval(x); }
+
+    // uint64_t find_node_key(const VEC &x) const {
+    //     const VEC &center = box_.center;
+    //     const VEC &half_width = box_.half_length;
+
+    //     const VEC x_scaled = 0.5 * (x - center).array() / box_.half_length.array() + VEC::Constant(0.5).array();
+    //     uint64_t m_max = calculate_key(x_scaled, max_depth_);
+
+    //     uint64_t rel_depth = (max_depth_ - max_full_) * DIM;
+    //     // Our guess is below the actual depth of the target node, move up tree until we hit it
+    //     while (flat_map_[m_max >> (rel_depth - DIM)] != std::numeric_limits<uint64_t>::max())
+    //         rel_depth -= DIM;
+
+    //     return m_max >> rel_depth;
+    // }
+};
+
+template <int DIM, int ORDER>
 class Function {
   public:
     static constexpr int NChild = 1 << DIM;
@@ -296,43 +383,43 @@ class Function {
     using CoeffVec = Eigen::Vector<double, ORDER>;
     using DBox = Box<DIM>;
 
-    std::vector<Node<DIM, ORDER>> nodes_;
-    std::vector<uint64_t> flat_map_;
     const double tol_;
     double (*f_)(VEC);
     DBox box_;
-    uint16_t max_depth_;
-    uint64_t parent_idx = 0;
-    uint64_t child_idx_base = 0;
-    uint16_t max_full_ = 0;
+    VEC lower_left_;
+
+    std::vector<FunctionTree<DIM, ORDER>> subtrees_;
+    Eigen::Vector<int, DIM> n_subtrees_;
+    VEC bin_size_;
 
     Function<DIM, ORDER>(const VEC &x, const VEC &l, double (*f)(VEC), double tol) : f_(f), box_(x, l), tol_(tol) {
         using key_t = uint64_t;
         std::queue<std::pair<DBox, key_t>> q;
 
-        max_depth_ = 0;
+        for (int i = 0; i < DIM; ++i)
+            n_subtrees_[i] = l[i] / l.minCoeff();
+
+        uint8_t max_depth_ = 0;
         q.push(std::make_pair(DBox(x, l), 1));
+
+        bool fill_subtrees = false;
 
         // Half-width of next children
         VEC half_width = l * 0.5;
+        uint64_t parent_idx = 0;
+        std::vector<Node<DIM, ORDER>> nodes;
         while (!q.empty()) {
             int n_next = q.size();
 
             uint64_t curr_child_idx = parent_idx + q.size();
 
-            int old_size = flat_map_.size();
-            flat_map_.resize(1 << ((max_depth_ + 1) * DIM));
-            for (int i = old_size; i < flat_map_.size(); i++)
-                flat_map_[i] = std::numeric_limits<uint64_t>::max();
-
             for (int i = 0; i < n_next; ++i) {
                 auto [box, node_key] = q.front();
                 q.pop();
                 Node<DIM, ORDER> test_node(box);
-                flat_map_[node_key] = parent_idx++;
-                nodes_.push_back(Node<DIM, ORDER>(box));
+                nodes.push_back(Node<DIM, ORDER>(box));
 
-                auto &node = nodes_.back();
+                auto &node = nodes.back();
                 if (!node.fit(f, tol_)) {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
@@ -356,41 +443,51 @@ class Function {
 
             if (!q.empty())
                 max_depth_++;
+
             half_width *= 0.5;
             if ((1 << (DIM * max_depth_)) == q.size())
-                max_full_ = max_depth_;
+                n_subtrees_ *= 2;
+            else {
+                for (int j = 0; j < DIM; ++j)
+                    bin_size_[j] = 2.0 * box_.half_length[j] / n_subtrees_[j];
+                lower_left_ = box_.center - box_.half_length;
+
+                subtrees_.reserve(n_subtrees_.prod());
+                for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin) {
+                    Eigen::Vector<int, DIM> bins = get_bins(i_bin);
+
+                    VEC parent_center =
+                        (bins.template cast<double>().array() + 0.5) * bin_size_.array() + lower_left_.array();
+
+                    Box<DIM> root_box = {parent_center, 0.5 * bin_size_};
+                    subtrees_.push_back(FunctionTree<DIM, ORDER>(root_box, f_, tol_));
+                }
+            }
         }
     }
 
-    uint64_t find_node_key(const VEC &x) const {
-        const VEC &center = box_.center;
-        const VEC &half_width = box_.half_length;
-
-        const VEC x_scaled = 0.5 * (x - center).array() / box_.half_length.array() + VEC::Constant(0.5).array();
-        uint64_t m_max = calculate_key(x_scaled, max_depth_);
-
-        uint64_t rel_depth = (max_depth_ - max_full_) * DIM;
-        // Our guess is below the actual depth of the target node, move up tree until we hit it
-        while (flat_map_[m_max >> (rel_depth - DIM)] != std::numeric_limits<uint64_t>::max())
-            rel_depth -= DIM;
-
-        return m_max >> rel_depth;
+    Eigen::Vector<int, DIM> get_bins(const int i_bin) {
+        if constexpr (DIM == 1)
+            return Eigen::Vector<int, DIM>{i_bin};
+        else if constexpr (DIM == 2)
+            return Eigen::Vector<int, DIM>{i_bin % n_subtrees_[0], i_bin / n_subtrees_[0]};
+        else if constexpr (DIM == 3)
+            return Eigen::Vector<int, DIM>{i_bin % n_subtrees_[0], (i_bin / n_subtrees_[0]) % n_subtrees_[1],
+                                           i_bin / (n_subtrees_[0] * n_subtrees_[1])};
     }
 
-    const Node<DIM, ORDER> &find_node(const VEC &x) const { return nodes_[flat_map_[find_node_key(x)]]; }
-
-    const Node<DIM, ORDER> &find_node_traverse(const VEC &x) const {
-        auto *node = &nodes_[0];
-        while (!node->is_leaf()) {
-            uint64_t child_idx = 0;
-            for (int i = 0; i < DIM; ++i)
-                child_idx = child_idx | ((x[i] > node->box_.center[i]) << i);
-
-            node = &nodes_[node->first_child_idx + child_idx];
-        }
-
-        return *node;
+    inline int get_linear_bin(const VEC &x) const {
+        const VEC x_bin = x - lower_left_;
+        const Eigen::Vector<int, DIM> bins = (x_bin.array() / bin_size_.array()).template cast<int>();
+        if constexpr (DIM == 1)
+            return bins[0];
+        else if constexpr (DIM == 2)
+            return bins[0] + n_subtrees_[0] * bins[1];
+        else if constexpr (DIM == 3)
+            return bins[0] + n_subtrees_[0] * bins[1] + n_subtrees_[0] * n_subtrees_[1] * bins[2];
     }
+
+    const Node<DIM, ORDER> &find_node(const VEC &x) const { return subtrees_[get_linear_bin(x)].find_node_traverse(x); }
 
     const double eval(const VEC &x) const { return find_node(x).eval(x); }
 
@@ -398,8 +495,8 @@ class Function {
 };
 
 template <int D, int ORDER>
-const Eigen::PartialPivLU<typename Node<D, ORDER>::VanderMat> Node<D, ORDER>::VLU_ =
-    Eigen::PartialPivLU<typename Node<D, ORDER>::VanderMat>(Node<D, ORDER>::calc_vandermonde());
-}
+const Eigen::PartialPivLU<typename Node<D, ORDER>::VanderMat>
+    Node<D, ORDER>::VLU_ = Eigen::PartialPivLU<typename Node<D, ORDER>::VanderMat>(Node<D, ORDER>::calc_vandermonde());
+} // namespace baobzi
 
 #endif
