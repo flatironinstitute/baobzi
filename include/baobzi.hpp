@@ -121,6 +121,25 @@ class Node {
     bool is_leaf() const { return coeffs_.size(); }
 
     bool fit(double (*f)(VEC), double tol) {
+        if constexpr (D == 1) {
+            Eigen::Vector<double, ORDER> F;
+            CoeffVec xvec =
+                chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+
+            for (int i = 0; i < ORDER; ++i)
+                F(i) = f(Eigen::Vector<double, 1>{xvec[i]});
+
+            Eigen::Vector<double, ORDER> coeffs = VLU_.solve(F);
+
+            if (standard_error(coeffs) > tol)
+                return false;
+
+            coeffs_.resize(coeffs.size());
+            for (int i = 0; i < coeffs.size(); ++i)
+                coeffs_[i] = coeffs(i);
+
+            return true;
+        }
         if constexpr (D == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
             CoeffVec xvec =
@@ -206,25 +225,22 @@ class Node {
     }
 
     double eval(const VEC &x) const {
+        VEC xinterp = (x - box_.center).array() / box_.half_length.array();
+
         if constexpr (D == 1) {
-            VEC Tns[ORDER];
-            Tns[0] = VEC::Ones();
-            VEC xinterp = (x - box_.center).array() / box_.half_length.array();
-            Tns[1] = xinterp;
-            xinterp *= 2.0;
-            for (int i = 2; i < ORDER; ++i) {
-                Tns[i] = xinterp.array() * Tns[i - 1].array() - Tns[i - 2].array();
-            }
+            double xd = xinterp[0];
+            CoeffVec Tn;
+            Tn[0] = 1.0;
+            Tn[1] = xd;
+            xd *= 2.0;
+            for (int i = 2; i < ORDER; ++i)
+                Tn[i] = xd * Tn[i - 1] - Tn[i - 2];
 
-            double res = 0.0;
-            for (int i = 0; i < ORDER; ++i) {
-                res += coeffs_[i] * Tns[i][0];
-            }
+            Eigen::Map<const Eigen::Vector<double, ORDER>> coeffs(coeffs_.data());
 
-            return res;
+            return coeffs.dot(Tn);
         }
         if constexpr (D == 2) {
-            VEC xinterp = (x - box_.center).array() / box_.half_length.array();
             CoeffVec Tnx, Tny;
             Eigen::Matrix<double, 2, ORDER> Tns;
             Tns.col(0).setOnes();
@@ -238,7 +254,6 @@ class Node {
             return Tns.row(0).transpose().dot(coeffs * Tns.row(1).transpose());
         }
         if constexpr (D == 3) {
-            VEC xinterp = (x - box_.center).array() / box_.half_length.array();
             CoeffVec Tn[3];
             Tn[0][0] = Tn[1][0] = Tn[2][0] = 1.0;
             for (int i = 0; i < 3; ++i) {
