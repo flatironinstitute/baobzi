@@ -273,31 +273,6 @@ class Node {
     }
 };
 
-template <int b>
-struct Int64Hash {
-    size_t operator()(const uint64_t &t) const {
-        constexpr uint64_t mask = (1 << b) - 1;
-        return t & mask;
-    }
-};
-
-template <int DIM>
-inline uint64_t calculate_key(const Eigen::Vector<double, DIM> &x_scaled, int depth) {
-    const std::array<uint64_t, 5> &dilate_mask = dilate_masks[DIM];
-
-    // root node always one
-    uint64_t key = 1 << (depth * DIM);
-    for (int dim = 0; dim < DIM; ++dim) {
-        uint32_t dim_key = x_scaled[dim] * (1 << depth);
-        constexpr unsigned int base_offset = sizeof(dim_key) * 8 * (DIM - 1);
-        for (int i = 0; i < 5; ++i)
-            dim_key = (dim_key | (dim_key << (base_offset >> (i + 1)))) & dilate_mask[i];
-        key = key | (dim_key << dim);
-    }
-
-    return key;
-}
-
 template <int DIM, int ORDER>
 struct FunctionTree {
     static constexpr int NChild = 1 << DIM;
@@ -311,33 +286,26 @@ struct FunctionTree {
     FunctionTree<DIM, ORDER>() : box_(Box<DIM>()){};
 
     FunctionTree<DIM, ORDER>(const Box<DIM> &box, double (*f)(VEC), double tol) : box_(box) {
-        using key_t = uint64_t;
-        std::queue<std::pair<Box<DIM>, key_t>> q;
-
+        std::queue<Box<DIM>> q;
         VEC half_width = box.half_length * 0.5;
+        q.push(box);
 
-        q.push(std::make_pair(box, 1));
-
-        uint64_t parent_idx = 0;
+        uint64_t curr_child_idx = 1;
         while (!q.empty()) {
             int n_next = q.size();
 
-            uint64_t curr_child_idx = parent_idx + q.size();
-
             for (int i = 0; i < n_next; ++i) {
-                auto [box, node_key] = q.front();
+                Box<DIM> box = q.front();
                 q.pop();
-                Node<DIM, ORDER> test_node(box);
-                nodes_.push_back(Node<DIM, ORDER>(box));
 
+                nodes_.push_back(Node<DIM, ORDER>(box));
                 auto &node = nodes_.back();
                 if (!node.fit(f, tol)) {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
 
-                    key_t parent = node_key << DIM;
                     VEC &center = box.center;
-                    for (key_t child = 0; child < NChild; ++child) {
+                    for (uint64_t child = 0; child < NChild; ++child) {
                         VEC offset;
 
                         // Extract sign of each offset component from the bits of child
@@ -347,7 +315,7 @@ struct FunctionTree {
                             offset[j] = signed_hw[(child >> j) & 1];
                         }
 
-                        q.push(std::make_pair(Box<DIM>(center + offset, half_width), parent + child));
+                        q.push(Box<DIM>(center + offset, half_width));
                     }
                 }
             }
@@ -370,21 +338,6 @@ struct FunctionTree {
     }
 
     double eval(const VEC &x) { return find_node_traverse(x).eval(x); }
-
-    // uint64_t find_node_key(const VEC &x) const {
-    //     const VEC &center = box_.center;
-    //     const VEC &half_width = box_.half_length;
-
-    //     const VEC x_scaled = 0.5 * (x - center).array() / box_.half_length.array() + VEC::Constant(0.5).array();
-    //     uint64_t m_max = calculate_key(x_scaled, max_depth_);
-
-    //     uint64_t rel_depth = (max_depth_ - max_full_) * DIM;
-    //     // Our guess is below the actual depth of the target node, move up tree until we hit it
-    //     while (flat_map_[m_max >> (rel_depth - DIM)] != std::numeric_limits<uint64_t>::max())
-    //         rel_depth -= DIM;
-
-    //     return m_max >> rel_depth;
-    // }
 };
 
 template <int DIM, int ORDER>
@@ -408,38 +361,27 @@ class Function {
     VEC bin_size_;
 
     Function<DIM, ORDER>(const VEC &x, const VEC &l, double (*f)(VEC), double tol) : f_(f), box_(x, l), tol_(tol) {
-        using key_t = uint64_t;
-        std::queue<std::pair<DBox, key_t>> q;
+        std::queue<DBox> q;
 
         for (int i = 0; i < DIM; ++i)
             n_subtrees_[i] = l[i] / l.minCoeff();
 
         uint8_t max_depth_ = 0;
-        q.push(std::make_pair(DBox(x, l), 1));
+        q.push(DBox(x, l));
 
         bool fill_subtrees = false;
 
         // Half-width of next children
         VEC half_width = l * 0.5;
-        uint64_t parent_idx = 0;
-        std::vector<Node<DIM, ORDER>> nodes;
         while (!q.empty()) {
             int n_next = q.size();
 
-            uint64_t curr_child_idx = parent_idx + q.size();
-
             for (int i = 0; i < n_next; ++i) {
-                auto [box, node_key] = q.front();
+                DBox box = q.front();
                 q.pop();
-                Node<DIM, ORDER> test_node(box);
-                nodes.push_back(Node<DIM, ORDER>(box));
 
-                auto &node = nodes.back();
+                Node<DIM, ORDER> node(box);
                 if (!node.fit(f, tol_)) {
-                    node.first_child_idx = curr_child_idx;
-                    curr_child_idx += NChild;
-
-                    key_t parent = node_key << DIM;
                     VEC &center = box.center;
                     for (key_t child = 0; child < NChild; ++child) {
                         VEC offset;
@@ -451,7 +393,7 @@ class Function {
                             offset[j] = signed_hw[(child >> j) & 1];
                         }
 
-                        q.push(std::make_pair(DBox(center + offset, half_width), parent + child));
+                        q.push(DBox(center + offset, half_width));
                     }
                 }
             }
