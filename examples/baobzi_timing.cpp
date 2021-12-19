@@ -5,7 +5,7 @@
 #include <omp.h>
 #include <random>
 
-double testfun_1d(Eigen::Vector<double, 1> x) { return cos(x[0]); }
+double testfun_1d(Eigen::Vector<double, 1> x) { return log(x[0]); }
 double testfun_2d(Eigen::Vector<double, 2> x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
 double testfun_2d_2(Eigen::Vector<double, 2> x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1])); }
 double testfun_3d(Eigen::Vector<double, 3> x) {
@@ -73,36 +73,51 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < n_points * 3; ++i)
         x[i] = dis(gen);
 
-    double time = omp_get_wtime();
-    Eigen::Vector2d hl{1.0, 1.0};
-    Eigen::Vector2d center2d = hl + Eigen::Vector2d{0.5, 2.0};
-    std::vector<double> x_2d_transformed(n_points * 2);
+    // {
+    //     Eigen::Vector<double, 1> hl_1d{2.0};
+    //     Eigen::Vector<double, 1> center_1d = hl_1d + Eigen::Vector<double, 1>{2.5};
 
-    for (int i = 0; i < 2 * n_points; i += 2)
-        for (int j = 0; j < 2; ++j)
-            x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
+    //     std::vector<double> x_1d_transformed(n_points);
 
-    baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2, 1E-8);
+    //     for (int i = 0; i < n_points; i += 1)
+    //         x_1d_transformed[i] = hl_1d[0] * (2.0 * x[i] - 1.0) + center_1d[0];
+    //     baobzi::Function<1, 8> func_approx_1d(center_1d, hl_1d, testfun_1d, 1E-8);
+    //     time_function<1>(func_approx_1d, x_1d_transformed, n_runs);
+    //     print_error(func_approx_1d, x_1d_transformed);
+    // }
 
-    std::ofstream finterp("funinterp.2d");
-    std::ofstream fun("fun.2d");
+    {
+        double time = omp_get_wtime();
+        Eigen::Vector2d hl{1.0, 1.0};
+        Eigen::Vector2d center2d = hl + Eigen::Vector2d{0.5, 2.0};
+        std::vector<double> x_2d_transformed(n_points * 2);
 
-    finterp.precision(17);
-    fun.precision(17);
-    for (int i = 0; i < 100; ++i) {
-        for (int j = 0; j < 100; ++j) {
-            Eigen::Vector<double, 2> point{center2d[0] + hl[0] * (i - 50) / 50.1,
-                                           center2d[1] + hl[1] * (j - 50) / 50.1};
-            auto node2d = func_approx_2d.find_node(point);
-            assert(node2d.box_.contains(point));
-            finterp << point[0] << " " << point[1] << " " << node2d.eval(point) << std::endl;
-            fun << point[0] << " " << point[1] << " " << func_approx_2d.f_(point) << std::endl;
+        for (int i = 0; i < 2 * n_points; i += 2)
+            for (int j = 0; j < 2; ++j)
+                x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
+
+        baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2, 1E-8);
+
+        std::ofstream finterp("funinterp.2d");
+        std::ofstream fun("fun.2d");
+
+        finterp.precision(17);
+        fun.precision(17);
+        for (int i = 0; i < 100; ++i) {
+            for (int j = 0; j < 100; ++j) {
+                Eigen::Vector<double, 2> point{center2d[0] + hl[0] * (i - 50) / 50.1,
+                                               center2d[1] + hl[1] * (j - 50) / 50.1};
+                auto node2d = func_approx_2d.find_node(point);
+                assert(node2d.box_.contains(point));
+                finterp << point[0] << " " << point[1] << " " << node2d.eval(point) << std::endl;
+                fun << point[0] << " " << point[1] << " " << func_approx_2d.f_(point) << std::endl;
+            }
         }
-    }
 
-    time_function<2>(func_approx_2d.f_, x_2d_transformed, n_runs);
-    time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
-    print_error(func_approx_2d, x_2d_transformed);
+        time_function<2>(func_approx_2d.f_, x_2d_transformed, n_runs);
+        time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
+        print_error(func_approx_2d, x_2d_transformed);
+    }
 
     return 0;
 }
