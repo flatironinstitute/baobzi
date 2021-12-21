@@ -404,22 +404,22 @@ class Function {
             half_width *= 0.5;
             if ((1 << (DIM * max_depth_)) == q.size())
                 n_subtrees_ *= 2;
-            else {
-                for (int j = 0; j < DIM; ++j)
-                    bin_size_[j] = 2.0 * box_.half_length[j] / n_subtrees_[j];
-                lower_left_ = box_.center - box_.half_length;
+            else
+                break;
+        }
 
-                subtrees_.reserve(n_subtrees_.prod());
-                for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin) {
-                    Eigen::Vector<int, DIM> bins = get_bins(i_bin);
+        for (int j = 0; j < DIM; ++j)
+            bin_size_[j] = 2.0 * box_.half_length[j] / n_subtrees_[j];
+        lower_left_ = box_.center - box_.half_length;
 
-                    VEC parent_center =
-                        (bins.template cast<double>().array() + 0.5) * bin_size_.array() + lower_left_.array();
+        subtrees_.reserve(n_subtrees_.prod());
+        for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin) {
+            Eigen::Vector<int, DIM> bins = get_bins(i_bin);
 
-                    Box<DIM> root_box = {parent_center, 0.5 * bin_size_};
-                    subtrees_.push_back(FunctionTree<DIM, ORDER>(root_box, f_, tol_));
-                }
-            }
+            VEC parent_center = (bins.template cast<double>().array() + 0.5) * bin_size_.array() + lower_left_.array();
+
+            Box<DIM> root_box = {parent_center, 0.5 * bin_size_};
+            subtrees_.push_back(FunctionTree<DIM, ORDER>(root_box, f_, tol_));
         }
     }
 
