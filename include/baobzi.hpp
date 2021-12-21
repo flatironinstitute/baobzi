@@ -383,7 +383,7 @@ class Function {
                 Node<DIM, ORDER> node(box);
                 if (!node.fit(f, tol_)) {
                     VEC &center = box.center;
-                    for (key_t child = 0; child < NChild; ++child) {
+                    for (unsigned child = 0; child < NChild; ++child) {
                         VEC offset;
 
                         // Extract sign of each offset component from the bits of child
