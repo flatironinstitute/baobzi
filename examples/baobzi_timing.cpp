@@ -5,6 +5,8 @@
 #include <omp.h>
 #include <random>
 
+using aligned_vector = std::vector<double, Eigen::aligned_allocator<double>>;
+
 double testfun_1d(Eigen::Vector<double, 1> x) { return log(x[0]); }
 double testfun_2d(Eigen::Vector<double, 2> x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
 double testfun_2d_2(Eigen::Vector<double, 2> x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1])); }
@@ -13,7 +15,7 @@ double testfun_3d(Eigen::Vector<double, 3> x) {
 }
 
 template <int DIM, typename Function>
-void time_function(const Function &function, const std::vector<double> &x, int n_runs) {
+void time_function(const Function &function, const aligned_vector &x, int n_runs) {
     const double time = omp_get_wtime();
     double res = 0.0;
     using VEC = Eigen::Vector<double, DIM>;
@@ -29,7 +31,7 @@ void time_function(const Function &function, const std::vector<double> &x, int n
 }
 
 template <typename Function>
-void print_error(const Function &function, const std::vector<double> &x) {
+void print_error(const Function &function, const aligned_vector &x) {
     double max_error = 0.0;
     double max_rel_error = 0.0;
     double mean_error = 0.0;
@@ -66,31 +68,31 @@ int main(int argc, char *argv[]) {
     size_t n_points = 1000000;
     size_t n_runs = 50;
 
-    std::random_device rd;
+    if (argc == 2)
+        n_runs = atoi(argv[1]);
+
     std::mt19937 gen(1);
     std::uniform_real_distribution<> dis(0, 1);
-    std::vector<double> x(n_points * 3);
+    aligned_vector x(n_points * 3);
     for (size_t i = 0; i < n_points * 3; ++i)
         x[i] = dis(gen);
 
     // {
+    //     aligned_vector x_1d_transformed(n_points);
     //     Eigen::Vector<double, 1> hl_1d{2.0};
     //     Eigen::Vector<double, 1> center_1d = hl_1d + Eigen::Vector<double, 1>{2.5};
-
-    //     std::vector<double> x_1d_transformed(n_points);
-
+    //     baobzi::Function<1, 8> func_approx_1d(center_1d, hl_1d, testfun_1d, 1E-8);
     //     for (int i = 0; i < n_points; i += 1)
     //         x_1d_transformed[i] = hl_1d[0] * (2.0 * x[i] - 1.0) + center_1d[0];
-    //     baobzi::Function<1, 8> func_approx_1d(center_1d, hl_1d, testfun_1d, 1E-8);
+
     //     time_function<1>(func_approx_1d, x_1d_transformed, n_runs);
     //     print_error(func_approx_1d, x_1d_transformed);
     // }
 
     {
-        double time = omp_get_wtime();
         Eigen::Vector2d hl{1.0, 1.0};
         Eigen::Vector2d center2d = hl + Eigen::Vector2d{0.5, 2.0};
-        std::vector<double> x_2d_transformed(n_points * 2);
+        aligned_vector x_2d_transformed(n_points * 2);
 
         for (int i = 0; i < 2 * n_points; i += 2)
             for (int j = 0; j < 2; ++j)
@@ -98,23 +100,7 @@ int main(int argc, char *argv[]) {
 
         baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2, 1E-8);
 
-        std::ofstream finterp("funinterp.2d");
-        std::ofstream fun("fun.2d");
-
-        finterp.precision(17);
-        fun.precision(17);
-        for (int i = 0; i < 100; ++i) {
-            for (int j = 0; j < 100; ++j) {
-                Eigen::Vector<double, 2> point{center2d[0] + hl[0] * (i - 50) / 50.1,
-                                               center2d[1] + hl[1] * (j - 50) / 50.1};
-                auto node2d = func_approx_2d.find_node(point);
-                assert(node2d.box_.contains(point));
-                finterp << point[0] << " " << point[1] << " " << node2d.eval(point) << std::endl;
-                fun << point[0] << " " << point[1] << " " << func_approx_2d.f_(point) << std::endl;
-            }
-        }
-
-        time_function<2>(func_approx_2d.f_, x_2d_transformed, n_runs);
+        // time_function<2>(func_approx_2d.f_, x_2d_transformed, 1);
         time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
         print_error(func_approx_2d, x_2d_transformed);
     }

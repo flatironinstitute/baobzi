@@ -14,7 +14,7 @@ set(BAOBZI_INCLUDES
   ${EIGEN3_INCLUDE_DIR}
   )
 
-file(GLOB EXAMPLE_SOURCES "examples/baobzi_timing.cpp")
+file(GLOB EXAMPLE_SOURCES "examples/*.cpp")
 
 add_executable(baobzi_timing ${EXAMPLE_SOURCES})
 target_include_directories(baobzi_timing PUBLIC ${BAOBZI_INCLUDES})

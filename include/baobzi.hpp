@@ -67,6 +67,62 @@ inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
     return maxcoeff / scaling_factor;
 }
 
+template <int ORDER>
+inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1> &box,
+                        const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
+    double xd = x[0] - box.center[0] / box.half_length[0];
+
+    Eigen::Vector<double, ORDER> Tn;
+    Tn[0] = 1.0;
+    Tn[1] = xd;
+    xd *= 2.0;
+    for (int i = 2; i < ORDER; ++i)
+        Tn[i] = xd * Tn[i - 1] - Tn[i - 2];
+
+    Eigen::Map<const Eigen::Vector<double, ORDER>> coeffs(coeffs_raw.data());
+
+    return coeffs.dot(Tn);
+}
+
+template <int ORDER>
+inline double cheb_eval(const Eigen::Vector2d &x, const Box<2> &box,
+                        const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
+    Eigen::Vector2d xinterp = (x - box.center).array() / box.half_length.array();
+    Eigen::Matrix<double, 2, ORDER> Tns;
+    Tns.col(0).setOnes();
+    Tns.col(1) = xinterp;
+    xinterp *= 2.0;
+    for (int i = 2; i < ORDER; ++i)
+        Tns.col(i) = xinterp.array() * Tns.col(i - 1).array() - Tns.col(i - 2).array();
+
+    Eigen::Map<const Eigen::Matrix<double, ORDER, ORDER>> coeffs(coeffs_raw.data());
+
+    return Tns.row(0).transpose().dot(coeffs * Tns.row(1).transpose());
+}
+
+template <int ORDER>
+inline double cheb_eval(const Eigen::Vector3d &x, const Box<3> &box,
+                        const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
+
+    Eigen::Vector3d xinterp = (x - box.center).array() / box.half_length.array();
+
+    Eigen::Vector<double, ORDER> Tn[3];
+    Tn[0][0] = Tn[1][0] = Tn[2][0] = 1.0;
+    for (int i = 0; i < 3; ++i) {
+        Tn[i][1] = xinterp[i];
+        xinterp[i] *= 2.0;
+        for (int j = 2; j < ORDER; ++j)
+            Tn[i][j] = xinterp[i] * Tn[i][j - 1] - Tn[i][j - 2];
+    }
+
+    double res = 0.0;
+    using map_t = Eigen::Map<const Eigen::Matrix<double, ORDER, ORDER>>;
+    for (int i = 0; i < ORDER; ++i)
+        res += Tn[0][i] * Tn[1].dot(map_t(coeffs_raw.data() + i * ORDER * ORDER) * Tn[2]);
+
+    return res;
+}
+
 template <int D, int ORDER>
 class Node {
   public:
@@ -101,7 +157,7 @@ class Node {
 
     Node<D, ORDER>(const Box<D> &box) : box_(box) {}
 
-    bool is_leaf() const { return leaf_; }
+    inline bool is_leaf() const { return leaf_; }
 
     bool fit(double (*f)(VEC), double tol) {
         if constexpr (D == 1) {
@@ -210,53 +266,7 @@ class Node {
         }
     }
 
-    double eval(const VEC &x) const {
-        VEC xinterp = (x - box_.center).array() / box_.half_length.array();
-
-        if constexpr (D == 1) {
-            double xd = xinterp[0];
-            CoeffVec Tn;
-            Tn[0] = 1.0;
-            Tn[1] = xd;
-            xd *= 2.0;
-            for (int i = 2; i < ORDER; ++i)
-                Tn[i] = xd * Tn[i - 1] - Tn[i - 2];
-
-            Eigen::Map<const Eigen::Vector<double, ORDER>> coeffs(coeffs_.data());
-
-            return coeffs.dot(Tn);
-        }
-        if constexpr (D == 2) {
-            CoeffVec Tnx, Tny;
-            Eigen::Matrix<double, 2, ORDER> Tns;
-            Tns.col(0).setOnes();
-            Tns.col(1) = xinterp;
-            xinterp *= 2.0;
-            for (int i = 2; i < ORDER; ++i)
-                Tns.col(i) = xinterp.array() * Tns.col(i - 1).array() - Tns.col(i - 2).array();
-
-            Eigen::Map<const Eigen::Matrix<double, ORDER, ORDER>> coeffs(coeffs_.data());
-
-            return Tns.row(0).transpose().dot(coeffs * Tns.row(1).transpose());
-        }
-        if constexpr (D == 3) {
-            CoeffVec Tn[3];
-            Tn[0][0] = Tn[1][0] = Tn[2][0] = 1.0;
-            for (int i = 0; i < 3; ++i) {
-                Tn[i][1] = xinterp[i];
-                xinterp[i] *= 2.0;
-                for (int j = 2; j < ORDER; ++j)
-                    Tn[i][j] = xinterp[i] * Tn[i][j - 1] - Tn[i][j - 2];
-            }
-
-            double res = 0.0;
-            using map_t = Eigen::Map<const Eigen::Matrix<double, ORDER, ORDER>>;
-            for (int i = 0; i < ORDER; ++i)
-                res += Tn[0][i] * Tn[1].dot(map_t(coeffs_.data() + i * ORDER * ORDER) * Tn[2]);
-
-            return res;
-        }
-    }
+    inline double eval(const VEC &x) const { return cheb_eval<ORDER>(x, box_, coeffs_); }
 };
 
 template <int DIM, int ORDER>
@@ -307,7 +317,7 @@ struct FunctionTree {
         }
     }
 
-    const Node<DIM, ORDER> &find_node_traverse(const VEC &x) const {
+    inline const Node<DIM, ORDER> &find_node_traverse(const VEC &x) const {
         auto *node = &nodes_[0];
         while (!node->is_leaf()) {
             uint64_t child_idx = 0;
@@ -320,7 +330,7 @@ struct FunctionTree {
         return *node;
     }
 
-    double eval(const VEC &x) { return find_node_traverse(x).eval(x); }
+    inline double eval(const VEC &x) const { return find_node_traverse(x).eval(x); }
 };
 
 template <int DIM, int ORDER>
@@ -406,7 +416,7 @@ class Function {
         }
     }
 
-    Eigen::Vector<int, DIM> get_bins(const int i_bin) {
+    inline Eigen::Vector<int, DIM> get_bins(const int i_bin) const {
         if constexpr (DIM == 1)
             return Eigen::Vector<int, DIM>{i_bin};
         else if constexpr (DIM == 2)
@@ -416,22 +426,30 @@ class Function {
                                            i_bin / (n_subtrees_[0] * n_subtrees_[1])};
     }
 
-    inline int get_linear_bin(const VEC &x) const {
-        const VEC x_bin = x - lower_left_;
-        const Eigen::Vector<int, DIM> bins = (x_bin.array() / bin_size_.array()).template cast<int>();
-        if constexpr (DIM == 1)
-            return bins[0];
-        else if constexpr (DIM == 2)
-            return bins[0] + n_subtrees_[0] * bins[1];
-        else if constexpr (DIM == 3)
-            return bins[0] + n_subtrees_[0] * bins[1] + n_subtrees_[0] * n_subtrees_[1] * bins[2];
+    inline int get_linear_bin(const Eigen::Vector<double, 1> &x) const {
+        const double x_bin = x[0] - lower_left_[0];
+        return x_bin / bin_size_[0];
     }
 
-    const Node<DIM, ORDER> &find_node(const VEC &x) const { return subtrees_[get_linear_bin(x)].find_node_traverse(x); }
+    inline int get_linear_bin(const Eigen::Vector2d &x) const {
+        const VEC x_bin = x - lower_left_;
+        const Eigen::Vector<int, DIM> bin = (x_bin.array() / bin_size_.array()).template cast<int>();
+        return bin[0] + n_subtrees_[0] * bin[1];
+    }
 
-    const double eval(const VEC &x) const { return find_node(x).eval(x); }
+    inline int get_linear_bin(const Eigen::Vector3d &x) const {
+        const VEC x_bin = x - lower_left_;
+        const Eigen::Vector<int, DIM> bin = (x_bin.array() / bin_size_.array()).template cast<int>();
+        return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
+    }
 
-    double operator()(const VEC &x) const { return eval(x); }
+    inline const Node<DIM, ORDER> &find_node(const VEC &x) const {
+        return subtrees_[get_linear_bin(x)].find_node_traverse(x);
+    }
+
+    inline double eval(const VEC &x) const { return find_node(x).eval(x); }
+
+    inline double operator()(const VEC &x) const { return eval(x); }
 };
 
 template <int D, int ORDER>
