@@ -4,29 +4,11 @@
 #include <queue>
 #include <vector>
 
+#include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
 
 namespace baobzi {
-
-static std::array<uint64_t, 5> dilate_masks[4] = {
-    {},
-    {},
-    {
-        0x0000FFFF0000FFFF,
-        0x00FF00FF00FF00FF,
-        0x0F0F0F0F0F0F0F0F,
-        0x3333333333333333,
-        0x5555555555555555,
-    },
-    {
-        0xFFFF00000000FFFF,
-        0x00FF0000FF0000FF,
-        0xF00F00F00F00F00F,
-        0x30C30C30C30C30C3,
-        0x9249249249249249,
-    },
-};
 
 template <int ORDER>
 struct chebyshev_nodes {
@@ -92,9 +74,10 @@ class Node {
     using VanderMat = Eigen::Matrix<double, ORDER, ORDER>;
     using CoeffVec = Eigen::Vector<double, ORDER>;
     static const Eigen::PartialPivLU<VanderMat> VLU_;
-    std::vector<double> coeffs_;
+    std::vector<double, Eigen::aligned_allocator<double>> coeffs_;
     Box<D> box_;
     uint64_t first_child_idx;
+    bool leaf_ = false;
 
     static VanderMat calc_vandermonde() {
         VanderMat V;
@@ -118,7 +101,7 @@ class Node {
 
     Node<D, ORDER>(const Box<D> &box) : box_(box) {}
 
-    bool is_leaf() const { return coeffs_.size(); }
+    bool is_leaf() const { return leaf_; }
 
     bool fit(double (*f)(VEC), double tol) {
         if constexpr (D == 1) {
@@ -138,6 +121,7 @@ class Node {
             for (int i = 0; i < coeffs.size(); ++i)
                 coeffs_[i] = coeffs(i);
 
+            leaf_ = true;
             return true;
         }
         if constexpr (D == 2) {
@@ -161,10 +145,11 @@ class Node {
             for (int i = 0; i < coeffs.size(); ++i)
                 coeffs_[i] = coeffs(i);
 
+            leaf_ = true;
             return true;
         }
         if constexpr (D == 3) {
-            std::vector<double> F(ORDER * ORDER * ORDER);
+            std::vector<double, Eigen::aligned_allocator<double>> F(ORDER * ORDER * ORDER);
             CoeffVec xvec =
                 chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
             CoeffVec yvec =
@@ -177,9 +162,9 @@ class Node {
                     for (int k = 0; k < ORDER; ++k)
                         F[i * ORDER * ORDER + j * ORDER + k] = f({xvec[i], yvec[j], zvec[k]});
 
-            std::vector<double> coeffs_z(ORDER * ORDER * ORDER);
-            std::vector<double> coeffs_y(ORDER * ORDER * ORDER);
-            std::vector<double> coeffs_x(ORDER * ORDER * ORDER);
+            std::vector<double, Eigen::aligned_allocator<double>> coeffs_z(ORDER * ORDER * ORDER);
+            std::vector<double, Eigen::aligned_allocator<double>> coeffs_y(ORDER * ORDER * ORDER);
+            std::vector<double, Eigen::aligned_allocator<double>> coeffs_x(ORDER * ORDER * ORDER);
             for (int block = 0; block < ORDER; ++block) {
                 using matrix_t = Eigen::Matrix<double, ORDER, ORDER>;
                 using map_t = Eigen::Map<matrix_t>;
@@ -205,7 +190,7 @@ class Node {
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
-                        VEC point = box_.center - box_.half_length + i * box_.half_length / ORDER;
+                        VEC point = box_.center - box_.half_length + 2.0 * i * box_.half_length / ORDER;
 
                         double test_val = this->eval(point);
                         double actual_val = f(point);
@@ -220,6 +205,7 @@ class Node {
                 }
             }
 
+            leaf_ = true;
             return true;
         }
     }
@@ -280,12 +266,9 @@ struct FunctionTree {
     static constexpr int Order = ORDER;
 
     using VEC = Eigen::Vector<double, DIM>;
-    Box<DIM> box_;
     std::vector<Node<DIM, ORDER>> nodes_;
 
-    FunctionTree<DIM, ORDER>() : box_(Box<DIM>()){};
-
-    FunctionTree<DIM, ORDER>(const Box<DIM> &box, double (*f)(VEC), double tol) : box_(box) {
+    FunctionTree<DIM, ORDER>(const Box<DIM> &box, double (*f)(VEC), double tol) {
         std::queue<Box<DIM>> q;
         VEC half_width = box.half_length * 0.5;
         q.push(box);
