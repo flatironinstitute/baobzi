@@ -159,14 +159,14 @@ class Node {
 
     inline bool is_leaf() const { return leaf_; }
 
-    bool fit(double (*f)(VEC), double tol) {
+    bool fit(double (*f)(const double *), double tol) {
         if constexpr (D == 1) {
             Eigen::Vector<double, ORDER> F;
             CoeffVec xvec =
                 chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
 
             for (int i = 0; i < ORDER; ++i)
-                F(i) = f(Eigen::Vector<double, 1>{xvec[i]});
+                F(i) = f(&xvec[i]);
 
             Eigen::Vector<double, ORDER> coeffs = VLU_.solve(F);
 
@@ -187,9 +187,12 @@ class Node {
             CoeffVec yvec =
                 chebyshev_nodes<ORDER>::get(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
 
-            for (int i = 0; i < ORDER; ++i)
-                for (int j = 0; j < ORDER; ++j)
-                    F(i, j) = f({xvec[i], yvec[j]});
+            for (int i = 0; i < ORDER; ++i) {
+                for (int j = 0; j < ORDER; ++j) {
+                    double x[2] = {xvec[i], yvec[j]};
+                    F(i, j) = f(x);
+                }
+            }
 
             Eigen::Matrix<double, ORDER, ORDER> coeffs = VLU_.solve(F);
             coeffs = VLU_.solve(coeffs.transpose()).transpose();
@@ -213,10 +216,14 @@ class Node {
             CoeffVec zvec =
                 chebyshev_nodes<ORDER>::get(box_.center[2] - box_.half_length[2], box_.center[2] + box_.half_length[2]);
 
-            for (int i = 0; i < ORDER; ++i)
-                for (int j = 0; j < ORDER; ++j)
-                    for (int k = 0; k < ORDER; ++k)
-                        F[i * ORDER * ORDER + j * ORDER + k] = f({xvec[i], yvec[j], zvec[k]});
+            for (int i = 0; i < ORDER; ++i) {
+                for (int j = 0; j < ORDER; ++j) {
+                    for (int k = 0; k < ORDER; ++k) {
+                        double x[3] = {xvec[i], yvec[j], zvec[k]};
+                        F[i * ORDER * ORDER + j * ORDER + k] = f(x);
+                    }
+                }
+            }
 
             std::vector<double, Eigen::aligned_allocator<double>> coeffs_z(ORDER * ORDER * ORDER);
             std::vector<double, Eigen::aligned_allocator<double>> coeffs_y(ORDER * ORDER * ORDER);
@@ -278,7 +285,7 @@ struct FunctionTree {
     using VEC = Eigen::Vector<double, DIM>;
     std::vector<Node<DIM, ORDER>> nodes_;
 
-    FunctionTree<DIM, ORDER>(const Box<DIM> &box, double (*f)(VEC), double tol) {
+    FunctionTree<DIM, ORDER>(double (*f)(const double *), const Box<DIM> &box, double tol) {
         std::queue<Box<DIM>> q;
         VEC half_width = box.half_length * 0.5;
         q.push(box);
@@ -345,7 +352,7 @@ class Function {
     using DBox = Box<DIM>;
 
     const double tol_;
-    double (*f_)(VEC);
+    double (*f_)(const double *);
     DBox box_;
     VEC lower_left_;
 
@@ -353,7 +360,10 @@ class Function {
     Eigen::Vector<int, DIM> n_subtrees_;
     VEC bin_size_;
 
-    Function<DIM, ORDER>(const VEC &x, const VEC &l, double (*f)(VEC), double tol) : f_(f), box_(x, l), tol_(tol) {
+    Function<DIM, ORDER>(double (*f)(const double *), const double *xp, const double *lp, double tol)
+        : f_(f), box_(VEC(xp), VEC(lp)), tol_(tol) {
+        VEC l(lp);
+        VEC x(xp);
         std::queue<DBox> q;
 
         for (int i = 0; i < DIM; ++i)
@@ -412,7 +422,7 @@ class Function {
             VEC parent_center = (bins.template cast<double>().array() + 0.5) * bin_size_.array() + lower_left_.array();
 
             Box<DIM> root_box = {parent_center, 0.5 * bin_size_};
-            subtrees_.push_back(FunctionTree<DIM, ORDER>(root_box, f_, tol_));
+            subtrees_.push_back(FunctionTree<DIM, ORDER>(f_, root_box, tol_));
         }
     }
 
@@ -448,8 +458,10 @@ class Function {
     }
 
     inline double eval(const VEC &x) const { return find_node(x).eval(x); }
+    inline double eval(const double *xp) const { return eval(VEC(xp)); }
 
     inline double operator()(const VEC &x) const { return eval(x); }
+    inline double operator()(const double *x) const { return eval(x); }
 };
 
 template <int D, int ORDER>
