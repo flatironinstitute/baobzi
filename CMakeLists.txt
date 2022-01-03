@@ -19,3 +19,9 @@ file(GLOB EXAMPLE_SOURCES "examples/*.cpp")
 add_executable(baobzi_timing ${EXAMPLE_SOURCES})
 target_include_directories(baobzi_timing PUBLIC ${BAOBZI_INCLUDES})
 target_link_libraries(baobzi_timing PUBLIC OpenMP::OpenMP_CXX)
+
+file(GLOB LIB_SOURCES "src/*.cpp")
+
+add_library(baobzi SHARED ${LIB_SOURCES})
+target_include_directories(baobzi PUBLIC ${BAOBZI_INCLUDES})
+target_link_libraries(baobzi PUBLIC)

@@ -7,22 +7,18 @@
 
 using aligned_vector = std::vector<double, Eigen::aligned_allocator<double>>;
 
-double testfun_1d(Eigen::Vector<double, 1> x) { return log(x[0]); }
-double testfun_2d(Eigen::Vector<double, 2> x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
-double testfun_2d_2(Eigen::Vector<double, 2> x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1])); }
-double testfun_3d(Eigen::Vector<double, 3> x) {
-    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
-}
+double testfun_1d(const double *x) { return log(x[0]); }
+double testfun_2d(const double *x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
+double testfun_2d_2(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1])); }
+double testfun_3d(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2])); }
 
 template <int DIM, typename Function>
 void time_function(const Function &function, const aligned_vector &x, int n_runs) {
     const double time = omp_get_wtime();
     double res = 0.0;
-    using VEC = Eigen::Vector<double, DIM>;
     for (int i_run = 0; i_run < n_runs; ++i_run) {
         for (int i = 0; i < x.size(); i += DIM) {
-            const VEC point(&x[i]);
-            res += function(point);
+            res += function(&x[i]);
         }
     }
     const double dt = omp_get_wtime() - time;
@@ -36,11 +32,10 @@ void print_error(const Function &function, const aligned_vector &x) {
     double max_rel_error = 0.0;
     double mean_error = 0.0;
     double mean_rel_error = 0.0;
-    using VEC = typename Function::VEC;
 
     size_t n_meas = 0;
     for (int i = 0; i < x.size(); i += Function::Dim) {
-        const VEC point(&x[i]);
+        const double *point = &x[i];
 
         double actual = function.f_(point);
         double interp = function.eval(point);
@@ -98,7 +93,7 @@ int main(int argc, char *argv[]) {
             for (int j = 0; j < 2; ++j)
                 x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
-        baobzi::Function<2, 8> func_approx_2d(center2d, hl, testfun_2d_2, 1E-8);
+        baobzi::Function<2, 8> func_approx_2d(testfun_2d_2, center2d.data(), hl.data(), 1E-8);
 
         // time_function<2>(func_approx_2d.f_, x_2d_transformed, 1);
         time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
