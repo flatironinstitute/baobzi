@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-for dim in {1..2}; do
+for dim in {1..3}; do
     for order in {6..16..2}; do
         srcfile=src/baobzi_${dim}d_$order.cpp
         printf '#include "baobzi.h"\n' > $srcfile
@@ -11,4 +11,3 @@ for dim in {1..2}; do
         printf '}\n' >> $srcfile
     done
 done
-

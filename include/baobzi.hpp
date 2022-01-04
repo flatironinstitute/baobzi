@@ -256,8 +256,8 @@ class Node {
                         VEC point = box_.center - box_.half_length + 2.0 * i * box_.half_length / ORDER;
 
                         double test_val = this->eval(point);
-                        double actual_val = f(point);
-                        double rel_error = std::abs(this->eval(point) - f(point));
+                        double actual_val = f(point.data());
+                        double rel_error = std::abs(this->eval(point) - f(point.data()));
 
                         if (fabs(actual_val) > 1E-16 && rel_error > tol) {
                             coeffs_.clear();

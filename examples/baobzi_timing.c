@@ -2,9 +2,9 @@
 
 #include <math.h>
 #include <omp.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 
 double testfun_1d(const double *x) { return log(x[0]); }
 double testfun_2d(const double *x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
@@ -56,7 +56,22 @@ void print_error(const baobzi_t *function, const double *x, int size) {
     printf("abs error max, mean: %g %g\n", max_error, mean_error);
 }
 
-#define JOIN_INTS(A, B) (((A) << 16) | (B))
+void test_func(double (*fin)(const double *), int dim, int order, const double *xin, const double *hl,
+               const double *center, int n_points, int n_runs) {
+    double *x_transformed = (double *)aligned_alloc(32, n_points * dim * sizeof(double));
+
+    for (int i = 0; i < dim * n_points; i += dim)
+        for (int j = 0; j < dim; ++j)
+            x_transformed[i + j] = hl[j] * (2.0 * xin[i + j] - 1.0) + center[j];
+
+    baobzi_t func_approx = baobzi_init(&testfun_2d, dim, order, center, hl, 1E-8);
+
+    time_function(&func_approx, x_transformed, n_points * dim, n_runs);
+    print_error(&func_approx, x_transformed, n_points * dim);
+
+    free(x_transformed);
+    baobzi_free(&func_approx);
+}
 
 int main(int argc, char *argv[]) {
     srand(1);
@@ -66,26 +81,24 @@ int main(int argc, char *argv[]) {
     if (argc == 2)
         n_runs = atoi(argv[1]);
 
-    double *x = (double *) aligned_alloc(32, n_points * 3 * sizeof(double));
+    double *x = (double *)aligned_alloc(32, n_points * 3 * sizeof(double));
     for (size_t i = 0; i < n_points * 3; ++i)
         x[i] = ((double)rand()) / RAND_MAX;
 
     {
+        const int dim = 2;
+        const int order = 6;
         double hl[2] = {1.0, 1.0};
-        double center2d[2] = {hl[0] + 0.5, hl[1] + 2.0};
-        double *x_2d_transformed = (double *)aligned_alloc(32, n_points * 2 * sizeof(double));
+        double center[2] = {hl[0] + 0.5, hl[1] + 2.0};
+        test_func(&testfun_2d, dim, order, x, hl, center, n_points, n_runs);
+    }
 
-        for (int i = 0; i < 2 * n_points; i += 2)
-            for (int j = 0; j < 2; ++j)
-                x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
-
-        baobzi_t func_approx_2d = baobzi_init(&testfun_2d, 2, 8, center2d, hl, 1E-8);
-
-        time_function(&func_approx_2d, x_2d_transformed, n_points * 2, n_runs);
-        print_error(&func_approx_2d, x_2d_transformed, n_points * 2);
-
-        free(x_2d_transformed);
-        baobzi_free(&func_approx_2d);
+    {
+        const int dim = 3;
+        const int order = 6;
+        double hl[3] = {1.0, 1.0, 1.0};
+        double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};
+        test_func(&testfun_3d, dim, order, x, hl, center, n_points, n_runs);
     }
 
     return 0;
