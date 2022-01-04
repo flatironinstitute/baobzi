@@ -259,7 +259,7 @@ class Node {
 
                         double test_val = this->eval(point);
                         double actual_val = f(point.data());
-                        double rel_error = std::abs((actual_val - test_val) / test_val);
+                        double rel_error = std::abs((actual_val - test_val) / actual_val);
 
                         if (fabs(actual_val) > 1E-16 && rel_error > tol) {
                             coeffs_.clear();
