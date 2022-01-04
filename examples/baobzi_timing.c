@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
         const int order = 6;
         double hl[3] = {1.0, 1.0, 1.0};
         double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};
-        test_func(&testfun_3d, dim, order, x, hl, center, n_points, n_runs, 1E-10);
+        test_func(&testfun_3d, dim, order, x, hl, center, n_points, n_runs, 1E-12);
     }
 
     return 0;

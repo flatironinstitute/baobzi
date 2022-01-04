@@ -7,6 +7,7 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
+#include <unsupported/Eigen/CXX11/Tensor>
 
 namespace baobzi {
 
@@ -208,7 +209,8 @@ class Node {
             return true;
         }
         if constexpr (D == 3) {
-            std::vector<double, Eigen::aligned_allocator<double>> F(ORDER * ORDER * ORDER);
+            Eigen::Tensor<double, 3> F(ORDER, ORDER, ORDER);
+
             CoeffVec xvec =
                 chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
             CoeffVec yvec =
@@ -220,35 +222,29 @@ class Node {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
                         double x[3] = {xvec[i], yvec[j], zvec[k]};
-                        F[i * ORDER * ORDER + j * ORDER + k] = f(x);
+                        F(i, j, k) = f(x);
                     }
                 }
             }
 
-            std::vector<double, Eigen::aligned_allocator<double>> coeffs_z(ORDER * ORDER * ORDER);
-            std::vector<double, Eigen::aligned_allocator<double>> coeffs_y(ORDER * ORDER * ORDER);
-            std::vector<double, Eigen::aligned_allocator<double>> coeffs_x(ORDER * ORDER * ORDER);
+            coeffs_.resize(ORDER * ORDER * ORDER);
+            Eigen::Tensor<double, 3> coeffs_tensor(ORDER, ORDER, ORDER);
+            using matrix_t = Eigen::Matrix<double, ORDER, ORDER>;
+            using map_t = Eigen::Map<matrix_t>;
+            using tensor_t = Eigen::Tensor<double, 2>;
             for (int block = 0; block < ORDER; ++block) {
-                using matrix_t = Eigen::Matrix<double, ORDER, ORDER>;
-                using map_t = Eigen::Map<matrix_t>;
-                int block_offset = block * ORDER * ORDER;
-                map_t F_block(F.data() + block_offset);
-                map_t coeffs_zsolve(coeffs_z.data() + block_offset);
-                map_t coeffs_ysolve(coeffs_y.data() + block_offset);
-                coeffs_zsolve = VLU_.solve(F_block);
-                coeffs_ysolve = VLU_.solve(coeffs_zsolve.transpose()).transpose();
+                tensor_t F_block_tensor = F.chip(block, 2);
+                map_t F_block(F_block_tensor.data());
+
+                matrix_t coeffs_tmp = VLU_.solve(F_block);
+                coeffs_tmp = VLU_.solve(coeffs_tmp.transpose()).transpose();
+                coeffs_tensor.chip(block, 2) = Eigen::TensorMap<tensor_t>(coeffs_tmp.data(), ORDER, ORDER);
             }
             for (int block = 0; block < ORDER; ++block) {
-                using matrix_t = Eigen::Matrix<double, ORDER, ORDER>;
-                using map_t = Eigen::Map<matrix_t, 0, Eigen::OuterStride<ORDER * ORDER>>;
-                int block_offset = block * ORDER;
-                matrix_t coeffs_ysolve = map_t(coeffs_y.data() + block_offset);
-
-                Eigen::Map<matrix_t> coeffs_xsolve(coeffs_x.data() + block * ORDER * ORDER);
-                coeffs_xsolve = VLU_.solve(coeffs_ysolve.transpose()).transpose();
+                Eigen::Tensor<double, 2> coeffs_tmp = coeffs_tensor.chip(block, 0);
+                map_t coeffs_ysolve(coeffs_tmp.data());
+                map_t(coeffs_.data() + block * ORDER * ORDER) = VLU_.solve(coeffs_ysolve.transpose()).transpose();
             }
-
-            coeffs_ = coeffs_x;
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -257,9 +253,9 @@ class Node {
                             (box_.center - box_.half_length).array() +
                             2.0 * VEC{(double)i, (double)j, (double)k}.array() * box_.half_length.array() / ORDER;
 
-                        double test_val = this->eval(point);
-                        double actual_val = f(point.data());
-                        double rel_error = std::abs((actual_val - test_val) / actual_val);
+                        const double test_val = eval(point);
+                        const double actual_val = f(point.data());
+                        const double rel_error = std::abs((actual_val - test_val) / actual_val);
 
                         if (fabs(actual_val) > 1E-16 && rel_error > tol) {
                             coeffs_.clear();
