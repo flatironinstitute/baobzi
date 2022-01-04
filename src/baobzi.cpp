@@ -36,6 +36,12 @@ baobzi_t baobzi_init(double (*fin)(const double *), uint16_t dim, uint16_t order
         BAOBZI_CASE(2, 12)
         BAOBZI_CASE(2, 14)
         BAOBZI_CASE(2, 16)
+        BAOBZI_CASE(3, 6)
+        BAOBZI_CASE(3, 8)
+        BAOBZI_CASE(3, 10)
+        BAOBZI_CASE(3, 12)
+        BAOBZI_CASE(3, 14)
+        BAOBZI_CASE(3, 16)
     default: {
         std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim << ", "
                   << order << ")\n";
