@@ -253,11 +253,13 @@ class Node {
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
-                        VEC point = box_.center - box_.half_length + 2.0 * i * box_.half_length / ORDER;
+                        VEC point =
+                            (box_.center - box_.half_length).array() +
+                            2.0 * VEC{(double)i, (double)j, (double)k}.array() * box_.half_length.array() / ORDER;
 
                         double test_val = this->eval(point);
                         double actual_val = f(point.data());
-                        double rel_error = std::abs(this->eval(point) - f(point.data()));
+                        double rel_error = std::abs((actual_val - test_val) / test_val);
 
                         if (fabs(actual_val) > 1E-16 && rel_error > tol) {
                             coeffs_.clear();
