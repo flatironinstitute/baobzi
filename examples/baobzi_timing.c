@@ -64,7 +64,7 @@ void test_func(double (*fin)(const double *), int dim, int order, const double *
         for (int j = 0; j < dim; ++j)
             x_transformed[i + j] = hl[j] * (2.0 * xin[i + j] - 1.0) + center[j];
 
-    baobzi_t func_approx = baobzi_init(&testfun_2d, dim, order, center, hl, tol);
+    baobzi_t func_approx = baobzi_init(fin, dim, order, center, hl, tol);
 
     time_function(&func_approx, x_transformed, n_points * dim, n_runs);
     print_error(&func_approx, x_transformed, n_points * dim);
