@@ -3,5 +3,5 @@
 #include "baobzi.hpp"
 
 extern "C" {
-BAOBZI_DEFS(3, 6)
+BAOBZI_DEFS(1, 14, 0)
 }
