@@ -58,7 +58,7 @@ void print_error(const baobzi_t *function, const double *x, int size) {
 
 void test_func(double (*fin)(const double *), int dim, int order, const double *xin, const double *hl,
                const double *center, int n_points, int n_runs, double tol) {
-    double *x_transformed = (double *)aligned_alloc(32, n_points * dim * sizeof(double));
+    double *x_transformed = (double *)malloc(n_points * dim * sizeof(double));
 
     for (int i = 0; i < dim * n_points; i += dim)
         for (int j = 0; j < dim; ++j)
@@ -75,13 +75,13 @@ void test_func(double (*fin)(const double *), int dim, int order, const double *
 
 int main(int argc, char *argv[]) {
     srand(1);
-    size_t n_points = 1000000;
+    size_t n_points = (size_t)1E6;
     size_t n_runs = 50;
 
     if (argc == 2)
         n_runs = atoi(argv[1]);
 
-    double *x = (double *)aligned_alloc(32, n_points * 5 * sizeof(double));
+    double *x = (double *)malloc(n_points * 5 * sizeof(double));
     for (size_t i = 0; i < n_points * 5; ++i)
         x[i] = ((double)rand()) / RAND_MAX;
 
