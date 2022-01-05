@@ -51,4 +51,5 @@ make -j
     * Python
     * Fortran
 * Add roadmap issues to... the issues tracker
+* Allow for choice of sampling or coefficient to judge fit
 * Your suggestion here -- I left my hard copy of the roadmap in the office.

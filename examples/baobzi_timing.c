@@ -58,47 +58,54 @@ void print_error(const baobzi_t *function, const double *x, int size) {
 
 void test_func(double (*fin)(const double *), int dim, int order, const double *xin, const double *hl,
                const double *center, int n_points, int n_runs, double tol) {
+    // Scale test points to our domain
     double *x_transformed = (double *)malloc(n_points * dim * sizeof(double));
-
     for (int i = 0; i < dim * n_points; i += dim)
         for (int j = 0; j < dim; ++j)
             x_transformed[i + j] = hl[j] * (2.0 * xin[i + j] - 1.0) + center[j];
 
+    // Create baobzi function approximator. Has pointers to relevant structures inside
+    // This may take a while, since it fits the function on init
     baobzi_t func_approx = baobzi_init(fin, dim, order, center, hl, tol);
 
     time_function(&func_approx, x_transformed, n_points * dim, n_runs);
     print_error(&func_approx, x_transformed, n_points * dim);
 
     free(x_transformed);
+    // DON'T FORGET TO FREE THE OBJECT WHEN YOU ARE TOTALLY DEFINITELY DONE WITH IT.
+    // They can be HUGE. Also memory leaks :(
     baobzi_free(&func_approx);
 }
 
 int main(int argc, char *argv[]) {
     srand(1);
     size_t n_points = (size_t)1E6;
-    size_t n_runs = 50;
+    size_t n_runs = 10;
 
     if (argc == 2)
         n_runs = atoi(argv[1]);
 
+    // Generate enough points for up to 5 dimensions (for later!)
     double *x = (double *)malloc(n_points * 5 * sizeof(double));
     for (size_t i = 0; i < n_points * 5; ++i)
         x[i] = ((double)rand()) / RAND_MAX;
 
     {
         const int dim = 2;
-        const int order = 6;
-        double hl[2] = {1.0, 1.0};
-        double center[2] = {hl[0] + 0.5, hl[1] + 2.0};
-        test_func(&testfun_2d, dim, order, x, hl, center, n_points, n_runs, 1E-10);
+        const int order = 6;             // Chebyshev polynomial order
+        const double tol = 1E-10;        // Maximum relative error target
+        const double hl[2] = {1.0, 1.0}; // half the length of the domain in each dimension
+        const double center[2] = {hl[0] + 0.5, hl[1] + 2.0}; // center of the domain
+        test_func(&testfun_2d, dim, order, x, hl, center, n_points, n_runs, tol);
     }
 
     {
         const int dim = 3;
         const int order = 6;
+        const double tol = 1E-12;
         double hl[3] = {1.0, 1.0, 1.0};
         double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};
-        test_func(&testfun_3d, dim, order, x, hl, center, n_points, n_runs, 1E-12);
+        test_func(&testfun_3d, dim, order, x, hl, center, n_points, n_runs, tol);
     }
 
     return 0;
