@@ -21,7 +21,7 @@ void time_function(const baobzi_t *function, const double *x, int size, int n_ru
     }
     const double dt = omp_get_wtime() - time;
     const long n_eval = n_runs * (size / function->DIM);
-    printf("%g %g %g\n", dt, n_eval / (dt * 1E6), res);
+    printf("time, Megaevals/s, sum: %g %g %g\n", dt, n_eval / (dt * 1E6), res);
 }
 
 void print_error(const baobzi_t *function, const double *x, int size) {
