@@ -46,5 +46,9 @@ make -j
 * Auto-optimization for 'spiky' trees
 * Maximum depth/infinite recursion detection/memory limits
 * Fix intel compilation
+* Add other language bindings (or direct implementations)
+    * Julia
+    * Python
+    * Fortran
 * Add roadmap issues to... the issues tracker
 * Your suggestion here -- I left my hard copy of the roadmap in the office.
