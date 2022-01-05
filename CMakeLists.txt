@@ -20,6 +20,12 @@ add_library(baobzi SHARED ${LIB_SOURCES})
 target_include_directories(baobzi PUBLIC ${BAOBZI_INCLUDES})
 target_link_libraries(baobzi PUBLIC)
 
+add_library(baobzi_static STATIC ${LIB_SOURCES})
+target_include_directories(baobzi_static PUBLIC ${BAOBZI_INCLUDES})
+target_link_libraries(baobzi_static PUBLIC)
+set_target_properties(baobzi_static PROPERTIES OUTPUT_NAME baobzi)
+
+
 set(EXAMPLE_SOURCE_CPP "examples/baobzi_timing.cpp")
 add_executable(baobzi_timing_cpp ${EXAMPLE_SOURCE_CPP})
 target_include_directories(baobzi_timing_cpp PUBLIC ${BAOBZI_INCLUDES})
