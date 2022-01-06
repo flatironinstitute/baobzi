@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-for iset in {0..2}; do
+for iset in {0..3}; do
     for dim in {1..3}; do
         for order in {6..16..2}; do
             srcfile=src/baobzi_${dim}d_${order}_${iset}.cpp

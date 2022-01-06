@@ -4,6 +4,7 @@
 #include <queue>
 #include <vector>
 
+#define EIGEN_MAX_ALIGN_BYTES 64
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
