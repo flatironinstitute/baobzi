@@ -4,6 +4,7 @@
 #include <queue>
 #include <vector>
 
+#define EIGEN_MAX_ALIGN_BYTES 64
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <Eigen/LU>
@@ -11,33 +12,14 @@
 
 namespace baobzi {
 
-template <int ORDER>
-struct chebyshev_nodes {
-    using arr_type = Eigen::Vector<double, ORDER>;
-    static const arr_type cosarray;
-
-    static arr_type get_cos_array() {
-        arr_type cosarray(ORDER);
-        for (int i = 0; i < ORDER; ++i)
-            cosarray[ORDER - i - 1] = cos(M_PI * (i + 0.5) / ORDER);
-        return cosarray;
-    }
-
-    static inline arr_type get(double lb, double ub) { return 0.5 * ((lb + ub) + (ub - lb) * cosarray.array()); }
-};
-
-template <int ORDER>
-const typename chebyshev_nodes<ORDER>::arr_type
-    chebyshev_nodes<ORDER>::cosarray = chebyshev_nodes<ORDER>::get_cos_array();
-
-template <int D>
+template <int D, int ISET>
 struct Box {
     using VEC = Eigen::Vector<double, D>;
     VEC center;
     VEC half_length;
 
-    Box<D>() = default;
-    Box<D>(const VEC &x, const VEC &hl) : center(x), half_length(hl) {}
+    Box<D, ISET>() = default;
+    Box<D, ISET>(const VEC &x, const VEC &hl) : center(x), half_length(hl) {}
 
     bool contains(const VEC &x) const {
         VEC dx = (x - center).array().abs();
@@ -68,8 +50,8 @@ inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
     return maxcoeff / scaling_factor;
 }
 
-template <int ORDER>
-inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1> &box,
+template <int ORDER, int ISET>
+inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1, ISET> &box,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
     double xd = x[0] - box.center[0] / box.half_length[0];
 
@@ -85,8 +67,8 @@ inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1> &box,
     return coeffs.dot(Tn);
 }
 
-template <int ORDER>
-inline double cheb_eval(const Eigen::Vector2d &x, const Box<2> &box,
+template <int ORDER, int ISET>
+inline double cheb_eval(const Eigen::Vector2d &x, const Box<2, ISET> &box,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
     Eigen::Vector2d xinterp = (x - box.center).array() / box.half_length.array();
     Eigen::Matrix<double, 2, ORDER> Tns;
@@ -101,8 +83,8 @@ inline double cheb_eval(const Eigen::Vector2d &x, const Box<2> &box,
     return Tns.row(0).transpose().dot(coeffs * Tns.row(1).transpose());
 }
 
-template <int ORDER>
-inline double cheb_eval(const Eigen::Vector3d &x, const Box<3> &box,
+template <int ORDER, int ISET>
+inline double cheb_eval(const Eigen::Vector3d &x, const Box<3, ISET> &box,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
 
     Eigen::Vector3d xinterp = (x - box.center).array() / box.half_length.array();
@@ -124,39 +106,23 @@ inline double cheb_eval(const Eigen::Vector3d &x, const Box<3> &box,
     return res;
 }
 
-template <int D, int ORDER>
+template <int DIM, int ORDER, int ISET>
+class Function;
+
+template <int D, int ORDER, int ISET>
 class Node {
   public:
     using VEC = Eigen::Vector<double, D>;
-    using VanderMat = Eigen::Matrix<double, ORDER, ORDER>;
     using CoeffVec = Eigen::Vector<double, ORDER>;
-    static const Eigen::PartialPivLU<VanderMat> VLU_;
     std::vector<double, Eigen::aligned_allocator<double>> coeffs_;
-    Box<D> box_;
-    uint64_t first_child_idx;
+    using Func = Function<D, ORDER, ISET>;
+    Box<D, ISET> box_;
+    uint64_t first_child_idx = -1;
     bool leaf_ = false;
 
-    static VanderMat calc_vandermonde() {
-        VanderMat V;
+    Node<D, ORDER, ISET>() = default;
 
-        auto x = chebyshev_nodes<ORDER>::get_cos_array();
-        for (int j = 0; j < ORDER; ++j) {
-            V(0, j) = 1;
-            V(1, j) = x(j);
-        }
-
-        for (int i = 2; i < ORDER; ++i) {
-            for (int j = 0; j < ORDER; ++j) {
-                V(i, j) = double(2) * V(i - 1, j) * x(j) - V(i - 2, j);
-            }
-        }
-        V = V.transpose().eval();
-        return V;
-    }
-
-    Node<D, ORDER>() = default;
-
-    Node<D, ORDER>(const Box<D> &box) : box_(box) {}
+    Node<D, ORDER, ISET>(const Box<D, ISET> &box) : box_(box) {}
 
     inline bool is_leaf() const { return leaf_; }
 
@@ -164,12 +130,12 @@ class Node {
         if constexpr (D == 1) {
             Eigen::Vector<double, ORDER> F;
             CoeffVec xvec =
-                chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+                Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
 
             for (int i = 0; i < ORDER; ++i)
                 F(i) = f(&xvec[i]);
 
-            Eigen::Vector<double, ORDER> coeffs = VLU_.solve(F);
+            Eigen::Vector<double, ORDER> coeffs = Func::VLU_.solve(F);
 
             if (standard_error(coeffs) > tol)
                 return false;
@@ -184,9 +150,9 @@ class Node {
         if constexpr (D == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
             CoeffVec xvec =
-                chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+                Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
             CoeffVec yvec =
-                chebyshev_nodes<ORDER>::get(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
+                Func::get_cheb_nodes(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -195,8 +161,8 @@ class Node {
                 }
             }
 
-            Eigen::Matrix<double, ORDER, ORDER> coeffs = VLU_.solve(F);
-            coeffs = VLU_.solve(coeffs.transpose()).transpose();
+            Eigen::Matrix<double, ORDER, ORDER> coeffs = Func::VLU_.solve(F);
+            coeffs = Func::VLU_.solve(coeffs.transpose()).transpose();
 
             if (standard_error(coeffs) > tol)
                 return false;
@@ -212,11 +178,11 @@ class Node {
             Eigen::Tensor<double, 3> F(ORDER, ORDER, ORDER);
 
             CoeffVec xvec =
-                chebyshev_nodes<ORDER>::get(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+                Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
             CoeffVec yvec =
-                chebyshev_nodes<ORDER>::get(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
+                Func::get_cheb_nodes(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
             CoeffVec zvec =
-                chebyshev_nodes<ORDER>::get(box_.center[2] - box_.half_length[2], box_.center[2] + box_.half_length[2]);
+                Func::get_cheb_nodes(box_.center[2] - box_.half_length[2], box_.center[2] + box_.half_length[2]);
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -236,14 +202,14 @@ class Node {
                 tensor_t F_block_tensor = F.chip(block, 2);
                 map_t F_block(F_block_tensor.data());
 
-                matrix_t coeffs_tmp = VLU_.solve(F_block);
-                coeffs_tmp = VLU_.solve(coeffs_tmp.transpose()).transpose();
+                matrix_t coeffs_tmp = Func::VLU_.solve(F_block);
+                coeffs_tmp = Func::VLU_.solve(coeffs_tmp.transpose()).transpose();
                 coeffs_tensor.chip(block, 2) = Eigen::TensorMap<tensor_t>(coeffs_tmp.data(), ORDER, ORDER);
             }
             for (int block = 0; block < ORDER; ++block) {
                 Eigen::Tensor<double, 2> coeffs_tmp = coeffs_tensor.chip(block, 0);
                 map_t coeffs_ysolve(coeffs_tmp.data());
-                map_t(coeffs_.data() + block * ORDER * ORDER) = VLU_.solve(coeffs_ysolve.transpose()).transpose();
+                map_t(coeffs_.data() + block * ORDER * ORDER) = Func::VLU_.solve(coeffs_ysolve.transpose()).transpose();
             }
 
             for (int i = 0; i < ORDER; ++i) {
@@ -271,20 +237,20 @@ class Node {
         }
     }
 
-    inline double eval(const VEC &x) const { return cheb_eval<ORDER>(x, box_, coeffs_); }
+    inline double eval(const VEC &x) const { return cheb_eval<ORDER, ISET>(x, box_, coeffs_); }
 };
 
-template <int DIM, int ORDER>
+template <int DIM, int ORDER, int ISET>
 struct FunctionTree {
     static constexpr int NChild = 1 << DIM;
     static constexpr int Dim = DIM;
     static constexpr int Order = ORDER;
 
     using VEC = Eigen::Vector<double, DIM>;
-    std::vector<Node<DIM, ORDER>> nodes_;
+    std::vector<Node<DIM, ORDER, ISET>> nodes_;
 
-    FunctionTree<DIM, ORDER>(double (*f)(const double *), const Box<DIM> &box, double tol) {
-        std::queue<Box<DIM>> q;
+    FunctionTree<DIM, ORDER, ISET>(double (*f)(const double *), const Box<DIM, ISET> &box, double tol) {
+        std::queue<Box<DIM, ISET>> q;
         VEC half_width = box.half_length * 0.5;
         q.push(box);
 
@@ -293,10 +259,10 @@ struct FunctionTree {
             int n_next = q.size();
 
             for (int i = 0; i < n_next; ++i) {
-                Box<DIM> box = q.front();
+                Box<DIM, ISET> box = q.front();
                 q.pop();
 
-                nodes_.push_back(Node<DIM, ORDER>(box));
+                nodes_.push_back(Node<DIM, ORDER, ISET>(box));
                 auto &node = nodes_.back();
                 if (!node.fit(f, tol)) {
                     node.first_child_idx = curr_child_idx;
@@ -313,7 +279,7 @@ struct FunctionTree {
                             offset[j] = signed_hw[(child >> j) & 1];
                         }
 
-                        q.push(Box<DIM>(center + offset, half_width));
+                        q.push(Box<DIM, ISET>(center + offset, half_width));
                     }
                 }
             }
@@ -322,7 +288,7 @@ struct FunctionTree {
         }
     }
 
-    inline const Node<DIM, ORDER> &find_node_traverse(const VEC &x) const {
+    inline const Node<DIM, ORDER, ISET> &find_node_traverse(const VEC &x) const {
         auto *node = &nodes_[0];
         while (!node->is_leaf()) {
             uint64_t child_idx = 0;
@@ -338,7 +304,7 @@ struct FunctionTree {
     inline double eval(const VEC &x) const { return find_node_traverse(x).eval(x); }
 };
 
-template <int DIM, int ORDER>
+template <int DIM, int ORDER, int ISET = 0>
 class Function {
   public:
     static constexpr int NChild = 1 << DIM;
@@ -347,19 +313,53 @@ class Function {
 
     using VEC = Eigen::Vector<double, DIM>;
     using CoeffVec = Eigen::Vector<double, ORDER>;
-    using DBox = Box<DIM>;
+    using VanderMat = Eigen::Matrix<double, ORDER, ORDER>;
 
-    const double tol_;
+    using DBox = Box<DIM, ISET>;
+
+    static CoeffVec cosarray_;
+    static Eigen::PartialPivLU<VanderMat> VLU_;
+
     double (*f_)(const double *);
     DBox box_;
+    const double tol_;
     VEC lower_left_;
 
-    std::vector<FunctionTree<DIM, ORDER>> subtrees_;
+    std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_;
     Eigen::Vector<int, DIM> n_subtrees_;
     VEC bin_size_;
 
-    Function<DIM, ORDER>(double (*f)(const double *), const double *xp, const double *lp, double tol)
+    static VanderMat calc_vandermonde() {
+        VanderMat V;
+
+        for (int j = 0; j < ORDER; ++j) {
+            V(0, j) = 1;
+            V(1, j) = cosarray_(j);
+        }
+
+        for (int i = 2; i < ORDER; ++i) {
+            for (int j = 0; j < ORDER; ++j) {
+                V(i, j) = double(2) * V(i - 1, j) * cosarray_(j) - V(i - 2, j);
+            }
+        }
+
+        return V.transpose();
+    }
+
+    static inline CoeffVec get_cheb_nodes(double lb, double ub) {
+        return 0.5 * ((lb + ub) + (ub - lb) * cosarray_.array());
+    }
+
+    static void init_statics() {
+        for (int i = 0; i < ORDER; ++i)
+            cosarray_[ORDER - i - 1] = cos(M_PI * (i + 0.5) / ORDER);
+        VLU_ = Eigen::PartialPivLU<VanderMat>(calc_vandermonde());
+    }
+
+    Function<DIM, ORDER, ISET>(double (*f)(const double *), const double *xp, const double *lp, double tol)
         : f_(f), box_(VEC(xp), VEC(lp)), tol_(tol) {
+        init_statics();
+
         VEC l(lp);
         VEC x(xp);
         std::queue<DBox> q;
@@ -370,8 +370,6 @@ class Function {
         uint8_t max_depth_ = 0;
         q.push(DBox(x, l));
 
-        bool fill_subtrees = false;
-
         // Half-width of next children
         VEC half_width = l * 0.5;
         while (!q.empty()) {
@@ -381,7 +379,7 @@ class Function {
                 DBox box = q.front();
                 q.pop();
 
-                Node<DIM, ORDER> node(box);
+                Node<DIM, ORDER, ISET> node(box);
                 if (!node.fit(f, tol_)) {
                     VEC &center = box.center;
                     for (unsigned child = 0; child < NChild; ++child) {
@@ -419,8 +417,8 @@ class Function {
 
             VEC parent_center = (bins.template cast<double>().array() + 0.5) * bin_size_.array() + lower_left_.array();
 
-            Box<DIM> root_box = {parent_center, 0.5 * bin_size_};
-            subtrees_.push_back(FunctionTree<DIM, ORDER>(f_, root_box, tol_));
+            Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size_};
+            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(f_, root_box, tol_));
         }
     }
 
@@ -451,7 +449,7 @@ class Function {
         return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
     }
 
-    inline const Node<DIM, ORDER> &find_node(const VEC &x) const {
+    inline const Node<DIM, ORDER, ISET> &find_node(const VEC &x) const {
         return subtrees_[get_linear_bin(x)].find_node_traverse(x);
     }
 
@@ -462,9 +460,11 @@ class Function {
     inline double operator()(const double *x) const { return eval(x); }
 };
 
-template <int D, int ORDER>
-const Eigen::PartialPivLU<typename Node<D, ORDER>::VanderMat>
-    Node<D, ORDER>::VLU_ = Eigen::PartialPivLU<typename Node<D, ORDER>::VanderMat>(Node<D, ORDER>::calc_vandermonde());
+template <int DIM, int ORDER, int ISET>
+typename Function<DIM, ORDER, ISET>::CoeffVec Function<DIM, ORDER, ISET>::cosarray_;
+
+template <int DIM, int ORDER, int ISET>
+Eigen::PartialPivLU<typename Function<DIM, ORDER, ISET>::VanderMat> Function<DIM, ORDER, ISET>::VLU_;
 } // namespace baobzi
 
 #endif
