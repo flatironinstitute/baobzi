@@ -68,8 +68,12 @@ void test_func(double (*fin)(const double *), int dim, int order, const double *
     // This may take a while, since it fits the function on init
     baobzi_t func_approx = baobzi_init(fin, dim, order, center, hl, tol);
 
+    char filename[256];
+    sprintf(filename, "func_approx_%dd", dim);
+
     time_function(&func_approx, x_transformed, n_points * dim, n_runs);
     print_error(&func_approx, x_transformed, n_points * dim);
+    baobzi_save(&func_approx, filename);
 
     free(x_transformed);
     // DON'T FORGET TO FREE THE OBJECT WHEN YOU ARE TOTALLY DEFINITELY DONE WITH IT.
