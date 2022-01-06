@@ -1,8 +1,13 @@
 #ifndef BAOBZI_HPP
 #define BAOBZI_HPP
 
+#include <fstream>
+#include <iostream>
 #include <queue>
 #include <vector>
+
+#include <msgpack.hpp>
+#define EIGEN_MATRIX_PLUGIN "eigen_matrix_plugin.h"
 
 #define EIGEN_MAX_ALIGN_BYTES 64
 #include <Eigen/Core>
@@ -28,6 +33,7 @@ struct Box {
                 return false;
         return true;
     }
+    MSGPACK_DEFINE(center, half_length);
 };
 
 inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
@@ -238,6 +244,7 @@ class Node {
     }
 
     inline double eval(const VEC &x) const { return cheb_eval<ORDER, ISET>(x, box_, coeffs_); }
+    MSGPACK_DEFINE(box_, first_child_idx, leaf_);
 };
 
 template <int DIM, int ORDER, int ISET>
@@ -302,6 +309,8 @@ struct FunctionTree {
     }
 
     inline double eval(const VEC &x) const { return find_node_traverse(x).eval(x); }
+
+    MSGPACK_DEFINE(nodes_);
 };
 
 template <int DIM, int ORDER, int ISET = 0>
@@ -458,6 +467,13 @@ class Function {
 
     inline double operator()(const VEC &x) const { return eval(x); }
     inline double operator()(const double *x) const { return eval(x); }
+
+    void save(const char *filename) {
+        std::ofstream ofs(filename, std::ofstream::binary | std::ofstream::out);
+        msgpack::pack(ofs, *this);
+    }
+
+    MSGPACK_DEFINE_MAP(Order, Dim, box_, subtrees_, n_subtrees_, tol_, lower_left_, bin_size_);
 };
 
 template <int DIM, int ORDER, int ISET>

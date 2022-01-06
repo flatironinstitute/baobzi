@@ -1,20 +1,27 @@
 #include "baobzi.h"
 #include "baobzi/macros.h"
 
+#include <msgpack.hpp>
+#define EIGEN_MATRIX_PLUGIN "eigen_matrix_plugin.h"
+
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 
 enum ISET { GENERIC, AVX, AVX2, AVX512 };
 
 extern "C" {
-double baobzi_eval(const baobzi_t *func, const double *x) { return func->eval(func->obj, x); };
+double baobzi_eval(const baobzi_t *func, const double *x) { return func->eval(func->obj, x); }
+
+void baobzi_save(const baobzi_t *func, const char *filename) { func->save(func->obj, filename); }
 
 void baobzi_free(baobzi_t *func) {
     func->free(func->obj);
     func->obj = nullptr;
     func->eval = nullptr;
     func->free = nullptr;
-};
+    func->save = nullptr;
+}
 
 baobzi_t baobzi_init(double (*fin)(const double *), uint16_t dim, uint16_t order, const double *center,
                      const double *half_length, const double tol) {
