@@ -6,12 +6,11 @@ project(
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(OpenMP REQUIRED)
-find_package(Eigen3 REQUIRED)
 
 set(BAOBZI_INCLUDES
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
-  ${EIGEN3_INCLUDE_DIR}
+  ${PROJECT_SOURCE_DIR}/extern/eigen
   )
 
 

@@ -39,7 +39,7 @@ make -j
       searches are slow, but I don't expect much honestly. Low priority, but worth a look.
 * Exclusion volume (don't interpolate in a given region)
     * Will have to carefully think about the best way to do this. Getting the API right is key.
-* Add Eigen to submodules. It's header only so _shrug_. Should be a pinch.
+* ~~Add Eigen to submodules. It's header only so _shrug_. Should be a pinch.~~
 * Add serialization. Truly expensive functions should have to only be fit once and re-used.
 * Add logging/reporting functionality -- probably with spdlog
     * Memory/tree statistics
