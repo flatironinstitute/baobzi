@@ -30,8 +30,8 @@ make -j
 ```
 
 ## Roadmap
-* CPU dispatch. With the code generation in place this shouldn't actually be too hard, I don't
-  think. Famous last words.
+* ~~CPU dispatch. With the code generation in place this shouldn't actually be too hard, I don't
+  think. Famous last words.~~
 * Fix header-only performance for C++ (or make a C++ non-template API).
 * Multiple function evaluation. i.e. fit multiple functions on the same tree, and evaluate and
   return the results from all of them on a single call.
