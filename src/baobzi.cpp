@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <iostream>
 
-enum ISET { AVX, AVX2, AVX512 };
+enum ISET { GENERIC, AVX, AVX2, AVX512 };
 
 extern "C" {
 double baobzi_eval(const baobzi_t *func, const double *x) { return func->eval(func->obj, x); };
@@ -23,7 +23,9 @@ baobzi_t baobzi_init(double (*fin)(const double *), uint16_t dim, uint16_t order
     res.DIM = dim;
     res.ORDER = order;
 
-    int iset = ISET::AVX;
+    int iset = ISET::GENERIC;
+    if (__builtin_cpu_supports("avx2"))
+        iset = ISET::AVX;
     if (__builtin_cpu_supports("avx2"))
         iset = ISET::AVX2;
     if (__builtin_cpu_supports("avx512f"))
@@ -84,6 +86,24 @@ baobzi_t baobzi_init(double (*fin)(const double *), uint16_t dim, uint16_t order
         BAOBZI_CASE(3, 12, 2)
         BAOBZI_CASE(3, 14, 2)
         BAOBZI_CASE(3, 16, 2)
+        BAOBZI_CASE(1, 6, 3)
+        BAOBZI_CASE(1, 8, 3)
+        BAOBZI_CASE(1, 10, 3)
+        BAOBZI_CASE(1, 12, 3)
+        BAOBZI_CASE(1, 14, 3)
+        BAOBZI_CASE(1, 16, 3)
+        BAOBZI_CASE(2, 6, 3)
+        BAOBZI_CASE(2, 8, 3)
+        BAOBZI_CASE(2, 10, 3)
+        BAOBZI_CASE(2, 12, 3)
+        BAOBZI_CASE(2, 14, 3)
+        BAOBZI_CASE(2, 16, 3)
+        BAOBZI_CASE(3, 6, 3)
+        BAOBZI_CASE(3, 8, 3)
+        BAOBZI_CASE(3, 10, 3)
+        BAOBZI_CASE(3, 12, 3)
+        BAOBZI_CASE(3, 14, 3)
+        BAOBZI_CASE(3, 16, 3)
     default: {
         std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim << ", "
                   << order << ")\n";
