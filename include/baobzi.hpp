@@ -264,18 +264,27 @@ struct FunctionTree {
         uint64_t curr_child_idx = 1;
         while (!q.empty()) {
             int n_next = q.size();
-
+            int node_index = nodes_.size();
             for (int i = 0; i < n_next; ++i) {
                 Box<DIM, ISET> box = q.front();
                 q.pop();
 
                 nodes_.push_back(Node<DIM, ORDER, ISET>(box));
-                auto &node = nodes_.back();
-                if (!node.fit(f, tol)) {
+            }
+
+#pragma omp parallel for
+            for (size_t i = 0; i < n_next; ++i) {
+                auto &node = nodes_[i + node_index];
+                node.fit(f, tol);
+            }
+
+            for (int i = 0; i < n_next; ++i) {
+                auto &node = nodes_[i + node_index];
+                if (!node.is_leaf()) {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
 
-                    VEC &center = box.center;
+                    VEC &center = node.box_.center;
                     for (uint64_t child = 0; child < NChild; ++child) {
                         VEC offset;
 
@@ -387,13 +396,21 @@ class Function {
         while (!q.empty()) {
             int n_next = q.size();
 
+            std::vector<Node<DIM, ORDER, ISET>> nodes;
             for (int i = 0; i < n_next; ++i) {
                 DBox box = q.front();
                 q.pop();
 
-                Node<DIM, ORDER, ISET> node(box);
-                if (!node.fit(f, tol_)) {
-                    VEC &center = box.center;
+                nodes.emplace_back(Node<DIM, ORDER, ISET>(box));
+            }
+
+#pragma omp parallel for
+            for (auto &node : nodes)
+                node.fit(f, tol);
+
+            for (auto &node : nodes) {
+                if (!node.is_leaf()) {
+                    VEC &center = node.box_.center;
                     for (unsigned child = 0; child < NChild; ++child) {
                         VEC offset;
 
