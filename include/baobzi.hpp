@@ -244,7 +244,7 @@ class Node {
     }
 
     inline double eval(const VEC &x) const { return cheb_eval<ORDER, ISET>(x, box_, coeffs_); }
-    MSGPACK_DEFINE(box_, first_child_idx, leaf_);
+    MSGPACK_DEFINE(box_, first_child_idx, leaf_, coeffs_);
 };
 
 template <int DIM, int ORDER, int ISET>
@@ -295,6 +295,8 @@ struct FunctionTree {
         }
     }
 
+    FunctionTree<DIM, ORDER, ISET>() = default;
+
     inline const Node<DIM, ORDER, ISET> &find_node_traverse(const VEC &x) const {
         auto *node = &nodes_[0];
         while (!node->is_leaf()) {
@@ -319,6 +321,7 @@ class Function {
     static constexpr int NChild = 1 << DIM;
     static constexpr int Dim = DIM;
     static constexpr int Order = ORDER;
+    static constexpr int ISet = ISET;
 
     using VEC = Eigen::Vector<double, DIM>;
     using CoeffVec = Eigen::Vector<double, ORDER>;
@@ -331,7 +334,7 @@ class Function {
 
     double (*f_)(const double *);
     DBox box_;
-    const double tol_;
+    double tol_;
     VEC lower_left_;
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_;
@@ -431,6 +434,8 @@ class Function {
         }
     }
 
+    Function<DIM, ORDER, ISET>() { init_statics(); };
+
     inline Eigen::Vector<int, DIM> get_bins(const int i_bin) const {
         if constexpr (DIM == 1)
             return Eigen::Vector<int, DIM>{i_bin};
@@ -470,10 +475,12 @@ class Function {
 
     void save(const char *filename) {
         std::ofstream ofs(filename, std::ofstream::binary | std::ofstream::out);
+        std::array<int, 2> params{Dim, Order};
+        msgpack::pack(ofs, params);
         msgpack::pack(ofs, *this);
     }
 
-    MSGPACK_DEFINE_MAP(Order, Dim, box_, subtrees_, n_subtrees_, tol_, lower_left_, bin_size_);
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, bin_size_);
 };
 
 template <int DIM, int ORDER, int ISET>
