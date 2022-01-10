@@ -12,6 +12,18 @@
         break;                                                                                                         \
     }
 
+#define BAOBZI_CASE_RESTORE(DIM, ORDER, ISET)                                                                          \
+    case BAOBZI_JOIN(DIM, ORDER, ISET): {                                                                              \
+        baobzi::Function<DIM, ORDER, ISET> *f_ptr = new baobzi::Function<DIM, ORDER, ISET>();                          \
+        *f_ptr = obj.as<baobzi::Function<DIM, ORDER, ISET>>();                                                         \
+        f_ptr->f_ = fin;                                                                                               \
+        res.obj = f_ptr;                                                                                               \
+        res.save = &baobzi_save_##DIM##d_##ORDER##_##ISET;                                                             \
+        res.eval = &baobzi_eval_##DIM##d_##ORDER##_##ISET;                                                             \
+        res.free = &baobzi_free_##DIM##d_##ORDER##_##ISET;                                                             \
+        break;                                                                                                         \
+    }
+
 #define BAOBZI_DEFS(DIM, ORDER, ISET)                                                                                  \
     double baobzi_eval_##DIM##d_##ORDER##_##ISET(const void *f, const double *x) {                                     \
         return (*(baobzi::Function<DIM, ORDER, ISET> *)f).eval(x);                                                     \

@@ -3,6 +3,7 @@
 mkdir -p include/baobzi
 
 casefile=include/baobzi/baobzi_cases.h
+casefile_restore=include/baobzi/baobzi_cases_restore.h
 declfile=include/baobzi/baobzi_decls.h
 
 rm -f $casefile $declfile
@@ -20,6 +21,7 @@ for iset in {0..3}; do
             printf '}\n' >> $srcfile
 
             printf 'BAOBZI_CASE(%d, %d, %d)\n' $dim $order $iset >> $casefile
+            printf 'BAOBZI_CASE_RESTORE(%d, %d, %d)\n' $dim $order $iset >> $casefile_restore
             printf 'BAOBZI_DECLS(%d, %d, %d)\n' $dim $order $iset >> $declfile
         done
     done
