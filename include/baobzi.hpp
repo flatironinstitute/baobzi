@@ -1,8 +1,13 @@
 #ifndef BAOBZI_HPP
 #define BAOBZI_HPP
 
+#include <fstream>
+#include <iostream>
 #include <queue>
 #include <vector>
+
+#include <msgpack.hpp>
+#define EIGEN_MATRIX_PLUGIN "eigen_matrix_plugin.h"
 
 #define EIGEN_MAX_ALIGN_BYTES 64
 #include <Eigen/Core>
@@ -28,6 +33,7 @@ struct Box {
                 return false;
         return true;
     }
+    MSGPACK_DEFINE(center, half_length);
 };
 
 inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
@@ -238,6 +244,7 @@ class Node {
     }
 
     inline double eval(const VEC &x) const { return cheb_eval<ORDER, ISET>(x, box_, coeffs_); }
+    MSGPACK_DEFINE(box_, first_child_idx, leaf_, coeffs_);
 };
 
 template <int DIM, int ORDER, int ISET>
@@ -288,6 +295,8 @@ struct FunctionTree {
         }
     }
 
+    FunctionTree<DIM, ORDER, ISET>() = default;
+
     inline const Node<DIM, ORDER, ISET> &find_node_traverse(const VEC &x) const {
         auto *node = &nodes_[0];
         while (!node->is_leaf()) {
@@ -302,6 +311,8 @@ struct FunctionTree {
     }
 
     inline double eval(const VEC &x) const { return find_node_traverse(x).eval(x); }
+
+    MSGPACK_DEFINE(nodes_);
 };
 
 template <int DIM, int ORDER, int ISET = 0>
@@ -310,6 +321,7 @@ class Function {
     static constexpr int NChild = 1 << DIM;
     static constexpr int Dim = DIM;
     static constexpr int Order = ORDER;
+    static constexpr int ISet = ISET;
 
     using VEC = Eigen::Vector<double, DIM>;
     using CoeffVec = Eigen::Vector<double, ORDER>;
@@ -322,7 +334,7 @@ class Function {
 
     double (*f_)(const double *);
     DBox box_;
-    const double tol_;
+    double tol_;
     VEC lower_left_;
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_;
@@ -422,6 +434,8 @@ class Function {
         }
     }
 
+    Function<DIM, ORDER, ISET>() { init_statics(); };
+
     inline Eigen::Vector<int, DIM> get_bins(const int i_bin) const {
         if constexpr (DIM == 1)
             return Eigen::Vector<int, DIM>{i_bin};
@@ -458,6 +472,15 @@ class Function {
 
     inline double operator()(const VEC &x) const { return eval(x); }
     inline double operator()(const double *x) const { return eval(x); }
+
+    void save(const char *filename) {
+        std::ofstream ofs(filename, std::ofstream::binary | std::ofstream::out);
+        std::array<int, 2> params{Dim, Order};
+        msgpack::pack(ofs, params);
+        msgpack::pack(ofs, *this);
+    }
+
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, bin_size_);
 };
 
 template <int DIM, int ORDER, int ISET>
