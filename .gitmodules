@@ -4,3 +4,6 @@
 [submodule "extern/eigen"]
 	path = extern/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "extern/catch2"]
+	path = extern/catch2
+	url = https://github.com/catchorg/Catch2
