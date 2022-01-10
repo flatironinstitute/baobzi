@@ -41,6 +41,7 @@ make -j
     * Will have to carefully think about the best way to do this. Getting the API right is key.
 * ~~Add Eigen to submodules. It's header only so _shrug_. Should be a pinch.~~
 * Add serialization. Truly expensive functions should have to only be fit once and re-used.
+* Add parallel fitting
 * Add logging/reporting functionality -- probably with spdlog
     * Memory/tree statistics
 * Auto-optimization for 'spiky' trees
