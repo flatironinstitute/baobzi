@@ -11,6 +11,7 @@ set(BAOBZI_INCLUDES
   ${PROJECT_SOURCE_DIR}/include
   ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
   ${PROJECT_SOURCE_DIR}/extern/eigen
+  ${PROJECT_SOURCE_DIR}/extern/catch2/src
   )
 
 option(BUILD_STATIC "Build the static library" OFF)
@@ -65,3 +66,14 @@ if (${BUILD_SHARED} AND ${BUILD_EXAMPLES})
   target_include_directories(baobzi_timing_c PUBLIC ${BAOBZI_INCLUDES})
   target_link_libraries(baobzi_timing_c PUBLIC baobzi OpenMP::OpenMP_CXX m)
 endif()
+
+
+add_subdirectory(extern/catch2)
+
+add_executable(test_c tests/test_c.cpp)
+target_link_libraries(test_c PRIVATE Catch2::Catch2WithMain baobzi)
+
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
+include(CTest)
+include(Catch)
+catch_discover_tests(test_c)
