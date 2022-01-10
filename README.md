@@ -23,8 +23,8 @@ git clone --recursive https://github.com/blackwer/baobzi.git
 cd baobzi
 mkdir build
 cd build
-# -march=broadwell performance is basically the same, and I suggest it for FI resources
-cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_FLAGS="-march=native" ..
+# Don't supply -march!!! Builds with CPU dispatch so avx, avx2, and avx512 are all supported by default
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
 make -j
 ./baobzi_timing_c
 ```
@@ -40,7 +40,7 @@ make -j
 * Exclusion volume (don't interpolate in a given region)
     * Will have to carefully think about the best way to do this. Getting the API right is key.
 * ~~Add Eigen to submodules. It's header only so _shrug_. Should be a pinch.~~
-* Add serialization. Truly expensive functions should have to only be fit once and re-used.
+* ~~Add serialization. Truly expensive functions should have to only be fit once and re-used.~~
 * Add parallel fitting
 * Add logging/reporting functionality -- probably with spdlog
     * Memory/tree statistics
