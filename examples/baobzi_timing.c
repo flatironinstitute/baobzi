@@ -10,6 +10,7 @@ double testfun_1d(const double *x) { return log(x[0]); }
 double testfun_2d(const double *x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
 double testfun_2d_2(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1])); }
 double testfun_3d(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2])); }
+double testfun_4d(const double *x) { return x[0] * x[1] * x[2] * x[3]; }
 
 void time_function(const baobzi_t *function, const double *x, int size, int n_runs) {
     const double time = omp_get_wtime();
@@ -110,6 +111,15 @@ int main(int argc, char *argv[]) {
         double hl[3] = {1.0, 1.0, 1.0};
         double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};
         test_func(&testfun_3d, dim, order, x, hl, center, n_points, n_runs, tol);
+    }
+
+    {
+        const int dim = 4;
+        const int order = 6;
+        const double tol = 1E-6;
+        double hl[4] = {2.0, 2.0, 2.0, 2.0};
+        double center[4] = {0.0, 0.0, 0.0, 0.0};
+        test_func(&testfun_4d, dim, order, x, hl, center, n_points, n_runs, tol);
     }
 
     return 0;

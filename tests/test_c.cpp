@@ -4,6 +4,7 @@
 #include <cmath>
 
 double testfun_2d(const double *x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
+double testfun_4d(const double *x) { return x[0] * x[1] * x[2] * x[3]; }
 
 TEST_CASE("2D evaluations", "[baobzi]") {
     const int dim = 2;
@@ -38,6 +39,20 @@ TEST_CASE("2D evaluations", "[baobzi]") {
 
         baobzi_free(&baobzi_func_restored);
     }
+
+    baobzi_free(&baobzi_func);
+}
+
+TEST_CASE("4D evaluations", "[baobzi]") {
+    const int dim = 4;
+    const int order = 6;
+    const double tol = 1E-6;
+    const double half_l[4] = {2.0, 2.0, 2.0, 2.0};
+    const double center[4] = {0.0, 0.0, 0.0, 0.0};
+
+    baobzi_t baobzi_func = baobzi_init(testfun_4d, dim, order, center, half_l, tol);
+
+    baobzi_eval(&baobzi_func, center);
 
     baobzi_free(&baobzi_func);
 }

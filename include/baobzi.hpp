@@ -112,6 +112,31 @@ inline double cheb_eval(const Eigen::Vector3d &x, const Box<3, ISET> &box,
     return res;
 }
 
+template <int ORDER, int ISET>
+inline double cheb_eval(const Eigen::Vector4d &x, const Box<4, ISET> &box,
+                        const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
+
+    Eigen::Vector4d xinterp = (x - box.center).array() / box.half_length.array();
+
+    Eigen::Vector<double, ORDER> Tn[4];
+    Tn[0][0] = Tn[1][0] = Tn[2][0] = Tn[3][0] = 1.0;
+    for (int i = 0; i < 4; ++i) {
+        Tn[i][1] = xinterp[i];
+        xinterp[i] *= 2.0;
+        for (int j = 2; j < ORDER; ++j)
+            Tn[i][j] = xinterp[i] * Tn[i][j - 1] - Tn[i][j - 2];
+    }
+
+    double res = 0.0;
+    for (int i = 0; i < ORDER; ++i)
+        for (int j = 0; j < ORDER; ++j)
+            for (int k = 0; k < ORDER; ++k)
+                for (int l = 0; l < ORDER; ++l)
+                    res += Tn[0][i] * Tn[1][j] * Tn[2][k] * Tn[3][l];
+
+    return res;
+}
+
 template <int DIM, int ORDER, int ISET>
 class Function;
 
@@ -202,11 +227,11 @@ class Node {
             coeffs_.resize(ORDER * ORDER * ORDER);
             Eigen::Tensor<double, 3> coeffs_tensor(ORDER, ORDER, ORDER);
             using matrix_t = Eigen::Matrix<double, ORDER, ORDER>;
-            using map_t = Eigen::Map<matrix_t>;
+            using matrix_map_t = Eigen::Map<matrix_t>;
             using tensor_t = Eigen::Tensor<double, 2>;
             for (int block = 0; block < ORDER; ++block) {
                 tensor_t F_block_tensor = F.chip(block, 2);
-                map_t F_block(F_block_tensor.data());
+                matrix_map_t F_block(F_block_tensor.data());
 
                 matrix_t coeffs_tmp = Func::VLU_.solve(F_block);
                 coeffs_tmp = Func::VLU_.solve(coeffs_tmp.transpose()).transpose();
@@ -214,8 +239,8 @@ class Node {
             }
             for (int block = 0; block < ORDER; ++block) {
                 Eigen::Tensor<double, 2> coeffs_tmp = coeffs_tensor.chip(block, 0);
-                map_t coeffs_ysolve(coeffs_tmp.data());
-                map_t(coeffs_.data() + block * ORDER * ORDER) = Func::VLU_.solve(coeffs_ysolve.transpose()).transpose();
+                matrix_map_t coeffs_ysolve(coeffs_tmp.data());
+                matrix_map_t(coeffs_.data() + block * ORDER * ORDER) = Func::VLU_.solve(coeffs_ysolve.transpose()).transpose();
             }
 
             for (int i = 0; i < ORDER; ++i) {
@@ -241,6 +266,72 @@ class Node {
             leaf_ = true;
             return true;
         }
+        if constexpr (D == 4) {
+            using tensor4_t = Eigen::Tensor<double, 4>;
+            tensor4_t F(ORDER, ORDER, ORDER, ORDER);
+
+            Eigen::Matrix<double, ORDER, 4> rvec;
+            for (int i = 0; i < 4; ++i)
+                rvec.col(i) =
+                    Func::get_cheb_nodes(box_.center[i] - box_.half_length[i], box_.center[i] + box_.half_length[i]);
+
+            for (int i = 0; i < ORDER; ++i)
+                for (int j = 0; j < ORDER; ++j)
+                    for (int k = 0; k < ORDER; ++k)
+                        for (int l = 0; l < ORDER; ++l)
+                            F(i, j, k, l) = f(rvec.col(i).data());
+
+            coeffs_.resize(ORDER * ORDER * ORDER * ORDER);
+            tensor4_t coeffs_tensor(ORDER, ORDER, ORDER, ORDER);
+            using matrix_t = Eigen::Matrix<double, ORDER, ORDER>;
+            using tensor3_t = Eigen::Tensor<double, 3>;
+            using tensor2_t = Eigen::Tensor<double, 2>;
+
+            using matrix_map_t = Eigen::Map<matrix_t>;
+            for (int i_block = 0; i_block < ORDER; ++i_block) {
+                tensor3_t F_cube_tensor = F.chip(i_block, 3);
+                for (int j_block = 0; j_block < ORDER; ++j_block) {
+                    tensor2_t F_block_tensor = F_cube_tensor.chip(j_block, 2);
+                    matrix_map_t F_block(F_block_tensor.data());
+
+                    matrix_t coeffs_tmp = Func::VLU_.solve(F_block);
+                    coeffs_tmp = Func::VLU_.solve(coeffs_tmp.transpose()).transpose();
+                    coeffs_tensor.chip(i_block, 3).chip(j_block, 2) =
+                        Eigen::TensorMap<tensor2_t>(coeffs_tmp.data(), ORDER, ORDER);
+                }
+                for (int j_block = 0; j_block < ORDER; ++j_block) {
+                    tensor2_t coeffs_tmp = coeffs_tensor.chip(i_block, 3).chip(j_block, 1);
+                    matrix_map_t coeffs_ysolve(coeffs_tmp.data());
+                    matrix_map_t(coeffs_.data() + i_block * ORDER * ORDER * ORDER) =
+                        Func::VLU_.solve(coeffs_ysolve.transpose()).transpose();
+                }
+            }
+
+            for (int i = 0; i < ORDER; ++i) {
+                for (int j = 0; j < ORDER; ++j) {
+                    for (int k = 0; k < ORDER; ++k) {
+                        for (int l = 0; l < ORDER; ++l) {
+                            VEC point =
+                                (box_.center - box_.half_length).array() +
+                                2.0 * VEC{(double)i, (double)j, (double)k, (double)l}.array() * box_.half_length.array() / ORDER;
+
+                            const double test_val = eval(point);
+                            const double actual_val = f(point.data());
+                            const double rel_error = std::abs((actual_val - test_val) / actual_val);
+
+                            if (fabs(actual_val) > 1E-16 && rel_error > tol) {
+                                coeffs_.clear();
+                                coeffs_.shrink_to_fit();
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+
+            leaf_ = true;
+            return true;
+        }        
     }
 
     inline double eval(const VEC &x) const { return cheb_eval<ORDER, ISET>(x, box_, coeffs_); }
@@ -461,6 +552,10 @@ class Function {
         else if constexpr (DIM == 3)
             return Eigen::Vector<int, DIM>{i_bin % n_subtrees_[0], (i_bin / n_subtrees_[0]) % n_subtrees_[1],
                                            i_bin / (n_subtrees_[0] * n_subtrees_[1])};
+        else if constexpr (DIM == 4)
+            return Eigen::Vector<int, DIM>{i_bin % n_subtrees_[0], (i_bin / n_subtrees_[0]) % n_subtrees_[1],
+                                           i_bin / (n_subtrees_[0] * n_subtrees_[1]) % n_subtrees_[2],
+                                           i_bin / (n_subtrees_[0] * n_subtrees_[1] * n_subtrees_[2])};
     }
 
     inline int get_linear_bin(const Eigen::Vector<double, 1> &x) const {
@@ -478,6 +573,13 @@ class Function {
         const VEC x_bin = x - lower_left_;
         const Eigen::Vector<int, DIM> bin = (x_bin.array() / bin_size_.array()).template cast<int>();
         return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
+    }
+
+    inline int get_linear_bin(const Eigen::Vector4d &x) const {
+        const VEC x_bin = x - lower_left_;
+        const Eigen::Vector<int, DIM> bin = (x_bin.array() / bin_size_.array()).template cast<int>();
+        return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2] +
+               n_subtrees_[0] * n_subtrees_[1] * n_subtrees_[2] * bin[3];
     }
 
     inline const Node<DIM, ORDER, ISET> &find_node(const VEC &x) const {
