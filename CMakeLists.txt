@@ -71,7 +71,7 @@ endif()
 add_subdirectory(extern/catch2)
 
 add_executable(test_c tests/test_c.cpp)
-target_link_libraries(test_c PRIVATE Catch2::Catch2WithMain baobzi  OpenMP::OpenMP_CXX)
+target_link_libraries(test_c PRIVATE Catch2::Catch2WithMain baobzi OpenMP::OpenMP_CXX)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
 include(CTest)
