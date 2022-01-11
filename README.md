@@ -30,28 +30,4 @@ make -j
 ```
 
 ## Roadmap
-* ~~CPU dispatch. With the code generation in place this shouldn't actually be too hard, I don't
-  think. Famous last words.~~
-* Fix header-only performance for C++ (or make a C++ non-template API).
-* Multiple function evaluation. i.e. fit multiple functions on the same tree, and evaluate and
-  return the results from all of them on a single call.
-    * Will require some fairly massive refactoring. Benefit could be large, if the tree
-      searches are slow, but I don't expect much honestly. Low priority, but worth a look.
-* Exclusion volume (don't interpolate in a given region)
-    * Will have to carefully think about the best way to do this. Getting the API right is key.
-* ~~Add Eigen to submodules. It's header only so _shrug_. Should be a pinch.~~
-* ~~Add serialization. Truly expensive functions should have to only be fit once and re-used.~~
-* ~~Add parallel fitting~~
-* Add logging/reporting functionality -- probably with spdlog
-    * Memory/tree statistics
-* Auto-optimization for 'spiky' trees
-* Maximum depth/infinite recursion detection/memory limits
-* Fix intel compilation
-* Add other language bindings (or direct implementations)
-    * Julia
-    * Python
-    * Fortran
-* Add higher dimensions (only fit/eval have to be written for any dimension)
-* Add roadmap issues to... the issues tracker
-* Allow for choice of sampling or coefficient to judge fit
-* Your suggestion here -- I left my hard copy of the roadmap in the office.
+See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker](https://github.com/blackwer/baobzi/projects/1).
