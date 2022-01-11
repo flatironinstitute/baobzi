@@ -8,11 +8,11 @@ do. Plant it (it's a tree!), and use it again and again. That's about the extent
 metaphor -- try not to think about it too much.
 
 ## Building/testing
-Baobzi's only dependencies are cmake >= 3.10, eigen >= 3.4, and a C++17 compiler. I get
-_vastly_ better performance out of g++-11 (ONLY FOR C++ HEADER ONLY BUILDS) right now than any
-other compiler, and I'm not sure exactly why. It's very finicky, where the size of the
-compilation unit matters. Therefore, for optimal performance, currently, I suggest using the C
-shared/static library interface with gcc rather than the C++ header directly. See
+Baobzi's only dependencies are cmake >= 3.5, and a C/C++17 compiler (gcc only really,
+currently). I get _vastly_ better performance out of g++-11 (ONLY FOR C++ HEADER ONLY BUILDS)
+right now than any other compiler, and I'm not sure exactly why. It's very finicky, where the
+size of the compilation unit matters. Therefore, for optimal performance, currently, I suggest
+using the C shared/static library interface with gcc rather than the C++ header directly. See
 [examples/baobzi_timing.c](examples/baobzi_timing.c) for an example. On my Xeon Gold 6128 using
 one core, this example gets roughly 50M evals/s on a simple 2D example, and 20M evals/s on a
 simple 3D example.
