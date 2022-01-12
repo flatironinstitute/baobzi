@@ -28,13 +28,13 @@ int get_iset() {
     return iset;
 }
 
-double baobzi_eval(const baobzi_t *func, const double *x) { return func->eval(func->obj, x); }
+double baobzi_eval(const baobzi_t func, const double *x) { return func->eval(func->obj, x); }
 
-void baobzi_save(const baobzi_t *func, const char *filename) { func->save(func->obj, filename); }
+void baobzi_save(const baobzi_t func, const char *filename) { func->save(func->obj, filename); }
 
 baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr) {
     std::string filename(filename_cstr);
-    baobzi_t res;
+    baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
     int fd = open(filename.c_str(), O_RDONLY);
     if (fd == -1)
         throw std::runtime_error("Unable to open baobzi file " + filename + ".");
@@ -60,9 +60,9 @@ baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr
 
     const int dim = dim_order[0];
     const int order = dim_order[1];
-    res.f_ = fin;
-    res.DIM = dim;
-    res.ORDER = order;
+    res->f_ = fin;
+    res->DIM = dim;
+    res->ORDER = order;
 
     int iset = get_iset();
     switch (BAOBZI_JOIN(dim, order, iset)) {
@@ -80,19 +80,17 @@ baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr
 }
 
 void baobzi_free(baobzi_t *func) {
-    func->free(func->obj);
-    func->obj = nullptr;
-    func->eval = nullptr;
-    func->free = nullptr;
-    func->save = nullptr;
+    (*func)->free((*func)->obj);
+    free(*func);
+    *func = nullptr;
 }
 
 baobzi_t baobzi_init(double (*fin)(const double *), uint16_t dim, uint16_t order, const double *center,
                      const double *half_length, const double tol) {
-    baobzi_t res;
-    res.f_ = fin;
-    res.DIM = dim;
-    res.ORDER = order;
+    baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
+    res->f_ = fin;
+    res->DIM = dim;
+    res->ORDER = order;
 
     int iset = get_iset();
 

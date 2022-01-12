@@ -16,25 +16,25 @@ TEST_CASE("2D evaluations", "[baobzi]") {
 
     SECTION("evaluations at lower left") {
         double x[2] = {center[0] - half_l[0], center[1] - half_l[1]};
-        double y_appx = baobzi_eval(&baobzi_func, x);
-        double y_exact = baobzi_func.f_(x);
+        double y_appx = baobzi_eval(baobzi_func, x);
+        double y_exact = baobzi_func->f_(x);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < tol);
     }
 
     SECTION("evaluations at center") {
-        double y_appx = baobzi_eval(&baobzi_func, center);
-        double y_exact = baobzi_func.f_(center);
+        double y_appx = baobzi_eval(baobzi_func, center);
+        double y_exact = baobzi_func->f_(center);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < tol);
     }
 
     SECTION("save/restore") {
         const char *filename = "test_func_approx_2d.baobzi";
-        baobzi_save(&baobzi_func, filename);
-        baobzi_t baobzi_func_restored = baobzi_restore(baobzi_func.f_, filename);
+        baobzi_save(baobzi_func, filename);
+        baobzi_t baobzi_func_restored = baobzi_restore(baobzi_func->f_, filename);
 
-        REQUIRE(baobzi_eval(&baobzi_func, center) == baobzi_eval(&baobzi_func_restored, center));
+        REQUIRE(baobzi_eval(baobzi_func, center) == baobzi_eval(baobzi_func_restored, center));
 
         baobzi_free(&baobzi_func_restored);
     }
