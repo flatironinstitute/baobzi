@@ -11,7 +11,7 @@ double testfun_2d(const double *x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1]
 double testfun_2d_2(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1])); }
 double testfun_3d(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2])); }
 
-void time_function(const baobzi_t *function, const double *x, int size, int n_runs) {
+void time_function(const baobzi_t function, const double *x, int size, int n_runs) {
     const double time = omp_get_wtime();
     double res = 0.0;
     for (int i_run = 0; i_run < n_runs; ++i_run) {
@@ -24,7 +24,7 @@ void time_function(const baobzi_t *function, const double *x, int size, int n_ru
     printf("time, Megaevals/s, sum: %g %g %g\n", dt, n_eval / (dt * 1E6), res);
 }
 
-void print_error(const baobzi_t *function, const double *x, int size) {
+void print_error(const baobzi_t function, const double *x, int size) {
     double max_error = 0.0;
     double max_rel_error = 0.0;
     double mean_error = 0.0;
@@ -71,9 +71,9 @@ void test_func(double (*fin)(const double *), int dim, int order, const double *
     char filename[256];
     sprintf(filename, "func_approx_%dd", dim);
 
-    time_function(&func_approx, x_transformed, n_points * dim, n_runs);
-    print_error(&func_approx, x_transformed, n_points * dim);
-    baobzi_save(&func_approx, filename);
+    time_function(func_approx, x_transformed, n_points * dim, n_runs);
+    print_error(func_approx, x_transformed, n_points * dim);
+    baobzi_save(func_approx, filename);
 
     free(x_transformed);
     // DON'T FORGET TO FREE THE OBJECT WHEN YOU ARE TOTALLY DEFINITELY DONE WITH IT.
@@ -96,9 +96,9 @@ int main(int argc, char *argv[]) {
 
     {
         const int dim = 2;
-        const int order = 6;             // Chebyshev polynomial order
-        const double tol = 1E-10;        // Maximum relative error target
-        const double hl[2] = {1.0, 1.0}; // half the length of the domain in each dimension
+        const int order = 6;                                 // Chebyshev polynomial order
+        const double tol = 1E-10;                            // Maximum relative error target
+        const double hl[2] = {1.0, 1.0};                     // half the length of the domain in each dimension
         const double center[2] = {hl[0] + 0.5, hl[1] + 2.0}; // center of the domain
         test_func(&testfun_2d, dim, order, x, hl, center, n_points, n_runs, tol);
     }

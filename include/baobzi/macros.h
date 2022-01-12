@@ -5,10 +5,10 @@
 
 #define BAOBZI_CASE(DIM, ORDER, ISET)                                                                                  \
     case BAOBZI_JOIN(DIM, ORDER, ISET): {                                                                              \
-        res.obj = baobzi_init_##DIM##d_##ORDER##_##ISET(fin, center, half_length, tol);                                \
-        res.save = &baobzi_save_##DIM##d_##ORDER##_##ISET;                                                             \
-        res.eval = &baobzi_eval_##DIM##d_##ORDER##_##ISET;                                                             \
-        res.free = &baobzi_free_##DIM##d_##ORDER##_##ISET;                                                             \
+        res->obj = baobzi_init_##DIM##d_##ORDER##_##ISET(fin, center, half_length, tol);                               \
+        res->save = &baobzi_save_##DIM##d_##ORDER##_##ISET;                                                            \
+        res->eval = &baobzi_eval_##DIM##d_##ORDER##_##ISET;                                                            \
+        res->free = &baobzi_free_##DIM##d_##ORDER##_##ISET;                                                            \
         break;                                                                                                         \
     }
 
@@ -17,10 +17,10 @@
         baobzi::Function<DIM, ORDER, ISET> *f_ptr = new baobzi::Function<DIM, ORDER, ISET>();                          \
         *f_ptr = obj.as<baobzi::Function<DIM, ORDER, ISET>>();                                                         \
         f_ptr->f_ = fin;                                                                                               \
-        res.obj = f_ptr;                                                                                               \
-        res.save = &baobzi_save_##DIM##d_##ORDER##_##ISET;                                                             \
-        res.eval = &baobzi_eval_##DIM##d_##ORDER##_##ISET;                                                             \
-        res.free = &baobzi_free_##DIM##d_##ORDER##_##ISET;                                                             \
+        res->obj = f_ptr;                                                                                              \
+        res->save = &baobzi_save_##DIM##d_##ORDER##_##ISET;                                                            \
+        res->eval = &baobzi_eval_##DIM##d_##ORDER##_##ISET;                                                            \
+        res->free = &baobzi_free_##DIM##d_##ORDER##_##ISET;                                                            \
         break;                                                                                                         \
     }
 
