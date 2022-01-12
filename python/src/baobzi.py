@@ -37,10 +37,6 @@ baobzi_restore.restype = baobzi_t
 baobzi_restore.argtypes = [INPUT_FUNC, c_char_p]
 
 
-def py_test_func(x):
-    return x[0] * x[1]
-
-
 class Baobzi:
     def __init__(self,
                  fin,
@@ -70,4 +66,3 @@ class Baobzi:
 
     def save(self, filename):
         baobzi_save(self.ptr, filename)
-
