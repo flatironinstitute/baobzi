@@ -36,8 +36,8 @@ TEST_CASE("2D evaluations", "[baobzi]") {
 
         REQUIRE(baobzi_eval(baobzi_func, center) == baobzi_eval(baobzi_func_restored, center));
 
-        baobzi_free(&baobzi_func_restored);
+        baobzi_free(baobzi_func_restored);
     }
 
-    baobzi_free(&baobzi_func);
+    baobzi_free(baobzi_func);
 }
