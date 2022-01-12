@@ -78,7 +78,7 @@ void test_func(double (*fin)(const double *), int dim, int order, const double *
     free(x_transformed);
     // DON'T FORGET TO FREE THE OBJECT WHEN YOU ARE TOTALLY DEFINITELY DONE WITH IT.
     // They can be HUGE. Also memory leaks :(
-    baobzi_free(&func_approx);
+    baobzi_free(func_approx);
 }
 
 int main(int argc, char *argv[]) {

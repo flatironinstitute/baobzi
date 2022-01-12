@@ -79,10 +79,10 @@ baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr
     return res;
 }
 
-void baobzi_free(baobzi_t *func) {
-    (*func)->free((*func)->obj);
-    free(*func);
-    *func = nullptr;
+baobzi_t baobzi_free(baobzi_t func) {
+    func->free(func->obj);
+    free(func);
+    return nullptr;
 }
 
 baobzi_t baobzi_init(double (*fin)(const double *), uint16_t dim, uint16_t order, const double *center,
