@@ -15,13 +15,43 @@ function init(fin, dim, order, center, half_length, tol::Float64)
     return output_ptr
 end
 
-function eval(func, x)
+function eval(func::Ptr{baobzi_struct}, x)
     return ccall(
         (:baobzi_eval, :libbaobzi),
         Cdouble,
         (Ptr{Cvoid}, Ptr{Cdouble},),
         func, x
     )
+end
+
+function free(func::Ptr{baobzi_struct})
+    ccall(
+        (:baobzi_free, :libbaobzi),
+        Ptr{Cvoid},
+        (Ptr{Cvoid},),
+        func
+    )
+end
+
+function save(func::Ptr{baobzi_struct}, filename::String)
+    ccall(
+        (:baobzi_save, :libbaobzi),
+        Ptr{Cvoid},
+        (Ptr{Cvoid}, Cstring),
+        func, filename
+    )
+end
+
+function restore(fin, filename::String)
+    c_fin = @cfunction($fin, Cdouble, (Ptr{Cdouble},))
+    output_ptr = ccall(
+        (:baobzi_restore, :libbaobzi),
+        Ptr{baobzi_struct},
+        (Ptr{Cvoid}, Cstring),
+        c_fin, filename
+    )
+
+    return output_ptr
 end
 
 end
