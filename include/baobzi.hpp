@@ -405,8 +405,8 @@ class Function {
             }
 
 #pragma omp parallel for
-            for (auto &node : nodes)
-                node.fit(f, tol);
+            for (int i = 0; i < nodes.size(); ++i)
+                nodes[i].fit(f, tol);
 
             for (auto &node : nodes) {
                 if (!node.is_leaf()) {
