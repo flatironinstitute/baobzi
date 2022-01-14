@@ -15,8 +15,9 @@
 #include <Eigen/LU>
 #include <unsupported/Eigen/CXX11/Tensor>
 
-namespace baobzi {
+#include <baobzi/header.h>
 
+namespace baobzi {
 template <int D, int ISET>
 struct Box {
     using VEC = Eigen::Vector<double, D>;
@@ -492,7 +493,7 @@ class Function {
 
     void save(const char *filename) {
         std::ofstream ofs(filename, std::ofstream::binary | std::ofstream::out);
-        std::array<int, 2> params{Dim, Order};
+        baobzi_header_t params{Dim, Order, BAOBZI_HEADER_VERSION};
         msgpack::pack(ofs, params);
         msgpack::pack(ofs, *this);
     }
