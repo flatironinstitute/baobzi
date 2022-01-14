@@ -2,6 +2,7 @@
 #define BAOBZI_H
 
 #include "baobzi/macros.h"
+#include "baobzi/header.h"
 
 #include <stdint.h>
 
@@ -27,6 +28,7 @@ baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename);
 baobzi_t baobzi_free(baobzi_t func);
 baobzi_t baobzi_init(double (*)(const double *), uint16_t dim, uint16_t order, const double *center,
                      const double *half_length, const double tol);
+baobzi_header_t read_header_from_file(const char *fname);
 
 #include "baobzi/baobzi_decls.h"
 
