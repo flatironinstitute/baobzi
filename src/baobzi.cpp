@@ -1,8 +1,8 @@
 #include "baobzi.hpp"
 #include "baobzi.h"
-#include "baobzi/macros.h"
 
 #include <msgpack.hpp>
+#include <tuple>
 #include <unistd.h>
 #define EIGEN_MATRIX_PLUGIN "eigen_matrix_plugin.h"
 
@@ -15,6 +15,30 @@
 #include <sys/stat.h>
 
 enum ISET { GENERIC, AVX, AVX2, AVX512 };
+
+struct mmap_wrapper {
+    char *addr;
+    int fd;
+    std::size_t buflen;
+
+    mmap_wrapper(const std::string &fname) {
+        fd = open(fname.c_str(), O_RDONLY);
+        if (fd == -1)
+            throw std::runtime_error("Unable to open baobzi file " + fname + ".");
+
+        struct stat sb;
+        if (fstat(fd, &sb) == -1)
+            throw std::runtime_error("Error statting " + fname + ".");
+
+        buflen = sb.st_size;
+
+        addr = static_cast<char *>(mmap(NULL, buflen, PROT_READ, MAP_PRIVATE, fd, 0u));
+        if (addr == MAP_FAILED)
+            throw std::runtime_error("Error mapping " + fname + " for restore.");
+    }
+
+    ~mmap_wrapper() { close(fd); }
+};
 
 extern "C" {
 int get_iset() {
@@ -32,40 +56,40 @@ double baobzi_eval(const baobzi_t func, const double *x) { return func->eval(fun
 
 void baobzi_save(const baobzi_t func, const char *filename) { func->save(func->obj, filename); }
 
+baobzi_header_t read_header(const char *addr, std::size_t buflen, std::size_t *offset) {
+    msgpack::object_handle oh;
+    msgpack::unpack(oh, addr, buflen, *offset);
+    return oh.get().as<baobzi_header_t>();
+}
+
+baobzi_header_t baobzi_read_header_from_file(const char *fname) {
+    std::size_t offset = 0;
+    std::string filename(fname);
+    mmap_wrapper infile(filename);
+    return read_header(infile.addr, infile.buflen, &offset);
+}
+
 baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr) {
     std::string filename(filename_cstr);
     baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
-    int fd = open(filename.c_str(), O_RDONLY);
-    if (fd == -1)
-        throw std::runtime_error("Unable to open baobzi file " + filename + ".");
-
-    struct stat sb;
-    if (fstat(fd, &sb) == -1)
-        throw std::runtime_error("Error statting " + filename + ".");
-
-    std::size_t buflen = sb.st_size;
-
-    const char *addr = static_cast<const char *>(mmap(NULL, buflen, PROT_READ, MAP_PRIVATE, fd, 0u));
-    if (addr == MAP_FAILED)
-        throw std::runtime_error("Error mapping " + filename + " for restore.");
 
     std::size_t offset = 0;
+    mmap_wrapper infile(filename);
+
+    baobzi_header_t header = read_header(infile.addr, infile.buflen, &offset);
+
     msgpack::object_handle oh;
-    msgpack::unpack(oh, addr, buflen, offset);
+    msgpack::unpack(oh, infile.addr, infile.buflen, offset);
     msgpack::object obj = oh.get();
-    std::array<int, 2> const &dim_order = obj.as<std::array<int, 2>>();
 
-    msgpack::unpack(oh, addr, buflen, offset);
-    obj = oh.get();
-
-    const int dim = dim_order[0];
-    const int order = dim_order[1];
     res->f_ = fin;
-    res->DIM = dim;
-    res->ORDER = order;
+    res->DIM = header.dim;
+    res->ORDER = header.order;
+
+    auto [dim, order, version] = std::make_tuple(header.dim, header.order, header.version);
 
     int iset = get_iset();
-    switch (BAOBZI_JOIN(dim, order, iset)) {
+    switch (BAOBZI_JOIN(header.dim, header.order, iset)) {
 #include "baobzi/baobzi_cases_restore.h"
     default: {
         std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim << ", "
@@ -73,8 +97,6 @@ baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr
         break;
     }
     }
-
-    close(fd);
 
     return res;
 }

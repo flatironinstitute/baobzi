@@ -17,6 +17,7 @@ set(BAOBZI_INCLUDES
 option(BUILD_STATIC "Build the static library" OFF)
 option(BUILD_SHARED "Build the shared library" ON)
 option(BUILD_EXAMPLES "Build C/C++ examples" ON)
+option(BUILD_MATLAB "Build MATLAB bindings" OFF)
 
 file(GLOB LIB_SOURCES_GENERIC "src/*0.cpp")
 add_library(baobzi_generic OBJECT ${LIB_SOURCES_GENERIC})
@@ -77,3 +78,9 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
 include(CTest)
 include(Catch)
 catch_discover_tests(test_c)
+
+if (BUILD_MATLAB)
+  find_package(Matlab REQUIRED)
+  matlab_add_mex(NAME baobzi_mex SRC matlab/src/baobzi_mex.cpp LINK_TO baobzi)
+  target_include_directories(baobzi_mex PUBLIC ${BAOBZI_INCLUDES})
+endif()
