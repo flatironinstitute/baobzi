@@ -62,13 +62,11 @@ baobzi_header_t read_header(const char *addr, std::size_t buflen, std::size_t *o
     return oh.get().as<baobzi_header_t>();
 }
 
-baobzi_header_t read_header_from_file(const char *fname) {
+baobzi_header_t baobzi_read_header_from_file(const char *fname) {
+    std::size_t offset = 0;
     std::string filename(fname);
     mmap_wrapper infile(filename);
-    std::size_t buflen = 0, offset = 0;
-    msgpack::object_handle oh;
-    msgpack::unpack(oh, infile.addr, buflen, offset);
-    return oh.get().as<baobzi_header_t>();
+    return read_header(infile.addr, infile.buflen, &offset);
 }
 
 baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr) {

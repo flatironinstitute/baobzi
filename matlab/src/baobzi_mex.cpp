@@ -28,14 +28,22 @@ class baobzi {
     baobzi(const char *matfun, int dim, int order, const double *center, const double *half_length, const double tol)
         : funname_(matfun), dim_(dim), order_(order) {
         set_all_params();
-        obj_ = baobzi_init(matfun_wrapper, dim, order, center, half_length, tol);
+        obj_ = baobzi_init(matfun_wrapper, dim_, order_, center, half_length, tol);
     }
+    baobzi(const char *matfun, const char *infile) : funname_(matfun) {
+        baobzi_header_t header = baobzi_read_header_from_file(infile);
+        dim_ = header.dim;
+        order_ = header.order;
+        set_all_params();
+        obj_ = baobzi_restore(matfun_wrapper, infile);
+    }
+
     ~baobzi() { obj_ = baobzi_free(obj_); }
     double eval(const double *x) {
         set_other_params();
         return baobzi_eval(obj_, x);
     };
-    void test() { mexPrintf("Calling test\n"); };
+    void save(const std::string &fname) { baobzi_save(obj_, fname.c_str()); }
 
     void set_all_params() {
         sprintf(baobzi_fit_fcn, funname_.c_str());
@@ -63,27 +71,48 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     // New
     if (!strcmp("new", cmd)) {
         // Check parameters
-        mexPrintf("%d\n", nrhs);
         if (nlhs != 1)
             mexErrMsgTxt("New: One output expected.");
-        if (nrhs != 2)
-            mexErrMsgTxt("New: One input expected.");
+        if (nrhs != 7)
+            mexErrMsgTxt("New: Seven inputs expected.");
 
         size_t buflen = mxGetN(prhs[1]) + 1;
         int status = mxGetString(prhs[1], baobzi_fit_fcn, (mwSize)buflen);
-        mexPrintf("%s\n", baobzi_fit_fcn);
 
         if (status != 0)
             mexErrMsgIdAndTxt("MATLAB:mexfeval:mxGetString", "Failed to copy function string into allocated memory.");
 
-        int dim = 2;
-        int order = 6;
-        double center[2] = {0.0, 0.0};
-        double half_length[2] = {1.0, 1.0};
-        double tol = 1E-8;
+        int dim = mxGetPr(prhs[2])[0];
+        int order = mxGetPr(prhs[3])[0];
+        double *center = mxGetPr(prhs[4]);
+        double *half_length = mxGetPr(prhs[5]);
+        double tol = mxGetPr(prhs[6])[0];
 
         // Return a handle to a new C++ instance
         plhs[0] = convertPtr2Mat<baobzi>(new baobzi(baobzi_fit_fcn, dim, order, center, half_length, tol));
+        return;
+    }
+
+    if (!strcmp("restore", cmd)) {
+        // Check parameters
+        if (nlhs != 1)
+            mexErrMsgTxt("New: One output expected.");
+        if (nrhs != 3)
+            mexErrMsgTxt("New: Two inputs expected.");
+
+        size_t buflen = mxGetN(prhs[1]) + 1;
+        int status = mxGetString(prhs[1], baobzi_fit_fcn, (mwSize)buflen);
+
+        if (status != 0)
+            mexErrMsgIdAndTxt("MATLAB:mexfeval:mxGetString", "Failed to copy function string into allocated memory.");
+
+        buflen = mxGetN(prhs[2]) + 1;
+        std::string infile(buflen, '\0');
+        status = mxGetString(prhs[2], &infile[0], (mwSize)buflen);
+
+        // Return a handle to a new C++ instance
+        plhs[0] = convertPtr2Mat<baobzi>(new baobzi(baobzi_fit_fcn, infile.c_str()));
+
         return;
     }
 
@@ -112,6 +141,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         plhs[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
         mxGetPr(plhs[0])[0] = baobzi_instance->eval(mxGetPr(prhs[2]));
 
+        return;
+    }
+
+    if (!strcmp("save", cmd)) {
+        if (nlhs > 0 || nrhs != 3)
+            mexErrMsgTxt("save: Unexpected arguments.");
+
+        size_t buflen = mxGetN(prhs[2]) + 1;
+        std::string outfile(buflen, '\0');
+        int status = mxGetString(prhs[2], &outfile[0], (mwSize)buflen);
+
+        baobzi_instance->save(outfile);
         return;
     }
 
