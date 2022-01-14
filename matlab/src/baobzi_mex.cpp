@@ -2,67 +2,121 @@
 #include "class_handle.hpp"
 #include "mex.h"
 
+#include <list>
+#include <mutex>
+#include <set>
 #include <string>
 
-static std::string baobzi_fit_fcn;
-static uint16_t baobzi_dim;
-static uint16_t baobzi_order;
+constexpr int n_slots = 10;
+static std::set<int> occupied_slots;
+static std::mutex mtx;
 
-double matfun_wrapper(const double *x) {
+struct wrapper_data_t {
+    std::string fit_fcn;
+    uint16_t dim;
+    uint16_t order;
+};
+static wrapper_data_t wrapper_data_arr[n_slots];
+
+int acquire_slot() {
+    mtx.lock();
+    for (int i = 0; i < n_slots; ++i) {
+        if (!occupied_slots.count(i)) {
+            occupied_slots.insert(i);
+            mtx.unlock();
+            return i;
+        }
+    }
+    mtx.unlock();
+    mexErrMsgTxt("Unable to aqcuire free baobzi function slot.");
+    return -1;
+}
+
+void free_slot(int i) {
+    mtx.lock();
+    occupied_slots.erase(i);
+    mtx.unlock();
+}
+
+template <int INDEX>
+double matfun_wrapper_template(const double *x) {
     mxArray *prhs[1];
     mxArray *plhs[1];
+    constexpr wrapper_data_t &data = wrapper_data_arr[INDEX];
     plhs[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    prhs[0] = mxCreateDoubleMatrix(baobzi_dim, 1, mxREAL);
+    prhs[0] = mxCreateDoubleMatrix(data.dim, 1, mxREAL);
 
     double *xptr = mxGetPr(prhs[0]);
-    for (int i = 0; i < baobzi_dim; ++i)
+    for (int i = 0; i < data.dim; ++i)
         xptr[i] = x[i];
 
-    int status = mexCallMATLAB(1, plhs, 1, prhs, baobzi_fit_fcn.c_str());
-    if (status != 0)
+    int status = mexCallMATLAB(1, plhs, 1, prhs, data.fit_fcn.c_str());
+    if (status != 0) {
+        free_slot(INDEX);
         mexErrMsgIdAndTxt("MATLAB:mexfeval:mxCallMATLAB", "Failed to execute MATLAB function.");
+    }
 
     return mxGetPr(plhs[0])[0];
 }
+
+double matfun_wrapper_0(const double *x) { return matfun_wrapper_template<0>(x); }
+double matfun_wrapper_1(const double *x) { return matfun_wrapper_template<1>(x); }
+double matfun_wrapper_2(const double *x) { return matfun_wrapper_template<2>(x); }
+double matfun_wrapper_3(const double *x) { return matfun_wrapper_template<3>(x); }
+double matfun_wrapper_4(const double *x) { return matfun_wrapper_template<4>(x); }
+double matfun_wrapper_5(const double *x) { return matfun_wrapper_template<5>(x); }
+double matfun_wrapper_6(const double *x) { return matfun_wrapper_template<6>(x); }
+double matfun_wrapper_7(const double *x) { return matfun_wrapper_template<7>(x); }
+double matfun_wrapper_8(const double *x) { return matfun_wrapper_template<8>(x); }
+double matfun_wrapper_9(const double *x) { return matfun_wrapper_template<9>(x); }
+
+double (*matfun_wrapper_arr[n_slots])(const double *) = {
+    matfun_wrapper_0, matfun_wrapper_1, matfun_wrapper_2, matfun_wrapper_3, matfun_wrapper_4,
+    matfun_wrapper_5, matfun_wrapper_6, matfun_wrapper_7, matfun_wrapper_8, matfun_wrapper_9};
 
 class baobzi {
   public:
     baobzi(const std::string &matfun, int dim, int order, const double *center, const double *half_length,
            const double tol)
         : funname_(matfun), dim_(dim), order_(order) {
-        set_all_params();
-        obj_ = baobzi_init(matfun_wrapper, dim_, order_, center, half_length, tol);
+
+        slot_ = acquire_slot();
+
+        wrapper_data_arr[slot_].fit_fcn = matfun;
+        wrapper_data_arr[slot_].dim = dim;
+        wrapper_data_arr[slot_].order = order;
+
+        // to prevent matlab from segfaulting if your function doesn't exist, try to call it once
+        matfun_wrapper_arr[slot_](center);
+        obj_ = baobzi_init(matfun_wrapper_arr[slot_], dim_, order_, center, half_length, tol);
     }
     baobzi(const std::string &matfun, const char *infile) : funname_(matfun) {
         baobzi_header_t header = baobzi_read_header_from_file(infile);
         dim_ = header.dim;
         order_ = header.order;
-        set_all_params();
-        obj_ = baobzi_restore(matfun_wrapper, infile);
+        slot_ = acquire_slot();
+
+        wrapper_data_arr[slot_].fit_fcn = matfun;
+        wrapper_data_arr[slot_].dim = dim_;
+        wrapper_data_arr[slot_].order = order_;
+
+        obj_ = baobzi_restore(matfun_wrapper_arr[slot_], infile);
     }
 
-    ~baobzi() { obj_ = baobzi_free(obj_); }
-    double eval(const double *x) {
-        set_other_params();
-        return baobzi_eval(obj_, x);
-    };
+    ~baobzi() {
+        free_slot(slot_);
+        if (obj_)
+            obj_ = baobzi_free(obj_);
+    }
+    double eval(const double *x) { return baobzi_eval(obj_, x); };
     void save(const std::string &fname) { baobzi_save(obj_, fname.c_str()); }
-
-    void set_all_params() {
-        baobzi_fit_fcn = funname_;
-        set_other_params();
-    }
-
-    void set_other_params() {
-        baobzi_dim = dim_;
-        baobzi_order = order_;
-    }
 
   private:
     std::string funname_;
     int dim_;
     int order_;
-    baobzi_t obj_;
+    int slot_;
+    baobzi_t obj_ = nullptr;
 };
 
 std::string to_string(const mxArray *arr) {
@@ -90,7 +144,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         if (nrhs != 7)
             mexErrMsgTxt("New: Seven inputs expected.");
 
-        baobzi_fit_fcn = to_string(prhs[1]);
+        std::string baobzi_fit_fcn = to_string(prhs[1]);
 
         int dim = mxGetPr(prhs[2])[0];
         int order = mxGetPr(prhs[3])[0];
@@ -110,7 +164,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         if (nrhs != 3)
             mexErrMsgTxt("New: Two inputs expected.");
 
-        baobzi_fit_fcn = to_string(prhs[1]);
+        std::string baobzi_fit_fcn = to_string(prhs[1]);
         std::string infile = to_string(prhs[2]);
 
         // Return a handle to a new C++ instance
