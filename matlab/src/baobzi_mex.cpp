@@ -4,7 +4,7 @@
 
 #include <string>
 
-static char baobzi_fit_fcn[64];
+static std::string baobzi_fit_fcn;
 static uint16_t baobzi_dim;
 static uint16_t baobzi_order;
 
@@ -18,19 +18,22 @@ double matfun_wrapper(const double *x) {
     for (int i = 0; i < baobzi_dim; ++i)
         xptr[i] = x[i];
 
-    int status = mexCallMATLAB(1, plhs, 1, prhs, baobzi_fit_fcn);
+    int status = mexCallMATLAB(1, plhs, 1, prhs, baobzi_fit_fcn.c_str());
+    if (status != 0)
+        mexErrMsgIdAndTxt("MATLAB:mexfeval:mxCallMATLAB", "Failed to execute MATLAB function.");
+
     return mxGetPr(plhs[0])[0];
 }
 
-// The class that we are interfacing to
 class baobzi {
   public:
-    baobzi(const char *matfun, int dim, int order, const double *center, const double *half_length, const double tol)
+    baobzi(const std::string &matfun, int dim, int order, const double *center, const double *half_length,
+           const double tol)
         : funname_(matfun), dim_(dim), order_(order) {
         set_all_params();
         obj_ = baobzi_init(matfun_wrapper, dim_, order_, center, half_length, tol);
     }
-    baobzi(const char *matfun, const char *infile) : funname_(matfun) {
+    baobzi(const std::string &matfun, const char *infile) : funname_(matfun) {
         baobzi_header_t header = baobzi_read_header_from_file(infile);
         dim_ = header.dim;
         order_ = header.order;
@@ -46,7 +49,7 @@ class baobzi {
     void save(const std::string &fname) { baobzi_save(obj_, fname.c_str()); }
 
     void set_all_params() {
-        sprintf(baobzi_fit_fcn, funname_.c_str());
+        baobzi_fit_fcn = funname_;
         set_other_params();
     }
 
@@ -56,11 +59,22 @@ class baobzi {
     }
 
   private:
-    baobzi_t obj_;
+    std::string funname_;
     int dim_;
     int order_;
-    std::string funname_;
+    baobzi_t obj_;
 };
+
+std::string to_string(const mxArray *arr) {
+    size_t buflen = mxGetN(arr) + 1;
+    std::string res(buflen, '\0');
+    int status = mxGetString(arr, &res[0], buflen);
+
+    if (status != 0)
+        mexErrMsgIdAndTxt("MATLAB:mexfeval:mxGetString", "Failed to copy string.");
+
+    return res;
+}
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     // Get the command string
@@ -76,11 +90,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         if (nrhs != 7)
             mexErrMsgTxt("New: Seven inputs expected.");
 
-        size_t buflen = mxGetN(prhs[1]) + 1;
-        int status = mxGetString(prhs[1], baobzi_fit_fcn, (mwSize)buflen);
-
-        if (status != 0)
-            mexErrMsgIdAndTxt("MATLAB:mexfeval:mxGetString", "Failed to copy function string into allocated memory.");
+        baobzi_fit_fcn = to_string(prhs[1]);
 
         int dim = mxGetPr(prhs[2])[0];
         int order = mxGetPr(prhs[3])[0];
@@ -100,15 +110,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         if (nrhs != 3)
             mexErrMsgTxt("New: Two inputs expected.");
 
-        size_t buflen = mxGetN(prhs[1]) + 1;
-        int status = mxGetString(prhs[1], baobzi_fit_fcn, (mwSize)buflen);
-
-        if (status != 0)
-            mexErrMsgIdAndTxt("MATLAB:mexfeval:mxGetString", "Failed to copy function string into allocated memory.");
-
-        buflen = mxGetN(prhs[2]) + 1;
-        std::string infile(buflen, '\0');
-        status = mxGetString(prhs[2], &infile[0], (mwSize)buflen);
+        baobzi_fit_fcn = to_string(prhs[1]);
+        std::string infile = to_string(prhs[2]);
 
         // Return a handle to a new C++ instance
         plhs[0] = convertPtr2Mat<baobzi>(new baobzi(baobzi_fit_fcn, infile.c_str()));
@@ -148,9 +151,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         if (nlhs > 0 || nrhs != 3)
             mexErrMsgTxt("save: Unexpected arguments.");
 
-        size_t buflen = mxGetN(prhs[2]) + 1;
-        std::string outfile(buflen, '\0');
-        int status = mxGetString(prhs[2], &outfile[0], (mwSize)buflen);
+        std::string outfile = to_string(prhs[2]);
 
         baobzi_instance->save(outfile);
         return;
