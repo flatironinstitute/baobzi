@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(
   baobzi
-  LANGUAGES C CXX)
+  LANGUAGES C CXX Fortran)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -48,7 +48,7 @@ target_compile_options(baobzi_avx512 PUBLIC -mavx512f -mfma -fopenmp)
 set_property(TARGET baobzi_avx512 PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 if (BUILD_SHARED)
-  add_library(baobzi SHARED src/baobzi.cpp)
+  add_library(baobzi SHARED src/baobzi.cpp src/baobzi.f90)
   target_include_directories(baobzi PUBLIC ${BAOBZI_INCLUDES})
   target_link_libraries(baobzi PUBLIC baobzi_generic baobzi_avx baobzi_avx2 baobzi_avx512 OpenMP::OpenMP_CXX)
   list(APPEND INSTALL_TARGETS baobzi)
@@ -102,3 +102,6 @@ install(FILES ${PROJECT_SOURCE_DIR}/julia/src/baobzi.jl
   DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/julia)
 install(FILES ${PROJECT_SOURCE_DIR}/python/src/baobzi.py
   DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/python)
+install(FILES ${PROJECT_SOURCE_DIR}/src/baobzi.f90
+  ${CMAKE_CURRENT_BINARY_DIR}/baobzi.mod
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/fortran)
