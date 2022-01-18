@@ -7,7 +7,7 @@
 #include <vector>
 
 #include <msgpack.hpp>
-#define EIGEN_MATRIX_PLUGIN "eigen_matrix_plugin.h"
+#define EIGEN_MATRIX_PLUGIN "baobzi/eigen_matrix_plugin.h"
 
 #define EIGEN_MAX_ALIGN_BYTES 64
 #include <Eigen/Core>

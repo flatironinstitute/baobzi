@@ -4,7 +4,6 @@
 #include <msgpack.hpp>
 #include <tuple>
 #include <unistd.h>
-#define EIGEN_MATRIX_PLUGIN "eigen_matrix_plugin.h"
 
 #include <cstdint>
 #include <fstream>
