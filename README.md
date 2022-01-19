@@ -34,7 +34,7 @@ the box containing your point and evaluates using this approximant.
 * No library dependencies. All code necessary to build `baobzi` is in `baobzi`. There is an
   optional static library are supported for building C/C++ codes where you don't want to load
   in the shared `baobzi` object, but would rather throw it right in your binary (though I don't
-  recommend this, the static library is _huge_ and will grow with more dimension support). 
+  recommend this, the static library is _huge_ and will grow with more dimension support).
 
 ## Building/testing
 Baobzi's only dependencies are cmake >= 3.5, and a C/C++17 compiler (gcc only really,
@@ -47,15 +47,200 @@ one core, this example gets roughly 50M evals/s on a simple 2D example, and 20M 
 simple 3D example.
 
 ```bash
-# At FI -- module load gcc cmake
+# At FI -- module load gcc cmake matlab
 git clone --recursive https://github.com/blackwer/baobzi.git
 cd baobzi
 mkdir build
 cd build
-# Don't supply -march!!! Builds with CPU dispatch so avx, avx2, and avx512 are all supported by default
-cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo
-make -j
-./baobzi_timing_c
+# Don't supply -march!!! Builds with CPU dispatch
+cmake -DBUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$HOME/local
+make -j $((2*$(nproc)))
+make install
+```
+
+## Running with...
+All examples require your project know where the `baobzi` shared object is located. In the
+example above, it's located in `$HOME/local/lib64`.
+```bash
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib64
+export LIBRARY_PATH=$LIBRARY_PATH:$HOME/local/lib64
+export C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOME/local/include
+export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$HOME/local/include
+export PYTHONPATH=$PYTHONPATH:$HOME/local/share/baobzi/python
+export JULIA_LOAD_PATH=$PYTHONPATH:$HOME/local/share/baobzi/julia
+export MATLABPATH=$PYTHONPATH:$HOME/local/share/baobzi/matlab
+```
+
+### C/C++ (no C++ bindings yet. Easy to wrap in class though)
+```C
+// test_baobzi.c
+#include <baobzi.h>
+#include <stdio.h>
+
+double testfunc(const double *x) { return x[0] * x[1]; }
+
+int main(int argc, char *argv[]) {
+    const int dim = 2;
+    const int order = 6;
+    const double tol = 1E-10;
+    const double hl[2] = {1.0, 1.0};
+    const double center[2] = {0.0, 0.0};
+    const double x[2] = {0.25, 0.25};
+
+    baobzi_t func_approx = baobzi_init(testfunc, dim, order, center, hl, tol);
+    printf("%g\n", baobzi_eval(func_approx, x));
+    baobzi_save(func_approx, "func_approx.baobzi");
+    func_approx = baobzi_free(func_approx);
+
+    func_approx = baobzi_restore("func_approx.baobzi");
+    printf("%g\n", baobzi_eval(func_approx, x));
+    return 0;
+}
+```
+
+```bash
+gcc -o test_baobzi.c -lbaobzi
+./test_baobzi
+```
+
+### Python
+[python/examples/simple2d.py](python/examples/simple2d.py)
+```python3
+# simple2d.py
+from baobzi import Baobzi
+
+def py_test_func(x):
+    return x[0] * x[1]
+
+center = [0.0, 0.0]
+hl = [1.0, 1.0]
+point = [0.25, 0.25]
+
+test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8)
+test.save('test.baobzi')
+print(test(point))
+del test
+
+test2 = Baobzi(filename='test.baobzi')
+print(test2(point))
+del test2
+```
+
+```bash
+python3 simple2d.py
+```
+
+### Julia
+```julia
+# simple2d.jl
+import baobzi
+
+function testfunc(xp::Ptr{Float64})::Cdouble
+    x = unsafe_load(xp, 1)
+    y = unsafe_load(xp, 2)
+    return x * y
+end
+
+center = [0.0, 0.0]
+hl = [0.5, 1.0]
+test_point = [0.25, 0.25]
+dim = 2
+order = 6
+tol = 1E-8
+output_file = "simple2d.baobzi"
+
+func_approx = baobzi.init(testfunc, dim, order, center, hl, tol)
+println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
+
+baobzi.save(func_approx, output_file)
+baobzi.free(func_approx)
+
+func_approx = baobzi.restore(output_file)
+println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
+```
+
+```bash
+julia simple2d.jl
+```
+
+### MATLAB
+MATLAB initialization does not work for anonymous functions. You must declare an actual
+function (in its on `myfunc.m` file).
+
+```matlab
+%% testfun.m
+function [y] = testfun(x)
+  y = x(1) * x(2);
+end
+```
+
+```matlab
+%% simple2d.m
+dim = 2;
+order = 6;
+center = [0.0, 0.0];
+hl = [1.0, 1.0];
+tol = 1E-8;
+func_approx = baobzi('new', 'testfun', dim, order, center, hl, tol);
+display(func_approx.eval([0.25, 0.25]))
+func_approx.save('simple2d.baobzi');
+clear func_approx
+func_approx = baobzi('restore', 'simple2d.baobzi');
+display(func_approx.eval([0.25, 0.25]))
+```
+
+```bash
+matlab -batch simple2d
+```
+
+### Fortran
+[examples/fortran_example.f90](examples/fortran_example.f90)
+```fortran
+program main
+  use baobzi
+  implicit none
+  type(c_funptr) :: func
+  real(kind=c_double) :: center(2), half_length(2), tol
+  real(kind=c_double) :: x(2)
+  integer(kind=c_int16_t) :: order, dim
+  type(c_ptr) :: func_approx
+  character(len=64) :: fname
+
+  func = c_funloc(testfun)
+  center(:) = 0.0
+  half_length(:) = 1.0
+  tol = 1E-8
+  dim = 2
+  order = 6
+
+  x(:) = 0.25
+
+  fname = trim(adjustl('fortran.baobzi'))//char(0)
+
+  func_approx = baobzi_init(func, dim, order, center, half_length, tol)
+  print *, baobzi_eval(func_approx, x) - testfun(x)
+
+  call baobzi_save(func_approx, fname)
+  func_approx = baobzi_free(func_approx)
+
+  func_approx = baobzi_restore(fname)
+  print *, baobzi_eval(func_approx, x) - testfun(x)
+
+contains
+  function testfun (x) bind(c) result(y)
+    use, intrinsic :: iso_c_binding
+    implicit none
+    real(kind=c_double), dimension(*) :: x
+    real(kind=c_double) :: y
+
+    y = x(1) * x(2)
+  end function testfun
+
+end program main
+```
+
+```bash
+gfortran -o fortran_example -I$HOME/local/share/baobzi/fortran fortran_example.f90 -lbaobzi
 ```
 
 ## Roadmap
@@ -78,6 +263,8 @@ See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker]
   technique. This effectively doubles the time to fit, but will give you a tolerance closer to
   the expected one. Start low, and move up until you find a fit that works for you. Eventually
   this will be an option in the API.
+* MATLAB initialization does not work for anonymous functions. You must declare an actual
+  function (in its own `myfunc.m` file).
 
 ## Why the name?
 It's a cute version of baobab, or the tree of life, which is already a very popular project
