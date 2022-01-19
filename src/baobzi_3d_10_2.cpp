@@ -1,6 +1,6 @@
+#include "baobzi_template.hpp"
 #include "baobzi.h"
 #include "baobzi/macros.h"
-#include "baobzi.hpp"
 
 extern "C" {
 BAOBZI_DEFS(3, 10, 2)
