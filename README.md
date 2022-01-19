@@ -31,3 +31,22 @@ make -j
 
 ## Roadmap
 See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker](https://github.com/blackwer/baobzi/projects/1).
+
+## Known Issues. IMPORTANT PLEASE READ
+* No out of bounds handling at all. If you call out of bounds, your program could crash or
+  worse. Only you can prevent segfaults (or even worse, wrong answers). Note that `baobzi`
+  dimensions are defined on the *semi-open* interval `[x0, x1)`. Calling on the upper
+  boundaries will segfault or give wrong answers.
+* Baobzi can't handle singularities or otherwise pathological functions like `sin(1/x)`. It
+  will eat your memory and crash. I intend to handle these issues, but I want to work on an API
+  that allows for more options to deal with them. That will take time.
+    * Workaround: for now, just piecewise a bunch of baobzi functions to work around
+      singularities. I hope to add an option to add exclusion domain, or a bunch of domains to
+      fit and represent as a single function.
+* In one and two dimensions, `baobzi` will determine tolerance matching by looking at the
+  values of certain chebyshev coefficients. This tends to underestimate the fit, resulting in
+  better precision than you expected (though there are exceptions). In 3D, it uses a sampling
+  technique. This effectively doubles the time to fit, but will give you a tolerance closer to
+  the expected one. Start low, and move up until you find a fit that works for you. Eventually
+  this will be an option in the API.
+
