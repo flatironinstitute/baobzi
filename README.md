@@ -266,6 +266,9 @@ See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker]
   this will be an option in the API.
 * MATLAB initialization does not work for anonymous functions. You must declare an actual
   function (in its own `myfunc.m` file).
+* Doesn't do 4+ dimensions (though possible, I haven't worked out the fitting procedures
+  yet). Probably don't want to go above 5 dimensions, since each node takes `O(8 * ORDER^D)`
+  bytes of memory.
 
 ## Why the name?
 It's a cute version of baobab, or the tree of life, which is already a very popular project
