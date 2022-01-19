@@ -3,7 +3,7 @@
 
 #define BAOBZI_HEADER_VERSION 0
 
-#ifdef __cplusplus
+#ifdef BAOBZI_TEMPLATE_HPP
 #include <msgpack.hpp>
 
 struct baobzi_header_t {
