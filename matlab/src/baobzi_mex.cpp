@@ -78,7 +78,7 @@ class baobzi {
   public:
     baobzi(const std::string &matfun, int dim, int order, const double *center, const double *half_length,
            const double tol)
-        : funname_(matfun), dim_(dim), order_(order) {
+        : dim_(dim), order_(order) {
 
         slot_ = acquire_slot();
 
@@ -90,17 +90,16 @@ class baobzi {
         matfun_wrapper_arr[slot_](center);
         obj_ = baobzi_init(matfun_wrapper_arr[slot_], dim_, order_, center, half_length, tol);
     }
-    baobzi(const std::string &matfun, const char *infile) : funname_(matfun) {
+    baobzi(const char *infile) {
         baobzi_header_t header = baobzi_read_header_from_file(infile);
         dim_ = header.dim;
         order_ = header.order;
         slot_ = acquire_slot();
 
-        wrapper_data_arr[slot_].fit_fcn = matfun;
         wrapper_data_arr[slot_].dim = dim_;
         wrapper_data_arr[slot_].order = order_;
 
-        obj_ = baobzi_restore(matfun_wrapper_arr[slot_], infile);
+        obj_ = baobzi_restore(infile);
     }
 
     ~baobzi() {
@@ -112,7 +111,6 @@ class baobzi {
     void save(const std::string &fname) { baobzi_save(obj_, fname.c_str()); }
 
   private:
-    std::string funname_;
     int dim_;
     int order_;
     int slot_;
@@ -161,14 +159,13 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         // Check parameters
         if (nlhs != 1)
             mexErrMsgTxt("New: One output expected.");
-        if (nrhs != 3)
-            mexErrMsgTxt("New: Two inputs expected.");
+        if (nrhs != 2)
+            mexErrMsgTxt("New: One input expected.");
 
-        std::string baobzi_fit_fcn = to_string(prhs[1]);
-        std::string infile = to_string(prhs[2]);
+        std::string infile = to_string(prhs[1]);
 
         // Return a handle to a new C++ instance
-        plhs[0] = convertPtr2Mat<baobzi>(new baobzi(baobzi_fit_fcn, infile.c_str()));
+        plhs[0] = convertPtr2Mat<baobzi>(new baobzi(infile.c_str()));
 
         return;
     }

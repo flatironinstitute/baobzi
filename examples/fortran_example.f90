@@ -25,7 +25,7 @@ program main
   call baobzi_save(func_approx, fname)
   func_approx = baobzi_free(func_approx)
 
-  func_approx = baobzi_restore(func, fname)
+  func_approx = baobzi_restore(fname)
   print *, baobzi_eval(func_approx, x) - testfun(x)
 
 contains
