@@ -32,8 +32,8 @@ the box containing your point and evaluates using this approximant.
 * CPU dispatch -- baobzi will detect your CPU and run an optimized codepath based on that --
   no intervention by the user.
 * No library dependencies. All code necessary to build `baobzi` is in `baobzi`. There is an
-  optional static library are supported for building C/C++ codes where you don't want to load
-  in the shared `baobzi` object, but would rather throw it right in your binary (though I don't
+  optional static library supported for building C/C++ codes where you don't want to load in
+  the shared `baobzi` object, but would rather throw it right in your binary (though I don't
   recommend this, the static library is _huge_ and will grow with more dimension support).
 
 ## Building/testing
