@@ -71,7 +71,7 @@ export JULIA_LOAD_PATH=$PYTHONPATH:$HOME/local/share/baobzi/julia
 export MATLABPATH=$PYTHONPATH:$HOME/local/share/baobzi/matlab
 ```
 
-### C/C++ (no C++ bindings yet. Easy to wrap in class though)
+### C class though)
 ```C
 // test_baobzi.c
 #include <baobzi.h>
@@ -101,6 +101,39 @@ int main(int argc, char *argv[]) {
 ```bash
 gcc -o test_baobzi.c -lbaobzi
 ./test_baobzi
+```
+
+### C++
+```c++
+// test_baobzi.cpp
+#include <baobzi.hpp>
+#include <cstdio>
+
+double testfunc(const double *x) { return x[0] * x[1]; }
+
+int main(int argc, char *argv[]) {
+    using baobzi::Baobzi;
+    const int dim = 2;
+    const int order = 6;
+    const double tol = 1E-10;
+    const double hl[2] = {1.0, 1.0};
+    const double center[2] = {0.0, 0.0};
+    const double x[2] = {0.25, 0.25};
+    {
+        Baobzi func_approx(testfunc, dim, order, center, hl, tol);
+        printf("%g\n", func_approx(x));
+        func_approx.save("func_approx.baobzi");
+    }
+
+    Baobzi func_approx("func_approx.baobzi");
+    printf("%g\n", func_approx(x));
+
+    return 0;
+}
+```
+
+```bash
+g++ -o test_baobzi.cpp -lbaobzi
 ```
 
 ### Python
