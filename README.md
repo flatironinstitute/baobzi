@@ -131,6 +131,7 @@ python3 simple2d.py
 ```
 
 ### Julia
+[julia/examples/simple2d.jl](julia/examples/simple2d.jl)
 ```julia
 # simple2d.jl
 import baobzi
