@@ -68,7 +68,7 @@ baobzi_header_t baobzi_read_header_from_file(const char *fname) {
     return read_header(infile.addr, infile.buflen, &offset);
 }
 
-baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr) {
+baobzi_t baobzi_restore(const char *filename_cstr) {
     std::string filename(filename_cstr);
     baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
 
@@ -81,6 +81,7 @@ baobzi_t baobzi_restore(double (*fin)(const double *), const char *filename_cstr
     msgpack::unpack(oh, infile.addr, infile.buflen, offset);
     msgpack::object obj = oh.get();
 
+    double (*fin)(const double *) = nullptr;
     res->f_ = fin;
     res->DIM = header.dim;
     res->ORDER = header.order;

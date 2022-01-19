@@ -42,13 +42,12 @@ function save(func::Ptr{baobzi_struct}, filename::String)
     )
 end
 
-function restore(fin, filename::String)
-    c_fin = @cfunction($fin, Cdouble, (Ptr{Cdouble},))
+function restore(filename::String)
     output_ptr = ccall(
         (:baobzi_restore, :libbaobzi),
         Ptr{baobzi_struct},
-        (Ptr{Cvoid}, Cstring),
-        c_fin, filename
+        (Cstring,),
+        filename
     )
 
     return output_ptr

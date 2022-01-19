@@ -34,35 +34,42 @@ baobzi_save.argtypes = [c_void_p, c_char_p]
 
 baobzi_restore = libbaobzi.baobzi_restore
 baobzi_restore.restype = baobzi_t
-baobzi_restore.argtypes = [INPUT_FUNC, c_char_p]
+baobzi_restore.argtypes = [c_char_p]
 
 
 class Baobzi:
     def __init__(self,
-                 fin,
+                 fin=None,
                  dim=None,
                  order=None,
                  center=None,
                  half_length=None,
                  tol=None,
                  filename=None):
-        self.f = INPUT_FUNC(fin)
+        self.ptr = None
         if filename:
-            self.ptr = baobzi_restore(self.f, filename)
+            bfilename = bytes(filename, 'utf-8')
+            self.ptr = baobzi_restore(bfilename)
             self.dim = self.ptr[0].dim
             self.order = self.ptr[0].order
-        else:
+        elif fin:
+            if not (dim and order and center and half_length and tol):
+                print("Baobzi: supply dim, order, center, half_length, and tol for init")
             self.dim = dim
             self.order = order
-            self.ptr = baobzi_init(self.f, self.dim, self.order,
+            self.ptr = baobzi_init(INPUT_FUNC(fin), self.dim, self.order,
                                    (c_double * dim)(*center),
                                    (c_double * dim)(*half_length), tol)
+        else:
+            print("Baobzi requires either a 'filename' argument or a 'fin' argument")
 
     def __del__(self):
-        baobzi_free(self.ptr)
+        if self.ptr:
+            baobzi_free(self.ptr)
 
     def __call__(self, x):
         return baobzi_eval(self.ptr, (c_double * self.dim)(*x))
 
     def save(self, filename):
-        baobzi_save(self.ptr, filename)
+        bfilename = bytes(filename, 'utf-8')
+        baobzi_save(self.ptr, bfilename)

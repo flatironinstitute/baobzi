@@ -32,7 +32,7 @@ TEST_CASE("2D evaluations", "[baobzi]") {
     SECTION("save/restore") {
         const char *filename = "test_func_approx_2d.baobzi";
         baobzi_save(baobzi_func, filename);
-        baobzi_t baobzi_func_restored = baobzi_restore(baobzi_func->f_, filename);
+        baobzi_t baobzi_func_restored = baobzi_restore(filename);
 
         REQUIRE(baobzi_eval(baobzi_func, center) == baobzi_eval(baobzi_func_restored, center));
 

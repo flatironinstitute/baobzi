@@ -20,5 +20,5 @@ println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
 baobzi.save(func_approx, output_file)
 baobzi.free(func_approx)
 
-func_approx = baobzi.restore(testfunc, output_file)
+func_approx = baobzi.restore(output_file)
 println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))

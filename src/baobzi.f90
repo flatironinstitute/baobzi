@@ -19,9 +19,8 @@ module baobzi
       type(c_ptr) :: func
     end subroutine baobzi_save
 
-    function baobzi_restore (f, fname) bind(c) result(func)
+    function baobzi_restore (fname) bind(c) result(func)
       use, intrinsic :: iso_c_binding
-      type(c_funptr), intent(in), value :: f
       character(kind=c_char), dimension(*), intent(in) :: fname
       type(c_ptr) :: func
     end function baobzi_restore
