@@ -1,5 +1,7 @@
-#include "baobzi.hpp"
+#include "baobzi_template.hpp"
+
 #include "baobzi.h"
+#include "baobzi.hpp"
 
 #include <msgpack.hpp>
 #include <tuple>
