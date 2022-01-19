@@ -1,15 +1,44 @@
 # Baobzi
-An adaptive fast function approximator based on tree search.
+An adaptive fast function approximator based on tree search. Word salad aside, `baobzi` is a
+tool to convert very CPU intensive function calculations into relatively cheap ones (at the
+cost of memory). This is similar to functions like `chebeval` in `MATLAB`, but can be
+significantly faster since the order of the polynomial fit can be much much lower to meet
+similar tolerances. It also isn't constrained for use only in `MATLAB`.
 
-## Why Baobzi?
-It's a cute version of baobab, or the tree of life, which is already a very popular project
-name. The baobab lives an extraordinarily long time, which this interpolator is designed to
-do. Plant it (it's a tree!), and use it again and again. That's about the extent of the
-metaphor -- try not to think about it too much.
+Internally, `baobzi` represents your function by a grid of binary/quad/oct/N trees, where the
+leaves represent the function in some small sub-box of the function's domain with chebyshev
+polynomials. When you evaluate your function at a point with baobzi, it searches the tree for
+the box containing your point and evaluates using this approximant.
+
+## Example use cases
+* Build complicated or high computational cost function in higher level language. Build a
+  `baobzi` function and use it as a drop in replacement to your function. Reap speed benefits.
+* Take prior function, export it, and use it in a higher performance language: production or
+  prototype.
+* Your favorite `scipy` function not supported in `numba` yet? Use `baobzi` instead of porting
+  that function.
+
+## Limitations
+* Can use a _lot_ of memory... especially on oscillatory or rapidly changing functions. If your
+  function is periodic, fit your function on one period. Transform the function if necessary.
+* Not suited around singularities. Just don't do it. Use multiple `baobzi` objects around your
+  singularity if necessary.
+* Doesn't do any bounds checking. *It is up to the user to sanitize input*.
+
+## Features
+* Relative language agnosticism. The library has a simple C interface, which is then bound to
+  multiple languages (C/C++, Fortran, Python, Julia, MATLAB). This means you can make a heavy duty
+  function in MATLAB, interpolate it there, and then call it from another language of your choice.
+* CPU dispatch -- baobzi will detect your CPU and run an optimized codepath based on that --
+  no intervention by the user.
+* No library dependencies. All code necessary to build `baobzi` is in `baobzi`. There is an
+  optional static library are supported for building C/C++ codes where you don't want to load
+  in the shared `baobzi` object, but would rather throw it right in your binary (though I don't
+  recommend this, the static library is _huge_ and will grow with more dimension support). 
 
 ## Building/testing
 Baobzi's only dependencies are cmake >= 3.5, and a C/C++17 compiler (gcc only really,
-currently). I get _vastly_ better performance out of g++-11 (ONLY FOR C++ HEADER ONLY BUILDS)
+currently). I get _vastly_ better performance out of g++-11 (*ONLY FOR C++ HEADER ONLY BUILDS*)
 right now than any other compiler, and I'm not sure exactly why. It's very finicky, where the
 size of the compilation unit matters. Therefore, for optimal performance, currently, I suggest
 using the C shared/static library interface with gcc rather than the C++ header directly. See
@@ -18,7 +47,7 @@ one core, this example gets roughly 50M evals/s on a simple 2D example, and 20M 
 simple 3D example.
 
 ```bash
-# At FI -- module load gcc cmake eigen
+# At FI -- module load gcc cmake
 git clone --recursive https://github.com/blackwer/baobzi.git
 cd baobzi
 mkdir build
@@ -50,3 +79,8 @@ See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker]
   the expected one. Start low, and move up until you find a fit that works for you. Eventually
   this will be an option in the API.
 
+## Why the name?
+It's a cute version of baobab, or the tree of life, which is already a very popular project
+name. The baobab lives an extraordinarily long time, which this interpolator is designed to
+do. Plant it (it's a tree!), and use it again and again. That's about the extent of the
+metaphor -- try not to think about it too much.
