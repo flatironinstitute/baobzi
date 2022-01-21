@@ -56,7 +56,7 @@ if (BAOBZI_BUILD_SHARED)
 endif()
 
 if (BAOBZI_BUILD_STATIC)
-  add_library(baobzi_static STATIC)
+  add_library(baobzi_static STATIC src/baobzi.cpp src/baobzi.f90)
   target_link_libraries(baobzi_static PUBLIC baobzi_generic baobzi_avx baobzi_avx2 baobzi_avx512 OpenMP::OpenMP_CXX)
   set_target_properties(baobzi_static PROPERTIES OUTPUT_NAME baobzi)
   list(APPEND INSTALL_TARGETS baobzi_static)
