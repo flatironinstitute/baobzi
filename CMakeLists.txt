@@ -96,6 +96,7 @@ if (BAOBZI_BUILD_MATLAB)
   install(TARGETS baobzi_mex DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/matlab)
 endif()
 
+include(GNUInstallDirs)
 install(TARGETS ${INSTALL_TARGETS})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
