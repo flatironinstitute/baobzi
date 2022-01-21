@@ -17,6 +17,7 @@ set(BAOBZI_INCLUDES
 option(BAOBZI_BUILD_STATIC "Build the static library" OFF)
 option(BAOBZI_BUILD_SHARED "Build the shared library" ON)
 option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
+option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
 # option(BAOBZI_BUILD_AVX "Build AVX support" ON)
 # option(BAOBZI_BUILD_AVX2 "Build AVX2 support" ON)
@@ -74,16 +75,17 @@ if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
   target_link_libraries(baobzi_timing_c PUBLIC baobzi OpenMP::OpenMP_CXX m)
 endif()
 
+if (BAOBZI_BUILD_TESTS)
+  add_subdirectory(extern/catch2)
 
-add_subdirectory(extern/catch2)
+  add_executable(test_c tests/test_c.cpp)
+  target_link_libraries(test_c PUBLIC Catch2::Catch2WithMain baobzi OpenMP::OpenMP_CXX)
 
-add_executable(test_c tests/test_c.cpp)
-target_link_libraries(test_c PUBLIC Catch2::Catch2WithMain baobzi OpenMP::OpenMP_CXX)
-
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
-include(CTest)
-include(Catch)
-catch_discover_tests(test_c)
+  list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
+  include(CTest)
+  include(Catch)
+  catch_discover_tests(test_c)
+endif()
 
 if (BAOBZI_BUILD_MATLAB)
   find_package(Matlab REQUIRED)
