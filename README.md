@@ -53,7 +53,7 @@ cd baobzi
 mkdir build
 cd build
 # Don't supply -march!!! Builds with CPU dispatch
-cmake -DBUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$HOME/local
+cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$HOME/local
 make -j $((2*$(nproc)))
 make install
 ```
