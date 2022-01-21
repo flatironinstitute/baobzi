@@ -17,6 +17,7 @@
 
 enum ISET { GENERIC, AVX, AVX2, AVX512 };
 
+/// @brief mmap a file
 struct mmap_wrapper {
     char *addr;
     int fd;
