@@ -10,6 +10,22 @@ leaves represent the function in some small sub-box of the function's domain wit
 polynomials. When you evaluate your function at a point with baobzi, it searches the tree for
 the box containing your point and evaluates using this approximant.
 
+* [Example use cases](#example-use-cases)
+* [Limitations](#limitations)
+* [Features](#features)
+* [Building/testing](#building-testing)
+* [Running with...](#running-with)
+    + [C](#c)
+    + [C++](#c--)
+    + [Python](#python)
+    + [Julia](#julia)
+    + [MATLAB](#matlab)
+    + [Fortran](#fortran)
+* [Including in your CMake project](#including-in-your-cmake-project)
+* [Roadmap](#roadmap)
+* [Known Issues. IMPORTANT PLEASE READ](#known-issues-important-please-read)
+* [Why the name?](#why-the-name-)
+
 ## Example use cases
 * Build complicated or high computational cost function in higher level language. Build a
   `baobzi` function and use it as a drop in replacement to your function. Reap speed benefits.
@@ -71,7 +87,7 @@ export JULIA_LOAD_PATH=$PYTHONPATH:$HOME/local/share/baobzi/julia
 export MATLABPATH=$PYTHONPATH:$HOME/local/share/baobzi/matlab
 ```
 
-### C class though)
+### C
 ```C
 // test_baobzi.c
 #include <baobzi.h>
@@ -277,6 +293,24 @@ end program main
 gfortran -o fortran_example -I$HOME/local/share/baobzi/fortran fortran_example.f90 -lbaobzi
 ```
 
+## Including in your CMake project
+Here I've added a git submodule in extern/baobzi, and I build and link in the static library.
+You can also set the shared library on, and the static off, though you'll want to ensure the
+shared library gets installed with your project. Probably better to use the static. In this
+example, it added 23MB to my test executable size.
+
+```cmake
+set(BAOBZI_BUILD_SHARED OFF CACHE BOOL "")
+set(BAOBZI_BUILD_STATIC ON CACHE BOOL "")
+set(BAOBZI_BUILD_EXAMPLES OFF CACHE BOOL "")
+set(BAOBZI_BUILD_TESTS OFF CACHE BOOL "")
+add_subdirectory(extern/baobzi)
+
+add_executable(baobzi_test src/test.cpp)
+target_include_directories(baobzi_test PUBLIC extern/baobzi/include)
+target_link_libraries(baobzi_test PUBLIC baobzi_static)
+```
+
 ## Roadmap
 See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker](https://github.com/blackwer/baobzi/projects/1).
 
@@ -302,6 +336,9 @@ See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker]
 * Doesn't do 4+ dimensions (though possible, I haven't worked out the fitting procedures
   yet). Probably don't want to go above 5 dimensions, since each node takes `O(8 * ORDER^D)`
   bytes of memory.
+* Compiling outside of Release/RelWithDebInfo mode can cause eigen alignment issues that I
+  haven't yet resolved. This causes crashes for orders that are multiples of four (8, 12, 16)
+  in Debug mode.
 
 ## Why the name?
 It's a cute version of baobab, or the tree of life, which is already a very popular project
