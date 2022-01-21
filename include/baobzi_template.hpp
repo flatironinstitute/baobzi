@@ -60,7 +60,7 @@ inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
 template <int ORDER, int ISET>
 inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1, ISET> &box,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
-    double xd = x[0] - box.center[0] / box.half_length[0];
+    double xd = (x[0] - box.center[0]) / box.half_length[0];
 
     Eigen::Vector<double, ORDER> Tn;
     Tn[0] = 1.0;
