@@ -591,7 +591,7 @@ class Function {
 
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at
-    /// @returns function approximation at point x
+    /// @returns function approximation at point xp
     inline double eval(const double *xp) const { return eval(VEC(xp)); }
 
     /// @brief eval function approximation at point
