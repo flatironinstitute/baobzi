@@ -16,7 +16,7 @@ the box containing your point and evaluates using this approximant.
 * [Building/testing](#building-testing)
 * [Running with...](#running-with)
     + [C](#c)
-    + [C++](#c--)
+    + [C++](#c-1)
     + [Python](#python)
     + [Julia](#julia)
     + [MATLAB](#matlab)
@@ -24,7 +24,7 @@ the box containing your point and evaluates using this approximant.
 * [Including in your CMake project](#including-in-your-cmake-project)
 * [Roadmap](#roadmap)
 * [Known Issues. IMPORTANT PLEASE READ](#known-issues-important-please-read)
-* [Why the name?](#why-the-name-)
+* [Why the name?](#why-the-name)
 
 ## Example use cases
 * Build complicated or high computational cost function in higher level language. Build a
@@ -49,8 +49,8 @@ the box containing your point and evaluates using this approximant.
   no intervention by the user.
 * No library dependencies. All code necessary to build `baobzi` is in `baobzi`. There is an
   optional static library supported for building C/C++ codes where you don't want to load in
-  the shared `baobzi` object, but would rather throw it right in your binary (though I don't
-  recommend this, the static library is _huge_ and will grow with more dimension support).
+  the shared `baobzi` object, but would rather throw it right in your binary. See [Including in
+  your CMake project](#including-in-your-cmake-project).
 
 ## Building/testing
 Baobzi's only dependencies are cmake >= 3.5, and a C/C++17 compiler (gcc only really,
