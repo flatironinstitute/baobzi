@@ -2,108 +2,64 @@
 #include "class_handle.hpp"
 #include "mex.h"
 
+#include <cstdint>
 #include <list>
 #include <mutex>
 #include <set>
 #include <string>
 
-constexpr int n_slots = 10;
-static std::set<int> occupied_slots;
-static std::mutex mtx;
-
 struct wrapper_data_t {
     std::string fit_fcn;
-    uint16_t dim;
-    uint16_t order;
+    int dim;
+    int order;
 };
-static wrapper_data_t wrapper_data_arr[n_slots];
 
-int acquire_slot() {
-    mtx.lock();
-    for (int i = 0; i < n_slots; ++i) {
-        if (!occupied_slots.count(i)) {
-            occupied_slots.insert(i);
-            mtx.unlock();
-            return i;
-        }
-    }
-    mtx.unlock();
-    mexErrMsgTxt("Unable to aqcuire free baobzi function slot.");
-    return -1;
-}
-
-void free_slot(int i) {
-    mtx.lock();
-    occupied_slots.erase(i);
-    mtx.unlock();
-}
-
-template <int INDEX>
-double matfun_wrapper_template(const double *x) {
+double matfun_wrapper(const double *x, const void *data_) {
     mxArray *prhs[1];
     mxArray *plhs[1];
-    constexpr wrapper_data_t &data = wrapper_data_arr[INDEX];
+    const wrapper_data_t *data = (wrapper_data_t *)data_;
     plhs[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
-    prhs[0] = mxCreateDoubleMatrix(data.dim, 1, mxREAL);
+    prhs[0] = mxCreateDoubleMatrix(data->dim, 1, mxREAL);
 
     double *xptr = mxGetPr(prhs[0]);
-    for (int i = 0; i < data.dim; ++i)
+    for (int i = 0; i < data->dim; ++i)
         xptr[i] = x[i];
 
-    int status = mexCallMATLAB(1, plhs, 1, prhs, data.fit_fcn.c_str());
+    int status = mexCallMATLAB(1, plhs, 1, prhs, data->fit_fcn.c_str());
     if (status != 0) {
-        free_slot(INDEX);
         mexErrMsgIdAndTxt("MATLAB:mexfeval:mxCallMATLAB", "Failed to execute MATLAB function.");
     }
 
     return mxGetPr(plhs[0])[0];
 }
 
-double matfun_wrapper_0(const double *x) { return matfun_wrapper_template<0>(x); }
-double matfun_wrapper_1(const double *x) { return matfun_wrapper_template<1>(x); }
-double matfun_wrapper_2(const double *x) { return matfun_wrapper_template<2>(x); }
-double matfun_wrapper_3(const double *x) { return matfun_wrapper_template<3>(x); }
-double matfun_wrapper_4(const double *x) { return matfun_wrapper_template<4>(x); }
-double matfun_wrapper_5(const double *x) { return matfun_wrapper_template<5>(x); }
-double matfun_wrapper_6(const double *x) { return matfun_wrapper_template<6>(x); }
-double matfun_wrapper_7(const double *x) { return matfun_wrapper_template<7>(x); }
-double matfun_wrapper_8(const double *x) { return matfun_wrapper_template<8>(x); }
-double matfun_wrapper_9(const double *x) { return matfun_wrapper_template<9>(x); }
-
-double (*matfun_wrapper_arr[n_slots])(const double *) = {
-    matfun_wrapper_0, matfun_wrapper_1, matfun_wrapper_2, matfun_wrapper_3, matfun_wrapper_4,
-    matfun_wrapper_5, matfun_wrapper_6, matfun_wrapper_7, matfun_wrapper_8, matfun_wrapper_9};
-
 class baobzi {
   public:
     baobzi(const std::string &matfun, int dim, int order, const double *center, const double *half_length,
            const double tol)
-        : dim_(dim), order_(order) {
+        : data_({matfun, dim, order}) {
 
-        slot_ = acquire_slot();
-
-        wrapper_data_arr[slot_].fit_fcn = matfun;
-        wrapper_data_arr[slot_].dim = dim;
-        wrapper_data_arr[slot_].order = order;
+        baobzi_input_t input = {
+            .func = matfun_wrapper,
+            .data = &data_,
+            .dim = dim,
+            .order = order,
+            .tol = tol,
+        };
 
         // to prevent matlab from segfaulting if your function doesn't exist, try to call it once
-        matfun_wrapper_arr[slot_](center);
-        obj_ = baobzi_init(matfun_wrapper_arr[slot_], dim_, order_, center, half_length, tol);
+        matfun_wrapper(center, &data_);
+        obj_ = baobzi_init(&input, center, half_length);
     }
     baobzi(const char *infile) {
         baobzi_header_t header = baobzi_read_header_from_file(infile);
-        dim_ = header.dim;
-        order_ = header.order;
-        slot_ = acquire_slot();
-
-        wrapper_data_arr[slot_].dim = dim_;
-        wrapper_data_arr[slot_].order = order_;
+        data_.dim = header.dim;
+        data_.order = header.dim;
 
         obj_ = baobzi_restore(infile);
     }
 
     ~baobzi() {
-        free_slot(slot_);
         if (obj_)
             obj_ = baobzi_free(obj_);
     }
@@ -111,9 +67,7 @@ class baobzi {
     void save(const std::string &fname) { baobzi_save(obj_, fname.c_str()); }
 
   private:
-    int dim_;
-    int order_;
-    int slot_;
+    wrapper_data_t data_;
     baobzi_t obj_ = nullptr;
 };
 
