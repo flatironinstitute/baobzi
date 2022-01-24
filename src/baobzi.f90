@@ -2,13 +2,20 @@ module baobzi
   use, intrinsic :: iso_c_binding
   implicit none
 
+  type, bind(c) :: baobzi_input_t
+    type(c_funptr) :: func
+    type(c_ptr) :: data
+    integer(c_int) :: dim
+    integer(c_int) :: order
+    real(c_double) :: tol
+  end type baobzi_input_t
+
   interface
-    function baobzi_init (fin, dim, order, center, half_length, tol) bind(c) result(func)
+    function baobzi_init (input, center, half_length) bind(c) result(func)
       use, intrinsic :: iso_c_binding
-      type(c_funptr), intent(in), value :: fin
-      integer(kind=c_int16_t), intent(in), value :: dim, order
+      import :: baobzi_input_t
+      type(baobzi_input_t), intent(in) :: input
       real(kind=c_double), dimension(*) :: center, half_length
-      real(kind=c_double), intent(in), value :: tol
       type(c_ptr) :: func
     end function baobzi_init
 
