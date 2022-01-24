@@ -7,10 +7,14 @@
 
 using aligned_vector = std::vector<double, Eigen::aligned_allocator<double>>;
 
-double testfun_1d(const double *x) { return log(x[0]); }
-double testfun_2d(const double *x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
-double testfun_2d_2(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1])); }
-double testfun_3d(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2])); }
+double testfun_1d(const double *x, const void *data) { return log(x[0]); }
+double testfun_2d(const double *x, const void *data) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
+double testfun_2d_2(const double *x, const void *data) {
+    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
+}
+double testfun_3d(const double *x, const void *data) {
+    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
+}
 
 template <int DIM, typename Function>
 void time_function(const Function &function, const aligned_vector &x, int n_runs) {
@@ -27,7 +31,7 @@ void time_function(const Function &function, const aligned_vector &x, int n_runs
 }
 
 template <typename Function>
-void print_error(const Function &function, const aligned_vector &x) {
+void print_error(const Function &function, baobzi_input_func_t exact_function, const aligned_vector &x) {
     double max_error = 0.0;
     double max_rel_error = 0.0;
     double mean_error = 0.0;
@@ -37,7 +41,7 @@ void print_error(const Function &function, const aligned_vector &x) {
     for (int i = 0; i < x.size(); i += Function::Dim) {
         const double *point = &x[i];
 
-        double actual = function.f_(point);
+        double actual = exact_function(point, nullptr);
         double interp = function.eval(point);
         double delta = actual - interp;
 
@@ -88,16 +92,22 @@ int main(int argc, char *argv[]) {
         Eigen::Vector2d hl{1.0, 1.0};
         Eigen::Vector2d center2d = hl + Eigen::Vector2d{0.5, 2.0};
         aligned_vector x_2d_transformed(n_points * 2);
+        baobzi_input_t input;
+        input.dim = 2;
+        input.order = 6;
+        input.data = nullptr;
+        input.tol = 1E-8;
+        input.func = testfun_2d_2;
 
         for (int i = 0; i < 2 * n_points; i += 2)
             for (int j = 0; j < 2; ++j)
                 x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
-        baobzi::Function<2, 8> func_approx_2d(testfun_2d_2, center2d.data(), hl.data(), 1E-8);
+        baobzi::Function<2, 8> func_approx_2d(&input, center2d.data(), hl.data());
 
         // time_function<2>(func_approx_2d.f_, x_2d_transformed, 1);
         time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
-        print_error(func_approx_2d, x_2d_transformed);
+        print_error(func_approx_2d, input.func, x_2d_transformed);
     }
 
     return 0;

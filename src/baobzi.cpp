@@ -84,8 +84,6 @@ baobzi_t baobzi_restore(const char *filename_cstr) {
     msgpack::unpack(oh, infile.addr, infile.buflen, offset);
     msgpack::object obj = oh.get();
 
-    double (*fin)(const double *) = nullptr;
-    res->f_ = fin;
     res->DIM = header.dim;
     res->ORDER = header.order;
 
@@ -110,20 +108,18 @@ baobzi_t baobzi_free(baobzi_t func) {
     return nullptr;
 }
 
-baobzi_t baobzi_init(double (*fin)(const double *), uint16_t dim, uint16_t order, const double *center,
-                     const double *half_length, const double tol) {
+baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length) {
     baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
-    res->f_ = fin;
-    res->DIM = dim;
-    res->ORDER = order;
+    res->DIM = input->dim;
+    res->ORDER = input->order;
 
     int iset = get_iset();
 
-    switch (BAOBZI_JOIN(dim, order, iset)) {
+    switch (BAOBZI_JOIN(res->DIM, res->ORDER, iset)) {
 #include "baobzi/baobzi_cases.h"
     default: {
-        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim << ", "
-                  << order << ")\n";
+        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << res->DIM
+                  << ", " << res->ORDER << ")\n";
         break;
     }
     }

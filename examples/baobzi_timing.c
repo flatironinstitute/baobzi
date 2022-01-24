@@ -6,10 +6,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-double testfun_1d(const double *x) { return log(x[0]); }
-double testfun_2d(const double *x) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
-double testfun_2d_2(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1])); }
-double testfun_3d(const double *x) { return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2])); }
+double testfun_1d(const double *x, const void *data) { return log(x[0]); }
+double testfun_2d(const double *x, const void *data) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
+double testfun_2d_2(const double *x, const void *data) {
+    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
+}
+double testfun_3d(const double *x, const void *data) {
+    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
+}
 
 void time_function(const baobzi_t function, const double *x, int size, int n_runs) {
     const double time = omp_get_wtime();
@@ -24,7 +28,7 @@ void time_function(const baobzi_t function, const double *x, int size, int n_run
     printf("time, Megaevals/s, sum: %g %g %g\n", dt, n_eval / (dt * 1E6), res);
 }
 
-void print_error(const baobzi_t function, const double *x, int size) {
+void print_error(const baobzi_t function, baobzi_input_t *input, const double *x, int size) {
     double max_error = 0.0;
     double max_rel_error = 0.0;
     double mean_error = 0.0;
@@ -34,7 +38,7 @@ void print_error(const baobzi_t function, const double *x, int size) {
     for (int i = 0; i < size; i += function->DIM) {
         const double *point = &x[i];
 
-        double actual = function->f_(point);
+        double actual = input->func(point, input->data);
         double interp = baobzi_eval(function, point);
         double delta = actual - interp;
 
@@ -56,23 +60,23 @@ void print_error(const baobzi_t function, const double *x, int size) {
     printf("abs error max, mean: %g %g\n", max_error, mean_error);
 }
 
-void test_func(double (*fin)(const double *), int dim, int order, const double *xin, const double *hl,
-               const double *center, int n_points, int n_runs, double tol) {
+void test_func(baobzi_input_t *input, const double *xin, const double *hl, const double *center, int n_points,
+               int n_runs) {
     // Scale test points to our domain
-    double *x_transformed = (double *)malloc(n_points * dim * sizeof(double));
-    for (int i = 0; i < dim * n_points; i += dim)
-        for (int j = 0; j < dim; ++j)
+    double *x_transformed = (double *)malloc(n_points * input->dim * sizeof(double));
+    for (int i = 0; i < input->dim * n_points; i += input->dim)
+        for (int j = 0; j < input->dim; ++j)
             x_transformed[i + j] = hl[j] * (2.0 * xin[i + j] - 1.0) + center[j];
 
     // Create baobzi function approximator. Has pointers to relevant structures inside
     // This may take a while, since it fits the function on init
-    baobzi_t func_approx = baobzi_init(fin, dim, order, center, hl, tol);
+    baobzi_t func_approx = baobzi_init(input, center, hl);
 
     char filename[256];
-    sprintf(filename, "func_approx_%dd", dim);
+    sprintf(filename, "func_approx_%dd", input->dim);
 
-    time_function(func_approx, x_transformed, n_points * dim, n_runs);
-    print_error(func_approx, x_transformed, n_points * dim);
+    time_function(func_approx, x_transformed, n_points * input->dim, n_runs);
+    print_error(func_approx, input, x_transformed, n_points * input->dim);
     baobzi_save(func_approx, filename);
 
     free(x_transformed);
@@ -95,21 +99,25 @@ int main(int argc, char *argv[]) {
         x[i] = ((double)rand()) / RAND_MAX;
 
     {
-        const int dim = 2;
-        const int order = 6;                                 // Chebyshev polynomial order
-        const double tol = 1E-10;                            // Maximum relative error target
+        baobzi_input_t input;
+        input.dim = 2;
+        input.order = 6;
+        input.func = testfun_2d;
+        input.tol = 1E-10;                                   // Maximum relative error target
         const double hl[2] = {1.0, 1.0};                     // half the length of the domain in each dimension
         const double center[2] = {hl[0] + 0.5, hl[1] + 2.0}; // center of the domain
-        test_func(&testfun_2d, dim, order, x, hl, center, n_points, n_runs, tol);
+        test_func(&input, x, hl, center, n_points, n_runs);
     }
 
     {
-        const int dim = 3;
-        const int order = 6;
-        const double tol = 1E-12;
+        baobzi_input_t input;
+        input.dim = 3;
+        input.order = 6;
+        input.tol = 1E-12;
+        input.func = testfun_3d;
         double hl[3] = {1.0, 1.0, 1.0};
         double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};
-        test_func(&testfun_3d, dim, order, x, hl, center, n_points, n_runs, tol);
+        test_func(&input, x, hl, center, n_points, n_runs);
     }
 
     return 0;

@@ -1,8 +1,8 @@
 #ifndef BAOBZI_H
 #define BAOBZI_H
 
-#include "baobzi/macros.h"
 #include "baobzi/header.h"
+#include "baobzi/macros.h"
 
 #include <stdint.h>
 
@@ -16,17 +16,16 @@ extern "C" {
 /// Contains pointers to the wrappers of the relevant template C++ functions for a
 /// dim+order+instruction set
 typedef struct {
-    void *obj; ///< Actual baobzi::Function object
-    int DIM; ///< Dimension of our function
-    int ORDER; ///< Order of the polynomial
-    double (*f_)(const double *); ///< Function our approximator represents
+    void *obj;                                    ///< Actual baobzi::Function object
+    int DIM;                                      ///< Dimension of our function
+    int ORDER;                                    ///< Order of the polynomial
     double (*eval)(const void *, const double *); ///< Pointer to evaluation function
-    void (*save)(const void *, const char *); ///< Pointer to save function
-    void (*free)(void *); ///< pointer to save function
+    void (*save)(const void *, const char *);     ///< Pointer to save function
+    void (*free)(void *);                         ///< pointer to save function
 } baobzi_struct;
 
 /// Our type for the C API
-typedef baobzi_struct* baobzi_t;
+typedef baobzi_struct *baobzi_t;
 
 /// @brief eval approximator at point x
 /// @param[in] func initialized C baobzi object
@@ -56,8 +55,7 @@ baobzi_t baobzi_free(baobzi_t func);
 /// @param[in] half_length [dim] half the size of the domain in each dimension
 /// @param[in] tol desired relative tolerance
 /// @returns initialized baobzi C object
-baobzi_t baobzi_init(double (*)(const double *), uint16_t dim, uint16_t order, const double *center,
-                     const double *half_length, const double tol);
+baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length);
 
 /// @brief read dim/order/version info from file
 /// @param[in] fname path to input file
