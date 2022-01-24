@@ -1,21 +1,32 @@
 module baobzi
 
-mutable struct baobzi_struct
+mutable struct baobzi_t
 end
 
-function init(fin, dim, order, center, half_length, tol::Float64)
-    c_fin = @cfunction($fin, Cdouble, (Ptr{Cdouble},))
+mutable struct baobzi_input_t
+    func::Ptr{Cvoid}
+    data::Ptr{Cvoid}
+    dim::Cint
+    order::Cint
+    tol::Cdouble
+end
+
+function init(fin, dim, order, center, half_length, tol)
+    fanon = (x, p) -> fin(x)
+    fbind = @cfunction($fanon, Cdouble, (Ptr{Cdouble}, Ptr{Cvoid},))
+    input = baobzi_input_t(fbind.ptr, C_NULL, dim, order, tol)
+
     output_ptr = ccall(
         (:baobzi_init, :libbaobzi),
-        Ptr{baobzi_struct},
-        (Ptr{Cvoid}, Cushort, Cushort, Ptr{Cdouble}, Ptr{Cdouble}, Cdouble,),
-        c_fin, dim, order, center, half_length, tol
+        Ptr{baobzi_t},
+        (Ref{baobzi_input_t}, Ptr{Cdouble}, Ptr{Cdouble},),
+        input, center, half_length
     )
 
     return output_ptr
 end
 
-function eval(func::Ptr{baobzi_struct}, x)
+function eval(func::Ptr{baobzi_t}, x)
     return ccall(
         (:baobzi_eval, :libbaobzi),
         Cdouble,
@@ -24,7 +35,7 @@ function eval(func::Ptr{baobzi_struct}, x)
     )
 end
 
-function free(func::Ptr{baobzi_struct})
+function free(func::Ptr{baobzi_t})
     ccall(
         (:baobzi_free, :libbaobzi),
         Ptr{Cvoid},
@@ -33,7 +44,7 @@ function free(func::Ptr{baobzi_struct})
     )
 end
 
-function save(func::Ptr{baobzi_struct}, filename::String)
+function save(func::Ptr{baobzi_t}, filename::String)
     ccall(
         (:baobzi_save, :libbaobzi),
         Ptr{Cvoid},
@@ -45,7 +56,7 @@ end
 function restore(filename::String)
     output_ptr = ccall(
         (:baobzi_restore, :libbaobzi),
-        Ptr{baobzi_struct},
+        Ptr{baobzi_t},
         (Cstring,),
         filename
     )
