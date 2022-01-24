@@ -93,17 +93,22 @@ export MATLABPATH=$PYTHONPATH:$HOME/local/share/baobzi/matlab
 #include <baobzi.h>
 #include <stdio.h>
 
-double testfunc(const double *x) { return x[0] * x[1]; }
+double testfunc(const double *x, const void *data) { return x[0] * x[1]; }
 
 int main(int argc, char *argv[]) {
-    const int dim = 2;
-    const int order = 6;
-    const double tol = 1E-10;
+    baobzi_input_t input = {
+        .func = testfunc,
+        .data = NULL,
+        .dim = 2,
+        .order = 6,
+        .tol = 1E-10
+    };
+
     const double hl[2] = {1.0, 1.0};
     const double center[2] = {0.0, 0.0};
     const double x[2] = {0.25, 0.25};
 
-    baobzi_t func_approx = baobzi_init(testfunc, dim, order, center, hl, tol);
+    baobzi_t func_approx = baobzi_init(&input, center, hl);
     printf("%g\n", baobzi_eval(func_approx, x));
     baobzi_save(func_approx, "func_approx.baobzi");
     func_approx = baobzi_free(func_approx);
@@ -129,14 +134,19 @@ double testfunc(const double *x) { return x[0] * x[1]; }
 
 int main(int argc, char *argv[]) {
     using baobzi::Baobzi;
-    const int dim = 2;
-    const int order = 6;
-    const double tol = 1E-10;
+    baobzi_input_t input = {
+        .func = testfunc,
+        .data = NULL,
+        .dim = 2,
+        .order = 6,
+        .tol = 1E-10
+    };
+
     const double hl[2] = {1.0, 1.0};
     const double center[2] = {0.0, 0.0};
     const double x[2] = {0.25, 0.25};
     {
-        Baobzi func_approx(testfunc, dim, order, center, hl, tol);
+        Baobzi func_approx(&input, center, hl);
         printf("%g\n", func_approx(x));
         func_approx.save("func_approx.baobzi");
     }
@@ -249,38 +259,38 @@ matlab -batch simple2d
 program main
   use baobzi
   implicit none
-  type(c_funptr) :: func
-  real(kind=c_double) :: center(2), half_length(2), tol
+  real(kind=c_double) :: center(2), half_length(2), tol, dummy
   real(kind=c_double) :: x(2)
-  integer(kind=c_int16_t) :: order, dim
   type(c_ptr) :: func_approx
   character(len=64) :: fname
+  type(baobzi_input_t) :: input
 
-  func = c_funloc(testfun)
+  input%func = c_funloc(testfun)
+  input%dim = 2
+  input%order = 6
+  input%tol = 1E-8
+
   center(:) = 0.0
   half_length(:) = 1.0
-  tol = 1E-8
-  dim = 2
-  order = 6
-
   x(:) = 0.25
 
   fname = trim(adjustl('fortran.baobzi'))//char(0)
 
-  func_approx = baobzi_init(func, dim, order, center, half_length, tol)
-  print *, baobzi_eval(func_approx, x) - testfun(x)
+  func_approx = baobzi_init(input, center, half_length)
+  print *, baobzi_eval(func_approx, x) - testfun(x, dummy)
 
   call baobzi_save(func_approx, fname)
   func_approx = baobzi_free(func_approx)
 
   func_approx = baobzi_restore(fname)
-  print *, baobzi_eval(func_approx, x) - testfun(x)
+  print *, baobzi_eval(func_approx, x) - testfun(x, dummy)
 
 contains
-  function testfun (x) bind(c) result(y)
+  function testfun (x, data) bind(c) result(y)
     use, intrinsic :: iso_c_binding
     implicit none
     real(kind=c_double), dimension(*) :: x
+    real(kind=c_double) :: data
     real(kind=c_double) :: y
 
     y = x(1) * x(2)
