@@ -17,9 +17,8 @@ class Baobzi {
     /// @param[in] center [dim] center of the domain
     /// @param[in] half_length [dim] half the size of the domain in each dimension
     /// @param[in] tol desired relative tolerance
-    Baobzi(double (*fin)(const double *), uint16_t dim, uint16_t order, const double *center, const double *half_length,
-           const double tol)
-        : obj_(baobzi_init(fin, dim, order, center, half_length, tol)) {}
+    Baobzi(const baobzi_input_t *input, const double *center, const double *half_length)
+        : obj_(baobzi_init(input, center, half_length)) {}
 
     /// @brief Restore baobzi object from serialized version
     /// @param[in] input_file path to file of serialized function

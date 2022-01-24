@@ -1,4 +1,4 @@
-from ctypes import CDLL, CFUNCTYPE, POINTER, c_double, c_void_p, c_uint16, c_int, c_char_p, Structure
+from ctypes import CDLL, CFUNCTYPE, POINTER, c_double, c_void_p, c_uint16, c_int, c_char_p, Structure, pointer
 
 libbaobzi = CDLL("libbaobzi.so")
 INPUT_FUNC = CFUNCTYPE(c_double, POINTER(c_double))
@@ -10,14 +10,19 @@ class BAOBZI_STRUCT(Structure):
                 ("free", c_void_p)]
 
 
+class BAOBZI_INPUT_STRUCT(Structure):
+    _fields_ = [("func", INPUT_FUNC), ("data", c_void_p), ("dim", c_int),
+                ("order", c_int), ("tol", c_double)]
+
+
 baobzi_t = POINTER(BAOBZI_STRUCT)
 
 baobzi_init = libbaobzi.baobzi_init
 baobzi_init.restype = baobzi_t
 baobzi_init.argtypes = [
-    INPUT_FUNC, c_uint16, c_uint16,
+    POINTER(BAOBZI_INPUT_STRUCT),
     POINTER(c_double),
-    POINTER(c_double), c_double
+    POINTER(c_double)
 ]
 
 baobzi_eval = libbaobzi.baobzi_eval
@@ -54,14 +59,21 @@ class Baobzi:
             self.order = self.ptr[0].order
         elif fin:
             if not (dim and order and center and half_length and tol):
-                print("Baobzi: supply dim, order, center, half_length, and tol for init")
+                print(
+                    "Baobzi: supply dim, order, center, half_length, and tol for init"
+                )
             self.dim = dim
             self.order = order
-            self.ptr = baobzi_init(INPUT_FUNC(fin), self.dim, self.order,
+            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order,
+                                            tol)
+
+            self.ptr = baobzi_init(pointer(inputdata),
                                    (c_double * dim)(*center),
-                                   (c_double * dim)(*half_length), tol)
+                                   (c_double * dim)(*half_length))
         else:
-            print("Baobzi requires either a 'filename' argument or a 'fin' argument")
+            print(
+                "Baobzi requires either a 'filename' argument or a 'fin' argument"
+            )
 
     def __del__(self):
         if self.ptr:
