@@ -1,25 +1,25 @@
 program main
   use baobzi
   implicit none
-  type(c_funptr) :: func
   real(kind=c_double) :: center(2), half_length(2), tol
   real(kind=c_double) :: x(2)
-  integer(kind=c_int16_t) :: order, dim
-  type(c_ptr) :: func_approx
   character(len=64) :: fname
+  type(c_ptr) :: func_approx
+  type(baobzi_input_t) :: input
 
-  func = c_funloc(testfun)
+  input%func = c_funloc(testfun)
+  input%dim = 2
+  input%order = 6
+  input%tol = 1E-8
+
   center(:) = 0.0
   half_length(:) = 1.0
-  tol = 1E-8
-  dim = 2
-  order = 6
 
   x(:) = 0.25
 
   fname = trim(adjustl('fortran.baobzi'))//char(0)
 
-  func_approx = baobzi_init(func, dim, order, center, half_length, tol)
+  func_approx = baobzi_init(input, center, half_length)
   print *, baobzi_eval(func_approx, x) - testfun(x)
 
   call baobzi_save(func_approx, fname)
