@@ -7,7 +7,10 @@
 #include <stdlib.h>
 
 double testfun_1d(const double *x, const void *data) { return log(x[0]); }
-double testfun_2d(const double *x, const void *data) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
+double testfun_2d(const double *x, const void *data) {
+    const double scale_factor = *(double *)data;
+    return scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
+}
 double testfun_2d_2(const double *x, const void *data) {
     return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
 }
@@ -99,18 +102,20 @@ int main(int argc, char *argv[]) {
         x[i] = ((double)rand()) / RAND_MAX;
 
     {
-        baobzi_input_t input;
+        double scale_factor = 1.5;
+        baobzi_input_t input = baobzi_input_default;
         input.dim = 2;
         input.order = 6;
         input.func = testfun_2d;
         input.tol = 1E-10;                                   // Maximum relative error target
+        input.data = &scale_factor;
         const double hl[2] = {1.0, 1.0};                     // half the length of the domain in each dimension
         const double center[2] = {hl[0] + 0.5, hl[1] + 2.0}; // center of the domain
         test_func(&input, x, hl, center, n_points, n_runs);
     }
 
     {
-        baobzi_input_t input;
+        baobzi_input_t input = baobzi_input_default;
         input.dim = 3;
         input.order = 6;
         input.tol = 1E-12;

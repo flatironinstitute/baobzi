@@ -8,7 +8,10 @@
 using aligned_vector = std::vector<double, Eigen::aligned_allocator<double>>;
 
 double testfun_1d(const double *x, const void *data) { return log(x[0]); }
-double testfun_2d(const double *x, const void *data) { return exp(cos(5.0 * x[0]) * sin(5.0 * x[1])); }
+double testfun_2d(const double *x, const void *data) {
+    const double scale_factor = *(double *)data;
+    return scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
+}
 double testfun_2d_2(const double *x, const void *data) {
     return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
 }
@@ -92,10 +95,11 @@ int main(int argc, char *argv[]) {
         Eigen::Vector2d hl{1.0, 1.0};
         Eigen::Vector2d center2d = hl + Eigen::Vector2d{0.5, 2.0};
         aligned_vector x_2d_transformed(n_points * 2);
+        double scale_factor = 1.5;
         baobzi_input_t input;
         input.dim = 2;
         input.order = 6;
-        input.data = nullptr;
+        input.data = &scale_factor;
         input.tol = 1E-8;
         input.func = testfun_2d_2;
 
@@ -103,7 +107,7 @@ int main(int argc, char *argv[]) {
             for (int j = 0; j < 2; ++j)
                 x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
-        baobzi::Function<2, 8> func_approx_2d(&input, center2d.data(), hl.data());
+        baobzi::Function<2, 6> func_approx_2d(&input, center2d.data(), hl.data());
 
         // time_function<2>(func_approx_2d.f_, x_2d_transformed, 1);
         time_function<2>(func_approx_2d, x_2d_transformed, n_runs);

@@ -3,11 +3,11 @@ module baobzi
   implicit none
 
   type, bind(c) :: baobzi_input_t
-    type(c_funptr) :: func
-    type(c_ptr) :: data
-    integer(c_int) :: dim
-    integer(c_int) :: order
-    real(c_double) :: tol
+    type(c_funptr) :: func = c_null_funptr
+    type(c_ptr) :: data = c_null_ptr
+    integer(c_int) :: dim = 0
+    integer(c_int) :: order = 0
+    real(c_double) :: tol = 0
   end type baobzi_input_t
 
   interface
