@@ -11,12 +11,9 @@ class Baobzi {
     baobzi_t obj_ = nullptr; ///< Pointer to C baobzi struct this class wraps
   public:
     /// @brief Construct Baobzi object from input function
-    /// @param[in] fin pointer to function to fit
-    /// @param[in] dim input dimension of the function
-    /// @param[in] order order of polynomial to fit
+    /// @param[in] input pointer to baobzi_input_t object
     /// @param[in] center [dim] center of the domain
     /// @param[in] half_length [dim] half the size of the domain in each dimension
-    /// @param[in] tol desired relative tolerance
     Baobzi(const baobzi_input_t *input, const double *center, const double *half_length)
         : obj_(baobzi_init(input, center, half_length)) {}
 
