@@ -32,24 +32,23 @@ struct Box {
     using VEC = Eigen::Vector<double, D>;
     VEC center;      ///< Center of box
     VEC half_length; ///< Half the dimension of the box
+    VEC inv_half_length; ///< 1.0 / half the dimension of the box
 
     Box<D, ISET>() = default; ///< default constructor for msgpack happiness
     /// @brief Constructor, just copies x, hl over
-    Box<D, ISET>(const VEC &x, const VEC &hl) : center(x), half_length(hl) {}
+    Box<D, ISET>(const VEC &x, const VEC &hl)
+        : center(x), half_length(hl), inv_half_length(VEC::Ones().array() / hl.array()) {}
 
     /// @brief Check if point lies inside box
     /// @param[in] x point to check
     /// @returns true if point in box, false otherwise
     bool contains(const VEC &x) const {
         VEC dx = (x - center).array().abs();
-        for (int i = 0; i < D; ++i)
-            if (dx[i] > half_length[i])
-                return false;
-        return true;
+        return !((dx > half_length).any());
     }
 
     /// @brief MSGPACK serialization magic
-    MSGPACK_DEFINE(center, half_length);
+    MSGPACK_DEFINE(center, half_length, inv_half_length);
 };
 
 /// @brief Return an estimate of the error for a given set of coefficientsj
@@ -90,7 +89,7 @@ inline double cheb_eval(const Eigen::Vector<double, DIM> &x, const Box<DIM, ISET
 template <int ORDER, int ISET>
 inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1, ISET> &box,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
-    double xd = (x[0] - box.center[0]) / box.half_length[0];
+    double xd = (x[0] - box.center[0]) * box.inv_half_length[0];
 
     Eigen::Vector<double, ORDER> Tn;
     Tn[0] = 1.0;
@@ -107,7 +106,7 @@ inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1, ISET> &b
 template <int ORDER, int ISET>
 inline double cheb_eval(const Eigen::Vector2d &x, const Box<2, ISET> &box,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
-    Eigen::Vector2d xinterp = (x - box.center).array() / box.half_length.array();
+    Eigen::Vector2d xinterp = (x - box.center).array() * box.inv_half_length.array();
     Eigen::Matrix<double, 2, ORDER> Tns;
     Tns.col(0).setOnes();
     Tns.col(1) = xinterp;
@@ -124,7 +123,7 @@ template <int ORDER, int ISET>
 inline double cheb_eval(const Eigen::Vector3d &x, const Box<3, ISET> &box,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
 
-    Eigen::Vector3d xinterp = (x - box.center).array() / box.half_length.array();
+    Eigen::Vector3d xinterp = (x - box.center).array() * box.inv_half_length.array();
 
     Eigen::Vector<double, ORDER> Tn[3];
     Tn[0][0] = Tn[1][0] = Tn[2][0] = 1.0;
