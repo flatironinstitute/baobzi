@@ -173,18 +173,18 @@ class Node {
     /// @param[in] fin function to fit
     /// @param[in] tol desired relative error
     /// @returns true if fit successful, false if not good enough
-    bool fit(double (*f)(const double *), double tol) {
+    bool fit(const baobzi_input_t *input) {
         if constexpr (D == 1) {
             Eigen::Vector<double, ORDER> F;
             CoeffVec xvec =
                 Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
 
             for (int i = 0; i < ORDER; ++i)
-                F(i) = f(&xvec[i]);
+                F(i) = input->func(&xvec[i], input->data);
 
             Eigen::Vector<double, ORDER> coeffs = Func::VLU_.solve(F);
 
-            if (standard_error(coeffs) > tol)
+            if (standard_error(coeffs) > input->tol)
                 return false;
 
             coeffs_.resize(coeffs.size());
@@ -204,14 +204,14 @@ class Node {
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
                     double x[2] = {xvec[i], yvec[j]};
-                    F(i, j) = f(x);
+                    F(i, j) = input->func(x, input->data);
                 }
             }
 
             Eigen::Matrix<double, ORDER, ORDER> coeffs = Func::VLU_.solve(F);
             coeffs = Func::VLU_.solve(coeffs.transpose()).transpose();
 
-            if (standard_error(coeffs) > tol)
+            if (standard_error(coeffs) > input->tol)
                 return false;
 
             coeffs_.resize(coeffs.size());
@@ -235,7 +235,7 @@ class Node {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
                         double x[3] = {xvec[i], yvec[j], zvec[k]};
-                        F(i, j, k) = f(x);
+                        F(i, j, k) = input->func(x, input->data);
                     }
                 }
             }
@@ -267,10 +267,10 @@ class Node {
                             2.0 * VEC{(double)i, (double)j, (double)k}.array() * box_.half_length.array() / ORDER;
 
                         const double test_val = eval(point);
-                        const double actual_val = f(point.data());
+                        const double actual_val = input->func(point.data(), input->data);
                         const double rel_error = std::abs((actual_val - test_val) / actual_val);
 
-                        if (fabs(actual_val) > 1E-16 && rel_error > tol) {
+                        if (fabs(actual_val) > 1E-16 && rel_error > input->tol) {
                             coeffs_.clear();
                             coeffs_.shrink_to_fit();
                             return false;
@@ -310,7 +310,7 @@ struct FunctionTree {
     /// @param[in] f function to interpolate
     /// @param[in] box box where we'll be interpolating
     /// @param[in] tol relative error we're going to tolerate in our function
-    FunctionTree<DIM, ORDER, ISET>(double (*f)(const double *), const Box<DIM, ISET> &box, double tol) {
+    FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box) {
         std::queue<Box<DIM, ISET>> q;
         VEC half_width = box.half_length * 0.5;
         q.push(box);
@@ -329,7 +329,7 @@ struct FunctionTree {
 #pragma omp parallel for
             for (size_t i = 0; i < n_next; ++i) {
                 auto &node = nodes_[i + node_index];
-                node.fit(f, tol);
+                node.fit(input);
             }
 
             for (int i = 0; i < n_next; ++i) {
@@ -406,10 +406,9 @@ class Function {
     static CoeffVec cosarray_;                  ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
 
-    double (*f_)(const double *); ///< Function we're fitting
-    DBox box_;                    ///< box representing the domain of our function
-    double tol_;                  ///< Desired relative tolerance of our approximation
-    VEC lower_left_;              ///< Bottom 'corner' of our domain
+    DBox box_;       ///< box representing the domain of our function
+    double tol_;     ///< Desired relative tolerance of our approximation
+    VEC lower_left_; ///< Bottom 'corner' of our domain
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;                   ///< Number of subtrees in each linear dimension of our space
@@ -457,8 +456,8 @@ class Function {
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
     /// @param[in] tol desired relative tolerance of function interpolation
-    Function<DIM, ORDER, ISET>(double (*f)(const double *), const double *xp, const double *lp, double tol)
-        : f_(f), box_(VEC(xp), VEC(lp)), tol_(tol) {
+    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp)
+        : box_(VEC(xp), VEC(lp)), tol_(input->tol) {
         init_statics();
 
         VEC l(lp);
@@ -490,7 +489,7 @@ class Function {
 
 #pragma omp parallel for
             for (int i = 0; i < nodes.size(); ++i)
-                nodes[i].fit(f, tol);
+                nodes[i].fit(input);
 
             for (auto &node : nodes) {
                 if (!node.is_leaf()) {
@@ -531,7 +530,7 @@ class Function {
             VEC parent_center = (bins.template cast<double>().array() + 0.5) * bin_size_.array() + lower_left_.array();
 
             Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size_};
-            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(f_, root_box, tol_));
+            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box));
         }
     }
 

@@ -3,7 +3,9 @@
 #include "baobzi.h"
 #include "baobzi.hpp"
 
+#include <exception>
 #include <msgpack.hpp>
+#include <stdexcept>
 #include <tuple>
 #include <unistd.h>
 
@@ -14,6 +16,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+
+const baobzi_input_t baobzi_input_default = {.func = NULL, .data = NULL, .dim = 0, .order = 0, .tol = 0.0};
 
 enum ISET { GENERIC, AVX, AVX2, AVX512 };
 
@@ -84,8 +88,6 @@ baobzi_t baobzi_restore(const char *filename_cstr) {
     msgpack::unpack(oh, infile.addr, infile.buflen, offset);
     msgpack::object obj = oh.get();
 
-    double (*fin)(const double *) = nullptr;
-    res->f_ = fin;
     res->DIM = header.dim;
     res->ORDER = header.order;
 
@@ -105,26 +107,47 @@ baobzi_t baobzi_restore(const char *filename_cstr) {
 }
 
 baobzi_t baobzi_free(baobzi_t func) {
+    if (!func)
+        return nullptr;
     func->free(func->obj);
     free(func);
     return nullptr;
 }
 
-baobzi_t baobzi_init(double (*fin)(const double *), uint16_t dim, uint16_t order, const double *center,
-                     const double *half_length, const double tol) {
+bool is_valid_func(const baobzi_input_t *input, const double *point) {
+    try {
+        input->func(point, input->data);
+    } catch (std::exception(e)) {
+        return false;
+    }
+
+    return true;
+}
+
+baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length) {
+    if (input->tol <= 0.0) {
+        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi due to invalid 'tol' parameter. Please supply "
+                     "something greater than zero.\n";
+        return nullptr;
+    } else if (!input->func || !is_valid_func(input, center)) {
+        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi due to empty or invalid 'func' parameter. Please supply "
+                     "a valid function to fit.\n";
+        return nullptr;
+    }
+
     baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
-    res->f_ = fin;
-    res->DIM = dim;
-    res->ORDER = order;
+    res->DIM = input->dim;
+    res->ORDER = input->order;
 
     int iset = get_iset();
 
-    switch (BAOBZI_JOIN(dim, order, iset)) {
+    switch (BAOBZI_JOIN(res->DIM, res->ORDER, iset)) {
 #include "baobzi/baobzi_cases.h"
     default: {
-        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim << ", "
-                  << order << ")\n";
-        break;
+        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << res->DIM
+                  << ", " << res->ORDER << ")\n";
+        free(res);
+        return nullptr;
     }
     }
 
