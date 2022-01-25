@@ -5,6 +5,12 @@ project(
 
 set(CMAKE_CXX_STANDARD 17)
 
+get_property(gen_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT gen_multi AND NOT (CMAKE_BUILD_TYPE OR DEFINED ENV{CMAKE_BUILD_TYPE}))
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "")
+endif()
+
+
 find_package(OpenMP REQUIRED)
 
 set(BAOBZI_INCLUDES
@@ -63,13 +69,13 @@ if (BAOBZI_BUILD_STATIC)
 endif()
 
 if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
-  set(EXAMPLE_SOURCE_CPP "examples/baobzi_timing.cpp")
+  set(EXAMPLE_SOURCE_CPP "examples/c++/baobzi_timing.cpp")
   add_executable(baobzi_timing_cpp ${EXAMPLE_SOURCE_CPP})
   target_include_directories(baobzi_timing_cpp PUBLIC ${BAOBZI_INCLUDES})
   target_link_libraries(baobzi_timing_cpp PUBLIC OpenMP::OpenMP_CXX)
   target_compile_options(baobzi_timing_cpp PUBLIC -march=native)
 
-  set(EXAMPLE_SOURCE_C "examples/baobzi_timing.c")
+  set(EXAMPLE_SOURCE_C "examples/C/baobzi_timing.c")
   add_executable(baobzi_timing_c ${EXAMPLE_SOURCE_C})
   target_include_directories(baobzi_timing_c PUBLIC ${BAOBZI_INCLUDES})
   target_link_libraries(baobzi_timing_c PUBLIC baobzi OpenMP::OpenMP_CXX m)
@@ -89,9 +95,9 @@ endif()
 
 if (BAOBZI_BUILD_MATLAB)
   find_package(Matlab REQUIRED)
-  matlab_add_mex(NAME baobzi_mex SRC matlab/src/baobzi_mex.cpp LINK_TO baobzi)
+  matlab_add_mex(NAME baobzi_mex SRC src/matlab/baobzi_mex.cpp LINK_TO baobzi)
   target_include_directories(baobzi_mex PUBLIC ${BAOBZI_INCLUDES})
-  install(FILES ${PROJECT_SOURCE_DIR}/matlab/src/baobzi.m
+  install(FILES ${PROJECT_SOURCE_DIR}/src/matlab/baobzi.m
     DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/matlab)
   install(TARGETS baobzi_mex DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/matlab)
 endif()
@@ -101,9 +107,9 @@ install(TARGETS ${INSTALL_TARGETS})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
-install(FILES ${PROJECT_SOURCE_DIR}/julia/src/baobzi.jl
+install(FILES ${PROJECT_SOURCE_DIR}/src/julia/baobzi.jl
   DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/julia)
-install(FILES ${PROJECT_SOURCE_DIR}/python/src/baobzi.py
+install(FILES ${PROJECT_SOURCE_DIR}/src/python/baobzi.py
   DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/python)
 install(FILES ${PROJECT_SOURCE_DIR}/src/baobzi.f90
   ${CMAKE_CURRENT_BINARY_DIR}/baobzi.mod
