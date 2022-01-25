@@ -64,8 +64,7 @@ class Baobzi:
                 )
             self.dim = dim
             self.order = order
-            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order,
-                                            tol)
+            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order, tol)
 
             self.ptr = baobzi_init(pointer(inputdata),
                                    (c_double * dim)(*center),

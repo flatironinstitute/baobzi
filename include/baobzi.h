@@ -27,6 +27,8 @@ typedef struct {
 /// Our type for the C API
 typedef baobzi_struct *baobzi_t;
 
+extern const baobzi_input_t baobzi_input_default;
+
 /// @brief eval approximator at point x
 /// @param[in] func initialized C baobzi object
 /// @param[in] x point to evaluate at
