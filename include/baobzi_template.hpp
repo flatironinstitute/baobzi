@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <queue>
 #include <vector>
 
@@ -396,6 +397,7 @@ class Function {
     static constexpr int Dim = DIM;
     static constexpr int Order = ORDER;
     static constexpr int ISet = ISET;
+    static std::mutex statics_mutex;
 
     using VEC = Eigen::Vector<double, DIM>;
     using CoeffVec = Eigen::Vector<double, ORDER>;
@@ -445,10 +447,15 @@ class Function {
     ///
     /// Modifies baobzi::Function::cosarray_, baobzi::Function::VLU_
     static void init_statics() {
-        // FIXME: init_statics not thread safe
+        static bool is_initialized = false;
+        std::lock_guard<std::mutex> lock(statics_mutex);
+        if (is_initialized)
+            return;
+
         for (int i = 0; i < ORDER; ++i)
             cosarray_[ORDER - i - 1] = cos(M_PI * (i + 0.5) / ORDER);
         VLU_ = Eigen::PartialPivLU<VanderMat>(calc_vandermonde());
+        is_initialized = true;
     }
 
     /// @brief Construct our Function object (fits recursively, can be slow)
@@ -615,6 +622,9 @@ class Function {
     /// @brief msgpack serialization magic
     MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, bin_size_);
 };
+
+template <int DIM, int ORDER, int ISET>
+std::mutex Function<DIM, ORDER, ISET>::statics_mutex;
 
 template <int DIM, int ORDER, int ISET>
 typename Function<DIM, ORDER, ISET>::CoeffVec Function<DIM, ORDER, ISET>::cosarray_;
