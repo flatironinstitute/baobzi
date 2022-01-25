@@ -93,6 +93,11 @@ baobzi_t baobzi_restore(const char *filename_cstr) {
 
     auto [dim, order, version] = std::make_tuple(header.dim, header.order, header.version);
 
+    if (version != BAOBZI_HEADER_VERSION) {
+        free(res);
+        return nullptr;
+    }
+
     int iset = get_iset();
     switch (BAOBZI_JOIN(header.dim, header.order, iset)) {
 #include "baobzi/baobzi_cases_restore.h"
