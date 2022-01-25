@@ -50,12 +50,9 @@ baobzi_t baobzi_restore(const char *filename);
 baobzi_t baobzi_free(baobzi_t func);
 
 /// @brief Construct C baobzi object from input function
-/// @param[in] fin pointer to function to fit
-/// @param[in] dim input dimension of the function
-/// @param[in] order order of polynomial to fit
+/// @param[in] input pointer to baobzi_input_t object
 /// @param[in] center [dim] center of the domain
 /// @param[in] half_length [dim] half the size of the domain in each dimension
-/// @param[in] tol desired relative tolerance
 /// @returns initialized baobzi C object
 baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length);
 
