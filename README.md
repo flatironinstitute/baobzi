@@ -88,6 +88,8 @@ export MATLABPATH=$PYTHONPATH:$HOME/local/share/baobzi/matlab
 ```
 
 ### C
+A more complicated example than below: [examples/C/baobzi_timing.c](examples/C/baobzi_timing.c)
+
 ```C
 // test_baobzi.c
 #include <baobzi.h>
@@ -125,7 +127,7 @@ gcc -o test_baobzi.c -lbaobzi
 ```
 
 ### C++
-[examples/c++/baobzi_timing.cpp](examples/c++/baobzi_timing.cpp)
+A more complicated example than below: [examples/c++/baobzi_timing.cpp](examples/c++/baobzi_timing.cpp)
 ```c++
 // test_baobzi.cpp
 #include <baobzi.hpp>
