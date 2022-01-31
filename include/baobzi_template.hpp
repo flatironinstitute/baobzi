@@ -149,10 +149,10 @@ inline double cheb_eval(const Eigen::Vector3d &x, const Box<3, ISET> &box,
 template <int D, int ORDER, int ISET>
 class Node {
   public:
-    using VEC = Eigen::Vector<double, D>;
-    using CoeffVec = Eigen::Vector<double, ORDER>;
+    using VEC = Eigen::Vector<double, D>; ///< D dimensional vector type
+    using CoeffVec = Eigen::Vector<double, ORDER>; ///< ORDER dimensional vector type
     std::vector<double, Eigen::aligned_allocator<double>> coeffs_; ///< Flattened chebyshev coeffs
-    using Func = Function<D, ORDER, ISET>;
+    using Func = Function<D, ORDER, ISET>; ///< Type of boabzi function this belongs to
     Box<D, ISET> box_;             ///< Geometric position/size of this node
     uint64_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
     bool leaf_ = false;            ///< Helper variable to determine if node is a leaf
@@ -170,8 +170,7 @@ class Node {
     /// @brief Fit node to a given tolerance. If fit succeeds, set leaf and coeffs, otherwise ... don't
     ///
     /// Modifies: Node::leaf_, Node::coeffs_
-    /// @param[in] fin function to fit
-    /// @param[in] tol desired relative error
+    /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns true if fit successful, false if not good enough
     bool fit(const baobzi_input_t *input) {
         if constexpr (D == 1) {
@@ -300,16 +299,15 @@ class Node {
 template <int DIM, int ORDER, int ISET>
 struct FunctionTree {
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
-    static constexpr int Dim = DIM;
-    static constexpr int Order = ORDER;
+    static constexpr int Dim = DIM; ///< Dimension of tree
+    static constexpr int Order = ORDER; ///< Order of tree
 
-    using VEC = Eigen::Vector<double, DIM>;
+    using VEC = Eigen::Vector<double, DIM>; ///< D dimensional vector type
     std::vector<Node<DIM, ORDER, ISET>> nodes_; ///< Flat list of all nodes in Tree (leaf or otherwise)
 
     /// @brief Construct tree
-    /// @param[in] f function to interpolate
-    /// @param[in] box box where we'll be interpolating
-    /// @param[in] tol relative error we're going to tolerate in our function
+    /// @param[in] input parameters for fit (function, tol, etc)
+    /// @param[in] box box that this tree lives in
     FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box) {
         std::queue<Box<DIM, ISET>> q;
         VEC half_width = box.half_length * 0.5;
@@ -393,16 +391,16 @@ template <int DIM, int ORDER, int ISET = 0>
 class Function {
   public:
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
-    static constexpr int Dim = DIM;
-    static constexpr int Order = ORDER;
-    static constexpr int ISet = ISET;
-    static std::mutex statics_mutex;
+    static constexpr int Dim = DIM; ///< Input dimension of function
+    static constexpr int Order = ORDER; ///< Order of polynomial representation
+    static constexpr int ISet = ISET; ///< Instruction set (dummy param)
+    static std::mutex statics_mutex; ///< mutex for locking vandermonde/chebyshev initialization
 
-    using VEC = Eigen::Vector<double, DIM>;
-    using CoeffVec = Eigen::Vector<double, ORDER>;
-    using VanderMat = Eigen::Matrix<double, ORDER, ORDER>;
+    using VEC = Eigen::Vector<double, DIM>; ///< D dimensional vector type
+    using CoeffVec = Eigen::Vector<double, ORDER>; ///< Order dimensional vector type
+    using VanderMat = Eigen::Matrix<double, ORDER, ORDER>; ///< VanderMonde Matrix type
 
-    using DBox = Box<DIM, ISET>;
+    using DBox = Box<DIM, ISET>; ///< D dimensional box type
 
     static CoeffVec cosarray_;                  ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
@@ -458,10 +456,9 @@ class Function {
     }
 
     /// @brief Construct our Function object (fits recursively, can be slow)
-    /// @param[in] f function pointer to interpolate
+    /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
-    /// @param[in] tol desired relative tolerance of function interpolation
     Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp)
         : box_(VEC(xp), VEC(lp)), tol_(input->tol) {
         init_statics();
@@ -595,12 +592,12 @@ class Function {
     inline double eval(const VEC &x) const { return find_node(x).eval(x); }
 
     /// @brief eval function approximation at point
-    /// @param[in] x point to evaluate function at
+    /// @param[in] xp [DIM] point to evaluate function at
     /// @returns function approximation at point xp
     inline double eval(const double *xp) const { return eval(VEC(xp)); }
 
     /// @brief eval function approximation at point
-    /// @param[in] x point to evaluate function at
+    /// @param[in] x [DIM] point to evaluate function at
     /// @returns function approximation at point x
     inline double operator()(const VEC &x) const { return eval(x); }
 
