@@ -125,6 +125,7 @@ gcc -o test_baobzi.c -lbaobzi
 ```
 
 ### C++
+[examples/c++/baobzi_timing.cpp](examples/c++/baobzi_timing.cpp)
 ```c++
 // test_baobzi.cpp
 #include <baobzi.hpp>
