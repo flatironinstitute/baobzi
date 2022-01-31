@@ -58,7 +58,7 @@ currently). I get _vastly_ better performance out of g++-11 (*ONLY FOR C++ HEADE
 right now than any other compiler, and I'm not sure exactly why. It's very finicky, where the
 size of the compilation unit matters. Therefore, for optimal performance, currently, I suggest
 using the C shared/static library interface with gcc rather than the C++ header directly. See
-[examples/baobzi_timing.c](examples/baobzi_timing.c) for an example. On my Xeon Gold 6128 using
+[examples/C/baobzi_timing.c](examples/C/baobzi_timing.c) for an example. On my Xeon Gold 6128 using
 one core, this example gets roughly 50M evals/s on a simple 2D example, and 20M evals/s on a
 simple 3D example.
 
@@ -163,7 +163,7 @@ g++ -o test_baobzi.cpp -lbaobzi
 ```
 
 ### Python
-[python/examples/simple2d.py](python/examples/simple2d.py)
+[examples/python/simple2d.py](examples/python/simple2d.py)
 ```python3
 # simple2d.py
 from baobzi import Baobzi
@@ -190,7 +190,7 @@ python3 simple2d.py
 ```
 
 ### Julia
-[julia/examples/simple2d.jl](julia/examples/simple2d.jl)
+[examples/julia/simple2d.jl](examples/julia/simple2d.jl)
 ```julia
 # simple2d.jl
 import baobzi
@@ -254,7 +254,7 @@ matlab -batch simple2d
 ```
 
 ### Fortran
-[examples/fortran_example.f90](examples/fortran_example.f90)
+[examples/fortran/fortran_example.f90](examples/fortran/fortran_example.f90)
 ```fortran
 program main
   use baobzi
