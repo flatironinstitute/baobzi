@@ -67,7 +67,6 @@ simple 3D example.
 git clone --recursive https://github.com/blackwer/baobzi.git
 cd baobzi
 mkdir build
-cd build
 # Don't supply -march!!! Builds with CPU dispatch
 cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$HOME/local
 make -j $((2*$(nproc)))
@@ -78,13 +77,13 @@ make install
 All examples require your project know where the `baobzi` shared object is located. In the
 example above, it's located in `$HOME/local/lib64`.
 ```bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib64
-export LIBRARY_PATH=$LIBRARY_PATH:$HOME/local/lib64
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib
+export LIBRARY_PATH=$LIBRARY_PATH:$HOME/local/lib
 export C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOME/local/include
 export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$HOME/local/include
 export PYTHONPATH=$PYTHONPATH:$HOME/local/share/baobzi/python
-export JULIA_LOAD_PATH=$PYTHONPATH:$HOME/local/share/baobzi/julia
-export MATLABPATH=$PYTHONPATH:$HOME/local/share/baobzi/matlab
+export JULIA_LOAD_PATH=$JULIA_LOAD_PATH:$HOME/local/share/baobzi/julia
+export MATLABPATH=$MATLAB_PATH:$HOME/local/share/baobzi/matlab
 ```
 
 ### C
