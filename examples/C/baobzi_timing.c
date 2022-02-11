@@ -1,3 +1,20 @@
+/* timing test from C, on 2d and 3d scalar functions.
+
+Usage (after makde baobzi library and installed in $HOME/local):
+
+export LIBRARY_PATH=$LIBRARY_PATH:$HOME/local/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib
+export C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOME/local/include
+
+gcc baobzi_timing.c -o baobzi_timing -lbaobzi -lgomp -lm
+./baobzi_timing
+
+or
+OMP_NUM_THREADS=8 ./baobzi_timing
+etc
+
+ */
+
 #include <baobzi.h>
 
 #include <math.h>
