@@ -39,7 +39,7 @@ void time_function(const baobzi_t function, const double *x, int size, int n_run
     const double time = omp_get_wtime();
     for (int i_run = 0; i_run < n_runs; ++i_run) {
         for (int i = 0; i < size; i += function->DIM) {
-            baobzi_eval(function, x);
+            baobzi_eval(function, x + i);
         }
     }
     const double dt = omp_get_wtime() - time;
