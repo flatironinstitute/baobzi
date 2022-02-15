@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
         double scale_factor = 1.5;
         baobzi_input_t input = baobzi_input_default;
         input.dim = 2;
-        input.order = 6;
+        input.order = 10;
         input.func = testfun_2d;
         input.tol = 1E-10;                                   // Maximum relative error target
         input.data = &scale_factor;
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
     {
         baobzi_input_t input = baobzi_input_default;
         input.dim = 3;
-        input.order = 6;
+        input.order = 8;
         input.tol = 1E-12;
         input.func = testfun_3d;
         double hl[3] = {1.0, 1.0, 1.0};
