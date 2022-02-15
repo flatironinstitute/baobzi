@@ -32,6 +32,11 @@ class Baobzi {
     /// @param[in] x [dim]
     /// @return approximate value of function at point x
     double operator()(const double *x) const { return baobzi_eval(obj_, x); }
+
+    /// @brief eval function approximation at ntrg points
+    /// @param[in] xp [DIM * ntrg] array of points to evaluate function at
+    /// @param[out] res [DIM * ntrg] array of results
+    inline void operator()(const double *xp, double *res, int ntrg) const { baobzi_eval_multi(obj_, xp, res, ntrg); }
 };
 } // namespace baobzi
 #endif

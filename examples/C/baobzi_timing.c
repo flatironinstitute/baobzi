@@ -19,15 +19,17 @@ double testfun_3d(const double *x, const void *data) {
 }
 
 void time_function(const baobzi_t function, const double *x, int size, int n_runs) {
+    const int ntrg = size / function->DIM;
+    double *res = (double*) malloc(sizeof(double) * ntrg);
+
     const double time = omp_get_wtime();
     for (int i_run = 0; i_run < n_runs; ++i_run) {
-        for (int i = 0; i < size; i += function->DIM) {
-            baobzi_eval(function, x + i);
-        }
+        baobzi_eval_multi(function, x, res, ntrg);
     }
     const double dt = omp_get_wtime() - time;
-    const long n_eval = n_runs * (size / function->DIM);
+    const long n_eval = n_runs * ntrg;
     printf("time, Megaevals/s: %g %g\n", dt, n_eval / (dt * 1E6));
+    free(res);
 }
 
 void print_error(const baobzi_t function, baobzi_input_t *input, const double *x, int size) {

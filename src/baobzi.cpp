@@ -60,6 +60,10 @@ int get_iset() {
 
 double baobzi_eval(const baobzi_t func, const double *x) { return func->eval(func->obj, x); }
 
+void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
+    func->eval_multi(func->obj, x, res, ntrg);
+}
+
 void baobzi_save(const baobzi_t func, const char *filename) { func->save(func->obj, filename); }
 
 baobzi_header_t read_header(const char *addr, std::size_t buflen, std::size_t *offset) {

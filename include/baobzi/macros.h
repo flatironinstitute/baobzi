@@ -8,6 +8,7 @@
         res->obj = baobzi_init_##DIM##d_##ORDER##_##ISET(input, center, half_length);                                  \
         res->save = &baobzi_save_##DIM##d_##ORDER##_##ISET;                                                            \
         res->eval = &baobzi_eval_##DIM##d_##ORDER##_##ISET;                                                            \
+        res->eval_multi = &baobzi_eval_multi_##DIM##d_##ORDER##_##ISET;                                                \
         res->free = &baobzi_free_##DIM##d_##ORDER##_##ISET;                                                            \
         break;                                                                                                         \
     }
@@ -19,6 +20,7 @@
         res->obj = f_ptr;                                                                                              \
         res->save = &baobzi_save_##DIM##d_##ORDER##_##ISET;                                                            \
         res->eval = &baobzi_eval_##DIM##d_##ORDER##_##ISET;                                                            \
+        res->eval_multi = &baobzi_eval_multi_##DIM##d_##ORDER##_##ISET;                                                \
         res->free = &baobzi_free_##DIM##d_##ORDER##_##ISET;                                                            \
         break;                                                                                                         \
     }
@@ -26,6 +28,9 @@
 #define BAOBZI_DEFS(DIM, ORDER, ISET)                                                                                  \
     double baobzi_eval_##DIM##d_##ORDER##_##ISET(const void *f, const double *x) {                                     \
         return (*(baobzi::Function<DIM, ORDER, ISET> *)f).eval(x);                                                     \
+    }                                                                                                                  \
+    void baobzi_eval_multi_##DIM##d_##ORDER##_##ISET(const void *f, const double *x, double *res, int ntrg) {          \
+        (*(baobzi::Function<DIM, ORDER, ISET> *)f).eval(x, res, ntrg);                                                 \
     }                                                                                                                  \
     void baobzi_save_##DIM##d_##ORDER##_##ISET(const void *f, const char *filename) {                                  \
         (*(baobzi::Function<DIM, ORDER, ISET> *)f).save(filename);                                                     \
@@ -38,6 +43,7 @@
 
 #define BAOBZI_DECLS(DIM, ORDER, ISET)                                                                                 \
     double baobzi_eval_##DIM##d_##ORDER##_##ISET(const void *f, const double *x);                                      \
+    void baobzi_eval_multi_##DIM##d_##ORDER##_##ISET(const void *f, const double *x, double *res, int ntrg);           \
     void baobzi_save_##DIM##d_##ORDER##_##ISET(const void *f, const char *filename);                                   \
     void baobzi_free_##DIM##d_##ORDER##_##ISET(void *f);                                                               \
     void *baobzi_init_##DIM##d_##ORDER##_##ISET(const baobzi_input_t *input, const double *center,                     \

@@ -30,8 +30,8 @@ class Function;
 template <int D, int ISET>
 struct Box {
     using VEC = Eigen::Vector<double, D>;
-    VEC center;      ///< Center of box
-    VEC half_length; ///< Half the dimension of the box
+    VEC center;          ///< Center of box
+    VEC half_length;     ///< Half the dimension of the box
     VEC inv_half_length; ///< 1.0 / half the dimension of the box
 
     Box<D, ISET>() = default; ///< default constructor for msgpack happiness
@@ -149,11 +149,11 @@ inline double cheb_eval(const Eigen::Vector3d &x, const Box<3, ISET> &box,
 template <int D, int ORDER, int ISET>
 class Node {
   public:
-    using VEC = Eigen::Vector<double, D>; ///< D dimensional vector type
-    using CoeffVec = Eigen::Vector<double, ORDER>; ///< ORDER dimensional vector type
+    using VEC = Eigen::Vector<double, D>;                          ///< D dimensional vector type
+    using CoeffVec = Eigen::Vector<double, ORDER>;                 ///< ORDER dimensional vector type
     std::vector<double, Eigen::aligned_allocator<double>> coeffs_; ///< Flattened chebyshev coeffs
-    using Func = Function<D, ORDER, ISET>; ///< Type of boabzi function this belongs to
-    Box<D, ISET> box_;             ///< Geometric position/size of this node
+    using Func = Function<D, ORDER, ISET>;                         ///< Type of boabzi function this belongs to
+    Box<D, ISET> box_;                                             ///< Geometric position/size of this node
     uint64_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
     bool leaf_ = false;            ///< Helper variable to determine if node is a leaf
 
@@ -299,10 +299,10 @@ class Node {
 template <int DIM, int ORDER, int ISET>
 struct FunctionTree {
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
-    static constexpr int Dim = DIM; ///< Dimension of tree
-    static constexpr int Order = ORDER; ///< Order of tree
+    static constexpr int Dim = DIM;         ///< Dimension of tree
+    static constexpr int Order = ORDER;     ///< Order of tree
 
-    using VEC = Eigen::Vector<double, DIM>; ///< D dimensional vector type
+    using VEC = Eigen::Vector<double, DIM>;     ///< D dimensional vector type
     std::vector<Node<DIM, ORDER, ISET>> nodes_; ///< Flat list of all nodes in Tree (leaf or otherwise)
 
     /// @brief Construct tree
@@ -391,13 +391,13 @@ template <int DIM, int ORDER, int ISET = 0>
 class Function {
   public:
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
-    static constexpr int Dim = DIM; ///< Input dimension of function
-    static constexpr int Order = ORDER; ///< Order of polynomial representation
-    static constexpr int ISet = ISET; ///< Instruction set (dummy param)
-    static std::mutex statics_mutex; ///< mutex for locking vandermonde/chebyshev initialization
+    static constexpr int Dim = DIM;         ///< Input dimension of function
+    static constexpr int Order = ORDER;     ///< Order of polynomial representation
+    static constexpr int ISet = ISET;       ///< Instruction set (dummy param)
+    static std::mutex statics_mutex;        ///< mutex for locking vandermonde/chebyshev initialization
 
-    using VEC = Eigen::Vector<double, DIM>; ///< D dimensional vector type
-    using CoeffVec = Eigen::Vector<double, ORDER>; ///< Order dimensional vector type
+    using VEC = Eigen::Vector<double, DIM>;                ///< D dimensional vector type
+    using CoeffVec = Eigen::Vector<double, ORDER>;         ///< Order dimensional vector type
     using VanderMat = Eigen::Matrix<double, ORDER, ORDER>; ///< VanderMonde Matrix type
 
     using DBox = Box<DIM, ISET>; ///< D dimensional box type
@@ -596,6 +596,14 @@ class Function {
     /// @returns function approximation at point xp
     inline double eval(const double *xp) const { return eval(VEC(xp)); }
 
+    /// @brief eval function approximation at ntrg points
+    /// @param[in] xp [DIM * ntrg] array of points to evaluate function at
+    /// @param[out] res [ntrg] array of results
+    inline void eval(const double *xp, double *res, int ntrg) {
+        for (int i = 0; i < ntrg; i++)
+            res[i] = eval(VEC(xp + DIM * i));
+    }
+
     /// @brief eval function approximation at point
     /// @param[in] x [DIM] point to evaluate function at
     /// @returns function approximation at point x
@@ -605,6 +613,11 @@ class Function {
     /// @param[in] x point to evaluate function at
     /// @returns function approximation at point x
     inline double operator()(const double *x) const { return eval(x); }
+
+    /// @brief eval function approximation at ntrg points
+    /// @param[in] xp [DIM * ntrg] array of points to evaluate function at
+    /// @param[out] res [DIM * ntrg] array of results
+    inline void operator()(const double *xp, double *res, int ntrg) const { eval(xp, res, ntrg); }
 
     /// @brief save function approximation to file
     /// @param[in] filename path to save file at
