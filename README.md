@@ -54,13 +54,12 @@ the box containing your point and evaluates using this approximant.
 
 ## Building/testing
 Baobzi's only dependencies are cmake >= 3.5, and a C/C++17 compiler (gcc only really,
-currently). I get _vastly_ better performance out of g++-11 (*ONLY FOR C++ HEADER ONLY BUILDS*)
-right now than any other compiler, and I'm not sure exactly why. It's very finicky, where the
-size of the compilation unit matters. Therefore, for optimal performance, currently, I suggest
-using the C shared/static library interface with gcc rather than the C++ header directly. See
-[examples/C/baobzi_timing.c](examples/C/baobzi_timing.c) for an example. On my Xeon Gold 6128 using
-one core, this example gets roughly 50M evals/s on a simple 2D example, and 20M evals/s on a
-simple 3D example.
+currently). I get the best performance out of g++-11 right now. While there is a header only
+library for C++, it can be quite finicky. Therefore, for optimal performance, I currently
+suggest using the C shared/static library interface with gcc rather than the C++ header
+directly. See [examples/C/baobzi_timing.c](examples/C/baobzi_timing.c) for an example. On my
+Xeon Gold 6128 using one core, this example gets roughly 20M evals/s on a simple 2D example,
+and 3M evals/s on a simple 3D example.
 
 ```bash
 # At FI -- module load gcc cmake matlab
@@ -70,16 +69,17 @@ mkdir build
 cd build
 # Don't supply -march!!! Builds with CPU dispatch
 cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$HOME/local
-make -j $((2*$(nproc)))
+make -j $((2*$(nproc))) ..
 make install
 ```
 
 ## Running with...
 All examples require your project know where the `baobzi` shared object is located. In the
-example above, it's located in `$HOME/local/lib64`.
+example above, it's located in either the `$HOME/local/lib` or `$HOME/local/lib64` directory,
+depending on your system.
 ```bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib64
-export LIBRARY_PATH=$LIBRARY_PATH:$HOME/local/lib64
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib
+export LIBRARY_PATH=$LIBRARY_PATH:$HOME/local/lib
 export C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOME/local/include
 export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$HOME/local/include
 export PYTHONPATH=$PYTHONPATH:$HOME/local/share/baobzi/python
