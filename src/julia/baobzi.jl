@@ -35,6 +35,19 @@ function eval(func::Ptr{baobzi_t}, x)
     )
 end
 
+function eval_multi(func::Ptr{baobzi_t}, x)
+    n_points = Int32(length(x) // 2)
+    println(n_points)
+    res = Array{Float64}(undef, n_points)
+    ccall(
+        (:baobzi_eval_multi, :libbaobzi),
+        Cvoid,
+        (Ptr{Cvoid}, Ptr{Cdouble}, Ptr{Cdouble}, Cint,),
+        func, x, res, n_points
+    )
+    return res
+end
+
 function free(func::Ptr{baobzi_t})
     ccall(
         (:baobzi_free, :libbaobzi),

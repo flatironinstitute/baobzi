@@ -7,7 +7,7 @@ function testfunc(xp::Ptr{Float64})::Cdouble
 end
 
 center = [0.0, 0.0]
-hl = [0.5, 1.0]
+hl = [1.0, 1.0]
 test_point = [0.25, 0.25]
 dim = 2
 order = 6
@@ -22,3 +22,6 @@ baobzi.free(func_approx)
 
 func_approx = baobzi.restore(output_file)
 println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
+
+points = 2.0 * (rand(Float64, 2000000)) .- 1.0
+baobzi.eval_multi(func_approx, points)
