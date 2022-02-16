@@ -63,28 +63,29 @@ and 3M evals/s on a simple 3D example.
 
 ```bash
 # At FI -- module load gcc cmake matlab
+export BAOBZI_ROOT=$HOME/local/baobzi
 git clone --recursive https://github.com/blackwer/baobzi.git
 cd baobzi
 mkdir build
 cd build
 # Don't supply -march!!! Builds with CPU dispatch
-cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$HOME/local ..
+cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$BAOBZI_ROOT ..
 make -j $((2*$(nproc)))
 make install
 ```
 
 ## Running with...
 All examples require your project know where the `baobzi` shared object is located. In the
-example above, it's located in either the `$HOME/local/lib` or `$HOME/local/lib64` directory,
+example above, it's located in either the `$BAOBZI_ROOT/lib` or `$BAOBZI_ROOT/lib64` directory,
 depending on your system.
 ```bash
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/local/lib
-export LIBRARY_PATH=$LIBRARY_PATH:$HOME/local/lib
-export C_INCLUDE_PATH=$C_INCLUDE_PATH:$HOME/local/include
-export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$HOME/local/include
-export PYTHONPATH=$PYTHONPATH:$HOME/local/share/baobzi/python
-export JULIA_LOAD_PATH=$PYTHONPATH:$HOME/local/share/baobzi/julia
-export MATLABPATH=$PYTHONPATH:$HOME/local/share/baobzi/matlab
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$BAOBZI_ROOT/lib
+export LIBRARY_PATH=$LIBRARY_PATH:$BAOBZI_ROOT/lib
+export C_INCLUDE_PATH=$C_INCLUDE_PATH:$BAOBZI_ROOT/include
+export CPLUS_INCLUDE_PATH=$CPLUS_INCLUDE_PATH:$BAOBZI_ROOT/include
+export PYTHONPATH=$PYTHONPATH:$BAOBZI_ROOT/share/baobzi/python
+export JULIA_LOAD_PATH=JULIA_LOAD_PATH:$BAOBZI_ROOT/share/baobzi/julia
+export MATLABPATH=$MATLABPATH:$BAOBZI_ROOT/share/baobzi/matlab
 ```
 
 ### C
@@ -305,7 +306,7 @@ end program main
 ```
 
 ```bash
-gfortran -o fortran_example -I$HOME/local/share/baobzi/fortran fortran_example.f90 -lbaobzi
+gfortran -o fortran_example -I$BAOBZI_ROOT/share/baobzi/fortran fortran_example.f90 -lbaobzi
 ```
 
 ## Including in your CMake project
