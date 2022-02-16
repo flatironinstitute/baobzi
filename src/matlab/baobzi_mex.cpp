@@ -65,9 +65,9 @@ class baobzi {
             obj_ = baobzi_free(obj_);
     }
     double eval(const double *x) { return baobzi_eval(obj_, x); };
+    void eval(const double *x, double *res, int ntrg) { baobzi_eval_multi(obj_, x, res, ntrg); };
     void save(const std::string &fname) { baobzi_save(obj_, fname.c_str()); }
 
-  private:
     wrapper_data_t data_;
     baobzi_t obj_ = nullptr;
 };
@@ -147,8 +147,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         if (nlhs > 1 || nrhs != 3)
             mexErrMsgTxt("eval: Unexpected arguments.");
         // Call the method
-        plhs[0] = mxCreateDoubleMatrix(1, 1, mxREAL);
-        mxGetPr(plhs[0])[0] = baobzi_instance->eval(mxGetPr(prhs[2]));
+        int n_points = mxGetNumberOfElements(prhs[2]) / baobzi_instance->data_.dim;
+        plhs[0] = mxCreateDoubleMatrix(n_points, 1, mxREAL);
+        if (n_points == 1)
+            mxGetPr(plhs[0])[0] = baobzi_instance->eval(mxGetPr(prhs[2]));
+        else
+            baobzi_instance->eval(mxGetPr(prhs[2]), mxGetPr(plhs[0]), n_points);
 
         return;
     }
