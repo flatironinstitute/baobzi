@@ -68,8 +68,8 @@ cd baobzi
 mkdir build
 cd build
 # Don't supply -march!!! Builds with CPU dispatch
-cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$HOME/local
-make -j $((2*$(nproc))) ..
+cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$HOME/local ..
+make -j $((2*$(nproc)))
 make install
 ```
 
@@ -228,7 +228,7 @@ julia simple2d.jl
 
 ### MATLAB
 MATLAB initialization does not work for anonymous functions. You must declare an actual
-function (in its on `myfunc.m` file).
+function (in its own `myfunc.m` file).
 
 ```matlab
 %% testfun.m
