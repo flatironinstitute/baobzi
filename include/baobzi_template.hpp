@@ -324,7 +324,6 @@ struct FunctionTree {
                 nodes_.push_back(Node<DIM, ORDER, ISET>(box));
             }
 
-#pragma omp parallel for
             for (size_t i = 0; i < n_next; ++i) {
                 auto &node = nodes_[i + node_index];
                 node.fit(input);
@@ -490,7 +489,6 @@ class Function {
                 nodes.emplace_back(Node<DIM, ORDER, ISET>(box));
             }
 
-#pragma omp parallel for
             for (int i = 0; i < nodes.size(); ++i)
                 nodes[i].fit(input);
 

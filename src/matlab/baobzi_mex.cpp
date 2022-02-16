@@ -28,6 +28,7 @@ double matfun_wrapper(const double *x, const void *data_) {
     int status = mexCallMATLAB(1, plhs, 1, prhs, data->fit_fcn.c_str());
     if (status != 0) {
         mexErrMsgIdAndTxt("MATLAB:mexfeval:mxCallMATLAB", "Failed to execute MATLAB function.");
+        return 0.0;
     }
 
     return mxGetPr(plhs[0])[0];

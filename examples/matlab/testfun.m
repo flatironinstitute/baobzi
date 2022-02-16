@@ -1,3 +1,3 @@
 function [y] = testfun(x)
-  y = x(1) * x(2);
+  y = exp(x(1)) * cos(x(2));
 end
