@@ -5,8 +5,6 @@
 #include <omp.h>
 #include <random>
 
-using aligned_vector = std::vector<double, Eigen::aligned_allocator<double>>;
-
 double testfun_1d(const double *x, const void *data) { return log(x[0]); }
 double testfun_2d(const double *x, const void *data) {
     const double scale_factor = *(double *)data;
@@ -20,21 +18,22 @@ double testfun_3d(const double *x, const void *data) {
 }
 
 template <int DIM, typename Function>
-void time_function(const Function &function, const aligned_vector &x, int n_runs) {
+std::vector<double> time_function(const Function &function, const std::vector<double> &x, int n_runs) {
+    std::vector<double> res(x.size());
     const double time = omp_get_wtime();
-    double res = 0.0;
     for (int i_run = 0; i_run < n_runs; ++i_run) {
         for (int i = 0; i < x.size(); i += DIM) {
-            res += function(&x[i]);
+            res[i] = function(&x[i]);
         }
     }
     const double dt = omp_get_wtime() - time;
     const long n_eval = n_runs * (x.size() / DIM);
-    std::cout << dt << " " << n_eval / (dt * 1E6) << " " << res << std::endl;
+    std::cout << dt << " " << n_eval / (dt * 1E6) << " " << std::endl;
+    return res;
 }
 
 template <typename Function>
-void print_error(const Function &function, baobzi_input_func_t exact_function, const aligned_vector &x) {
+void print_error(const Function &function, baobzi_input_t &input, const std::vector<double> &x) {
     double max_error = 0.0;
     double max_rel_error = 0.0;
     double mean_error = 0.0;
@@ -44,7 +43,7 @@ void print_error(const Function &function, baobzi_input_func_t exact_function, c
     for (int i = 0; i < x.size(); i += Function::Dim) {
         const double *point = &x[i];
 
-        double actual = exact_function(point, nullptr);
+        double actual = input.func(point, input.data);
         double interp = function.eval(point);
         double delta = actual - interp;
 
@@ -75,7 +74,7 @@ int main(int argc, char *argv[]) {
 
     std::mt19937 gen(1);
     std::uniform_real_distribution<> dis(0, 1);
-    aligned_vector x(n_points * 3);
+    std::vector<double> x(n_points * 3);
     for (size_t i = 0; i < n_points * 3; ++i)
         x[i] = dis(gen);
 
@@ -94,24 +93,23 @@ int main(int argc, char *argv[]) {
     {
         Eigen::Vector2d hl{1.0, 1.0};
         Eigen::Vector2d center2d = hl + Eigen::Vector2d{0.5, 2.0};
-        aligned_vector x_2d_transformed(n_points * 2);
+        std::vector<double> x_2d_transformed(n_points * 2);
         double scale_factor = 1.5;
         baobzi_input_t input;
         input.dim = 2;
-        input.order = 6;
+        input.order = 10;
         input.data = &scale_factor;
-        input.tol = 1E-8;
-        input.func = testfun_2d_2;
+        input.tol = 1E-10;
+        input.func = testfun_2d;
 
         for (int i = 0; i < 2 * n_points; i += 2)
             for (int j = 0; j < 2; ++j)
                 x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
-        baobzi::Function<2, 6> func_approx_2d(&input, center2d.data(), hl.data());
+        baobzi::Function<2, 10> func_approx_2d(&input, center2d.data(), hl.data());
 
-        // time_function<2>(func_approx_2d.f_, x_2d_transformed, 1);
         time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
-        print_error(func_approx_2d, input.func, x_2d_transformed);
+        print_error(func_approx_2d, input, x_2d_transformed);
     }
 
     return 0;
