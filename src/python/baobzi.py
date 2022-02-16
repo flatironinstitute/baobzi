@@ -1,4 +1,5 @@
 from ctypes import CDLL, CFUNCTYPE, POINTER, c_double, c_void_p, c_uint16, c_int, c_char_p, Structure, pointer
+import numpy as np
 
 libbaobzi = CDLL("libbaobzi.so")
 INPUT_FUNC = CFUNCTYPE(c_double, POINTER(c_double))
@@ -29,6 +30,10 @@ baobzi_eval = libbaobzi.baobzi_eval
 baobzi_eval.restype = c_double
 baobzi_eval.argtypes = [c_void_p, POINTER(c_double)]
 
+baobzi_eval_multi = libbaobzi.baobzi_eval_multi
+baobzi_eval_multi.restype = c_void_p
+baobzi_eval_multi.argtypes = [c_void_p, POINTER(c_double), POINTER(c_double), c_int]
+
 baobzi_free = libbaobzi.baobzi_free
 baobzi_free.restype = baobzi_t
 baobzi_free.argtypes = [c_void_p]
@@ -58,7 +63,7 @@ class Baobzi:
             self.dim = self.ptr[0].dim
             self.order = self.ptr[0].order
         elif fin:
-            if not (dim and order and center and half_length and tol):
+            if not (dim and order and center.size and half_length.size and tol):
                 print(
                     "Baobzi: supply dim, order, center, half_length, and tol for init"
                 )
@@ -67,8 +72,8 @@ class Baobzi:
             inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order, tol)
 
             self.ptr = baobzi_init(pointer(inputdata),
-                                   (c_double * dim)(*center),
-                                   (c_double * dim)(*half_length))
+                                   center.ctypes.data_as(POINTER(c_double)),
+                                   half_length.ctypes.data_as(POINTER(c_double)))
         else:
             print(
                 "Baobzi requires either a 'filename' argument or a 'fin' argument"
@@ -79,7 +84,12 @@ class Baobzi:
             baobzi_free(self.ptr)
 
     def __call__(self, x):
-        return baobzi_eval(self.ptr, (c_double * self.dim)(*x))
+        if x.size == self.dim:
+            return baobzi_eval(self.ptr, (c_double * self.dim)(*x))
+        else:
+            res = np.empty(x.size // self.dim, dtype=np.float64)
+            baobzi_eval_multi(self.ptr, x.ctypes.data_as(POINTER(c_double)), res.ctypes.data_as(POINTER(c_double)), res.size)
+            return res
 
     def save(self, filename):
         bfilename = bytes(filename, 'utf-8')
