@@ -3,7 +3,10 @@ program main
   implicit none
   real(kind=c_double) :: center(2), half_length(2), tol
   real(kind=c_double) :: x(2)
+  real(kind=c_double) :: x_multi(4)
+  real(kind=c_double) :: res_multi(2)
   real(kind=c_double), target :: scale_factor
+  integer(kind=c_int) :: ntrg
   character(len=64) :: fname
   type(c_ptr) :: func_approx
   type(baobzi_input_t) :: input
@@ -20,6 +23,8 @@ program main
   half_length(:) = 1.0
 
   x(:) = 0.25
+  x_multi(:) = 0.25
+  ntrg = 2
 
   fname = trim(adjustl('fortran.baobzi'))//char(0)
 
@@ -31,6 +36,9 @@ program main
 
   func_approx = baobzi_restore(fname)
   print *, baobzi_eval(func_approx, x) - testfun(x, scale_factor)
+
+  call baobzi_eval_multi(func_approx, x_multi, res_multi, ntrg)
+  print *, res_multi
 
 contains
   function testfun (x, data) bind(c) result(y)

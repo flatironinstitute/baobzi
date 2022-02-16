@@ -39,6 +39,14 @@ module baobzi
       real(kind=c_double) :: y
     end function baobzi_eval
 
+    subroutine baobzi_eval_multi (f, x, res, ntrg) bind(c)
+      use, intrinsic :: iso_c_binding
+      type(c_ptr), intent(in), value :: f
+      real(kind=c_double), dimension(*) :: x
+      real(kind=c_double), dimension(*) :: res
+      integer(kind=c_int), value :: ntrg
+    end subroutine baobzi_eval_multi
+
     function baobzi_free (f) bind(c) result(f_null)
       use, intrinsic :: iso_c_binding
       type(c_ptr), intent(in), value :: f
