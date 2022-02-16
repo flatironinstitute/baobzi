@@ -51,7 +51,7 @@ struct Box {
     MSGPACK_DEFINE(center, half_length, inv_half_length);
 };
 
-/// @brief Return an estimate of the error for a given set of coefficientsj
+/// @brief Return an estimate of the error for a given set of coefficients
 /// @param[in] coeffs one or two dimensional Vector/Matrix of coefficients
 /// @returns estimation of error given those coefficients
 inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
