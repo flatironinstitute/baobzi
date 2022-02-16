@@ -19,15 +19,14 @@ double testfun_3d(const double *x, const void *data) {
 
 template <int DIM, typename Function>
 std::vector<double> time_function(const Function &function, const std::vector<double> &x, int n_runs) {
-    std::vector<double> res(x.size());
+    const size_t n_points = x.size() / DIM;
+    std::vector<double> res(n_points);
     const double time = omp_get_wtime();
-    for (int i_run = 0; i_run < n_runs; ++i_run) {
-        for (int i = 0; i < x.size(); i += DIM) {
-            res[i] = function(&x[i]);
-        }
-    }
+    for (int i_run = 0; i_run < n_runs; ++i_run)
+        function(x.data(), res.data(), n_points);
+
     const double dt = omp_get_wtime() - time;
-    const long n_eval = n_runs * (x.size() / DIM);
+    const long n_eval = n_runs * n_points;
     std::cout << dt << " " << n_eval / (dt * 1E6) << " " << std::endl;
     return res;
 }

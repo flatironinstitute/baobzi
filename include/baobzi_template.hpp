@@ -599,7 +599,7 @@ class Function {
     /// @brief eval function approximation at ntrg points
     /// @param[in] xp [DIM * ntrg] array of points to evaluate function at
     /// @param[out] res [ntrg] array of results
-    inline void eval(const double *xp, double *res, int ntrg) {
+    inline void eval(const double *xp, double *res, int ntrg) const {
         for (int i = 0; i < ntrg; i++)
             res[i] = eval(VEC(xp + DIM * i));
     }
