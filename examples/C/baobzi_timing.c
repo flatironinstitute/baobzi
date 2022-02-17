@@ -75,6 +75,7 @@ void test_func(baobzi_input_t *input, const double *xin, const double *hl, const
     // Create baobzi function approximator. Has pointers to relevant structures inside
     // This may take a while, since it fits the function on init
     baobzi_t func_approx = baobzi_init(input, center, hl);
+    baobzi_stats(func_approx);
 
     char filename[256];
     sprintf(filename, "func_approx_%dd", input->dim);

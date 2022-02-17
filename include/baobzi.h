@@ -16,13 +16,14 @@ extern "C" {
 /// Contains pointers to the wrappers of the relevant template C++ functions for a
 /// dim+order+instruction set
 typedef struct {
-    void *obj;                                    ///< Actual baobzi::Function object
-    int DIM;                                      ///< Dimension of our function
-    int ORDER;                                    ///< Order of the polynomial
-    double (*eval)(const void *, const double *); ///< Pointer to evaluation function
+    void *obj;                                                            ///< Actual baobzi::Function object
+    int DIM;                                                              ///< Dimension of our function
+    int ORDER;                                                            ///< Order of the polynomial
+    double (*eval)(const void *, const double *);                         ///< Pointer to evaluation function
     void (*eval_multi)(const void *, const double *, double *, int ntrg); ///< Pointer to multi-evaluation function
-    void (*save)(const void *, const char *);     ///< Pointer to save function
-    void (*free)(void *);                         ///< pointer to save function
+    void (*save)(const void *, const char *);                             ///< Pointer to save function
+    void (*stats)(void *);                                                ///< pointer to stats function
+    void (*free)(void *);                                                 ///< pointer to free function
 } baobzi_struct;
 
 /// Our type for the C API
@@ -51,6 +52,9 @@ void baobzi_save(const baobzi_t func, const char *filename);
 /// @param[in] filename path to serialized baobzi file
 /// @returns initialized baobzi C object
 baobzi_t baobzi_restore(const char *filename);
+
+/// @brief Print stats about baobzi object creation
+void baobzi_stats(baobzi_t func);
 
 /// @brief free all memory associated with C baobzi object
 /// @returns nullptr

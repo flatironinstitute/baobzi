@@ -115,6 +115,12 @@ baobzi_t baobzi_restore(const char *filename_cstr) {
     return res;
 }
 
+void baobzi_stats(baobzi_t func) {
+    if (!func)
+        return;
+    func->stats(func->obj);
+}
+
 baobzi_t baobzi_free(baobzi_t func) {
     if (!func)
         return nullptr;
@@ -139,8 +145,9 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
                      "something greater than zero.\n";
         return nullptr;
     } else if (!input->func || !is_valid_func(input, center)) {
-        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi due to empty or invalid 'func' parameter. Please supply "
-                     "a valid function to fit.\n";
+        std::cerr
+            << "BAOBZI ERROR: Unable to initialize Baobzi due to empty or invalid 'func' parameter. Please supply "
+               "a valid function to fit.\n";
         return nullptr;
     }
 
