@@ -106,6 +106,7 @@ int main(int argc, char *argv[]) {
                 x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
         baobzi::Function<2, 10> func_approx_2d(&input, center2d.data(), hl.data());
+        func_approx_2d.print_stats();
 
         time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
         print_error(func_approx_2d, input, x_2d_transformed);

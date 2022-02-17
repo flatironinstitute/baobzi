@@ -1,6 +1,7 @@
 #ifndef BAOBZI_TEMPLATE_HPP
 #define BAOBZI_TEMPLATE_HPP
 
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <mutex>
@@ -288,6 +289,8 @@ class Node {
     /// @returns function approximation at x
     inline double eval(const VEC &x) const { return cheb_eval<ORDER, ISET>(x, box_, coeffs_); }
 
+    inline std::size_t memory_usage() const { return sizeof(*this) + coeffs_.capacity() * sizeof(double); }
+
     /// @brief MSGPACK serialization magic
     MSGPACK_DEFINE(box_, first_child_idx, leaf_, coeffs_);
 };
@@ -304,6 +307,7 @@ struct FunctionTree {
 
     using VEC = Eigen::Vector<double, DIM>;     ///< D dimensional vector type
     std::vector<Node<DIM, ORDER, ISET>> nodes_; ///< Flat list of all nodes in Tree (leaf or otherwise)
+    int max_depth_;                             ///< Maximum depth of tree
 
     /// @brief Construct tree
     /// @param[in] input parameters for fit (function, tol, etc)
@@ -314,6 +318,7 @@ struct FunctionTree {
         q.push(box);
 
         uint64_t curr_child_idx = 1;
+        max_depth_ = 0;
         while (!q.empty()) {
             int n_next = q.size();
             int node_index = nodes_.size();
@@ -351,6 +356,9 @@ struct FunctionTree {
                 }
             }
 
+            if (!q.empty())
+                max_depth_++;
+
             half_width *= 0.5;
         }
     }
@@ -371,6 +379,15 @@ struct FunctionTree {
         }
 
         return *node;
+    }
+
+    inline const std::size_t size() const { return nodes_.size(); }
+    inline const int max_depth() const { return max_depth_; }
+    inline const std::size_t memory_usage() const {
+        std::size_t memory_usage = sizeof(*this);
+        for (const auto &node : nodes_)
+            memory_usage += node.memory_usage();
+        return memory_usage;
     }
 
     /// @brief eval function approximation at point
@@ -411,6 +428,36 @@ class Function {
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;                   ///< Number of subtrees in each linear dimension of our space
     VEC bin_size_;                                         ///< Linear dimensions of the bins that our subtrees live
+
+    struct {
+        uint16_t base_depth = 0;   ///< depth of subtrees
+        uint64_t n_evals_root = 0; ///< number of function evals before subtree calls
+        uint32_t t_elapsed = 0;    ///< time in milliseconds to create object
+    } stats_;
+
+    void print_stats() {
+        std::size_t n_nodes = 0;
+        std::size_t n_leaves = 0;
+        std::size_t n_subtrees = subtrees_.size();
+        int max_depth = 0;
+        std::size_t memory_usage = sizeof(*this);
+        for (const auto &subtree : subtrees_) {
+            n_nodes += subtree.size();
+            max_depth = std::max(max_depth, subtree.max_depth());
+            memory_usage += subtree.memory_usage();
+            for (const auto &node : subtree.nodes_)
+                n_leaves += node.is_leaf();
+        }
+
+        std::cout << "Baobzi tree represented by " << n_nodes << " nodes, of which " << n_leaves << " are leaves\n";
+        std::cout << "Nodes are distributed across " << n_subtrees << " subtrees at an initial depth of "
+                  << stats_.base_depth << " with a maximum subtree depth of " << max_depth << "\n";
+        std::cout << "Total function evaluations required for fit: "
+                  << n_nodes * (int)std::pow(ORDER, DIM) + stats_.n_evals_root << std::endl;
+        std::cout << "Total time to create tree: " << stats_.t_elapsed << " milliseconds\n";
+        std::cout << "Approximate memory usage of tree: " << (double)memory_usage / (1024 * 1024) << " MiB"
+                  << std::endl;
+    }
 
     /// @brief calculate vandermonde matrix
     /// @return Vandermonde matrix for chebyshev polynomials with order=ORDER
@@ -460,6 +507,7 @@ class Function {
     /// @param[in] lp [dim] half length of function domain
     Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp)
         : box_(VEC(xp), VEC(lp)), tol_(input->tol) {
+        auto t_start = std::chrono::steady_clock::now();
         init_statics();
 
         VEC l(lp);
@@ -469,7 +517,6 @@ class Function {
         for (int i = 0; i < DIM; ++i)
             n_subtrees_[i] = l[i] / l.minCoeff();
 
-        uint8_t max_depth_ = 0;
         q.push(DBox(x, l));
 
         // Half-width of next children
@@ -491,6 +538,7 @@ class Function {
 
             for (int i = 0; i < nodes.size(); ++i)
                 nodes[i].fit(input);
+            stats_.n_evals_root += nodes.size() * (int)std::pow(ORDER, DIM);
 
             for (auto &node : nodes) {
                 if (!node.is_leaf()) {
@@ -510,13 +558,11 @@ class Function {
                 }
             }
 
-            if (!q.empty())
-                max_depth_++;
-
             half_width *= 0.5;
-            if ((1 << (DIM * max_depth_)) == q.size())
+            if ((1 << (DIM * (stats_.base_depth + 1))) == q.size()) {
                 n_subtrees_ *= 2;
-            else
+                stats_.base_depth++;
+            } else
                 break;
         }
 
@@ -533,6 +579,10 @@ class Function {
             Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size_};
             subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box));
         }
+
+        auto t_end = std::chrono::steady_clock::now();
+        auto t_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
+        stats_.t_elapsed = t_elapsed.count();
     }
 
     /// @brief default constructor for msgpack magic
