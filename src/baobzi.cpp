@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 
@@ -54,6 +55,25 @@ int get_iset() {
         iset = ISET::AVX2;
     if (__builtin_cpu_supports("avx512f"))
         iset = ISET::AVX512;
+
+    const char *iset_str_const = getenv("BAOBZI_ARCH");
+    if (iset_str_const) {
+        std::string iset_str(iset_str_const);
+        std::transform(iset_str.begin(), iset_str.end(), iset_str.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+
+        if (iset_str == "generic")
+            iset = ISET::GENERIC;
+        else if (iset_str == "avx")
+            iset = ISET::AVX;
+        else if (iset_str == "avx2")
+            iset = ISET::AVX2;
+        else if (iset_str == "avx512")
+            iset = ISET::AVX512;
+        else
+            std::cout << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
+    }
+
     return iset;
 }
 
