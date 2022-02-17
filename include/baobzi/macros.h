@@ -16,9 +16,7 @@
 
 #define BAOBZI_CASE_RESTORE(DIM, ORDER, ISET)                                                                          \
     case BAOBZI_JOIN(DIM, ORDER, ISET): {                                                                              \
-        baobzi::Function<DIM, ORDER, ISET> *f_ptr = new baobzi::Function<DIM, ORDER, ISET>();                          \
-        *f_ptr = obj.as<baobzi::Function<DIM, ORDER, ISET>>();                                                         \
-        res->obj = f_ptr;                                                                                              \
+        res->obj = baobzi_restore_##DIM##d_##ORDER##_##ISET(&obj);                                                     \
         res->save = &baobzi_save_##DIM##d_##ORDER##_##ISET;                                                            \
         res->eval = &baobzi_eval_##DIM##d_##ORDER##_##ISET;                                                            \
         res->eval_multi = &baobzi_eval_multi_##DIM##d_##ORDER##_##ISET;                                                \
@@ -42,6 +40,12 @@
     void *baobzi_init_##DIM##d_##ORDER##_##ISET(const baobzi_input_t *input, const double *center,                     \
                                                 const double *half_length) {                                           \
         return (void *)new baobzi::Function<DIM, ORDER, ISET>(input, center, half_length);                             \
+    }                                                                                                                  \
+    void *baobzi_restore_##DIM##d_##ORDER##_##ISET(const void *obj_) {                                                 \
+        const msgpack::object *obj = (msgpack::object *)obj_;                                                          \
+        baobzi::Function<DIM, ORDER, ISET> *f_ptr = new baobzi::Function<DIM, ORDER, ISET>();                          \
+        *f_ptr = obj->as<baobzi::Function<DIM, ORDER, ISET>>();                                                        \
+        return f_ptr;                                                                                                  \
     }
 
 #define BAOBZI_DECLS(DIM, ORDER, ISET)                                                                                 \
@@ -51,6 +55,7 @@
     void baobzi_stats_##DIM##d_##ORDER##_##ISET(void *f);                                                              \
     void baobzi_free_##DIM##d_##ORDER##_##ISET(void *f);                                                               \
     void *baobzi_init_##DIM##d_##ORDER##_##ISET(const baobzi_input_t *input, const double *center,                     \
-                                                const double *half_length);
+                                                const double *half_length);                                            \
+    void *baobzi_restore_##DIM##d_##ORDER##_##ISET(const void *obj);
 
 #endif

@@ -152,9 +152,9 @@ class Node {
   public:
     using VEC = Eigen::Vector<double, D>;                          ///< D dimensional vector type
     using CoeffVec = Eigen::Vector<double, ORDER>;                 ///< ORDER dimensional vector type
+    Box<D, ISET> box_;                                             ///< Geometric position/size of this node
     std::vector<double, Eigen::aligned_allocator<double>> coeffs_; ///< Flattened chebyshev coeffs
     using Func = Function<D, ORDER, ISET>;                         ///< Type of boabzi function this belongs to
-    Box<D, ISET> box_;                                             ///< Geometric position/size of this node
     uint64_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
     bool leaf_ = false;            ///< Helper variable to determine if node is a leaf
 
@@ -304,9 +304,11 @@ struct FunctionTree {
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
     static constexpr int Dim = DIM;         ///< Dimension of tree
     static constexpr int Order = ORDER;     ///< Order of tree
+    using node_t = Node<DIM, ORDER, ISET>;
+    using box_t = Box<DIM, ISET>;
 
     using VEC = Eigen::Vector<double, DIM>;     ///< D dimensional vector type
-    std::vector<Node<DIM, ORDER, ISET>> nodes_; ///< Flat list of all nodes in Tree (leaf or otherwise)
+    std::vector<node_t> nodes_;                 ///< Flat list of all nodes in Tree (leaf or otherwise)
     int max_depth_;                             ///< Maximum depth of tree
 
     /// @brief Construct tree
@@ -323,10 +325,10 @@ struct FunctionTree {
             int n_next = q.size();
             int node_index = nodes_.size();
             for (int i = 0; i < n_next; ++i) {
-                Box<DIM, ISET> box = q.front();
+                box_t box = q.front();
                 q.pop();
 
-                nodes_.push_back(Node<DIM, ORDER, ISET>(box));
+                nodes_.push_back(node_t(box));
             }
 
             for (size_t i = 0; i < n_next; ++i) {
@@ -368,7 +370,7 @@ struct FunctionTree {
     /// @brief Find leaf node containing a point via standard pointer traversal
     /// @param[in] x point that the node will contain
     /// @return leaf node containing point x
-    inline const Node<DIM, ORDER, ISET> &find_node_traverse(const VEC &x) const {
+    inline const node_t &find_node_traverse(const VEC &x) const {
         auto *node = &nodes_[0];
         while (!node->is_leaf()) {
             uint64_t child_idx = 0;
@@ -415,13 +417,14 @@ class Function {
     using VEC = Eigen::Vector<double, DIM>;                ///< D dimensional vector type
     using CoeffVec = Eigen::Vector<double, ORDER>;         ///< Order dimensional vector type
     using VanderMat = Eigen::Matrix<double, ORDER, ORDER>; ///< VanderMonde Matrix type
+    using node_t = Node<DIM, ORDER, ISET>;
 
-    using DBox = Box<DIM, ISET>; ///< D dimensional box type
+    using box_t = Box<DIM, ISET>; ///< D dimensional box type
 
     static CoeffVec cosarray_;                  ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
 
-    DBox box_;       ///< box representing the domain of our function
+    box_t box_;       ///< box representing the domain of our function
     double tol_;     ///< Desired relative tolerance of our approximation
     VEC lower_left_; ///< Bottom 'corner' of our domain
 
@@ -512,12 +515,12 @@ class Function {
 
         VEC l(lp);
         VEC x(xp);
-        std::queue<DBox> q;
+        std::queue<box_t> q;
 
         for (int i = 0; i < DIM; ++i)
             n_subtrees_[i] = l[i] / l.minCoeff();
 
-        q.push(DBox(x, l));
+        q.push(box_t(x, l));
 
         // Half-width of next children
         VEC half_width = l * 0.5;
@@ -528,12 +531,12 @@ class Function {
         while (!q.empty()) {
             int n_next = q.size();
 
-            std::vector<Node<DIM, ORDER, ISET>> nodes;
+            std::vector<node_t> nodes;
             for (int i = 0; i < n_next; ++i) {
-                DBox box = q.front();
+                box_t box = q.front();
                 q.pop();
 
-                nodes.emplace_back(Node<DIM, ORDER, ISET>(box));
+                nodes.emplace_back(node_t(box));
             }
 
             for (int i = 0; i < nodes.size(); ++i)
@@ -553,7 +556,7 @@ class Function {
                             offset[j] = signed_hw[(child >> j) & 1];
                         }
 
-                        q.push(DBox(center + offset, half_width));
+                        q.push(box_t(center + offset, half_width));
                     }
                 }
             }
@@ -630,9 +633,7 @@ class Function {
     /// @brief get constant reference to leaf node that contains a point
     /// @param[in] x point of interest
     /// @returns constant reference to leaf node that contains x
-    inline const Node<DIM, ORDER, ISET> &find_node(const VEC &x) const {
-        return subtrees_[get_linear_bin(x)].find_node_traverse(x);
-    }
+    inline const node_t &find_node(const VEC &x) const { return subtrees_[get_linear_bin(x)].find_node_traverse(x); }
 
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at

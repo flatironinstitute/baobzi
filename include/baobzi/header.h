@@ -13,7 +13,7 @@ typedef struct {
     double tol;
 } baobzi_input_t;
 
-#ifdef BAOBZI_TEMPLATE_HPP
+#ifdef __cplusplus
 #include <msgpack.hpp>
 struct baobzi_header_t {
     int dim;

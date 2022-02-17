@@ -1,10 +1,9 @@
-#include "baobzi_template.hpp"
+#include <msgpack.hpp>
 
 #include "baobzi.h"
 #include "baobzi.hpp"
 
 #include <exception>
-#include <msgpack.hpp>
 #include <stdexcept>
 #include <tuple>
 #include <unistd.h>

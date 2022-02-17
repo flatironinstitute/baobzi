@@ -16,6 +16,12 @@ for iset in {0..3}; do
             printf '#include "baobzi_template.hpp"\n' > $srcfile
             printf '#include "baobzi.h"\n' >> $srcfile
             printf '#include "baobzi/macros.h"\n\n' >> $srcfile
+            printf "namespace baobzi {\n" >> $srcfile
+            printf "template\n" >> $srcfile
+            printf "typename Function<%d, %d, %d>::CoeffVec Function<%d, %d, %d>::cosarray_;\n" $dim $order $iset $dim $order $iset >> $srcfile
+            printf "template\n" >> $srcfile
+            printf "Eigen::PartialPivLU<typename Function<%d, %d, %d>::VanderMat> Function<%d, %d, %d>::VLU_;\n" $dim $order $iset $dim $order $iset>> $srcfile
+            printf "}\n\n" >> $srcfile
             printf 'extern "C" {\n' >> $srcfile
             printf 'BAOBZI_DEFS(%d, %d, %d)\n' $dim $order $iset >> $srcfile
             printf '}\n' >> $srcfile
