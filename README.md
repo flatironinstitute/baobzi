@@ -352,9 +352,6 @@ See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker]
 * Doesn't do 4+ dimensions (though possible, I haven't worked out the fitting procedures
   yet). Probably don't want to go above 5 dimensions, since each node takes `O(8 * ORDER^D)`
   bytes of memory.
-* Compiling outside of Release/RelWithDebInfo mode can cause eigen alignment issues that I
-  haven't yet resolved. This causes crashes for orders that are multiples of four (8, 12, 16)
-  in Debug mode.
 
 ## Why the name?
 It's a cute version of baobab, or the tree of life, which is already a very popular project
