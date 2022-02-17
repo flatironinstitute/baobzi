@@ -11,6 +11,7 @@ point = np.array([0.25, 0.25])
 
 # create, save, and delete baobzi object
 test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8)
+test.stats()
 test.save('test.baobzi')
 print(test(point))
 del test

@@ -67,6 +67,7 @@ class baobzi {
     double eval(const double *x) { return baobzi_eval(obj_, x); };
     void eval(const double *x, double *res, int ntrg) { baobzi_eval_multi(obj_, x, res, ntrg); };
     void save(const std::string &fname) { baobzi_save(obj_, fname.c_str()); }
+    void stats() const { baobzi_stats(obj_); }
 
     wrapper_data_t data_;
     baobzi_t obj_ = nullptr;
@@ -141,6 +142,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 
     // Get the class instance pointer from the second input
     baobzi *baobzi_instance = convertMat2Ptr<baobzi>(prhs[1]);
+
+    if (!strcmp("stats", cmd)) {
+        baobzi_instance->stats();
+        return;
+    }
 
     if (!strcmp("eval", cmd)) {
         // Check parameters

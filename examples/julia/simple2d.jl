@@ -15,6 +15,7 @@ tol = 1E-8
 output_file = "simple2d.baobzi"
 
 func_approx = baobzi.init(testfunc, dim, order, center, hl, tol)
+baobzi.stats(func_approx)
 println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
 
 baobzi.save(func_approx, output_file)

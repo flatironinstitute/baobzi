@@ -27,6 +27,10 @@ classdef baobzi < handle
       [varargout{1:nargout}] = baobzi_mex('eval', this.objectHandle, varargin{:});
     end
 
+    function varargout = stats(this, varargin)
+      [varargout{1:nargout}] = baobzi_mex('stats', this.objectHandle, varargin{:});
+    end
+
     function varargout = save(this, varargin)
       [varargout{1:nargout}] = baobzi_mex('save', this.objectHandle, varargin{:});
     end

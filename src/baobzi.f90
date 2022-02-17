@@ -47,6 +47,12 @@ module baobzi
       integer(kind=c_int), value :: ntrg
     end subroutine baobzi_eval_multi
 
+    subroutine baobzi_stats (fin) bind(c)
+      use, intrinsic :: iso_c_binding
+      type(c_ptr), intent(in), value :: fin
+      type(c_ptr) :: func
+    end subroutine baobzi_stats
+
     function baobzi_free (f) bind(c) result(f_null)
       use, intrinsic :: iso_c_binding
       type(c_ptr), intent(in), value :: f

@@ -34,6 +34,10 @@ baobzi_eval_multi = libbaobzi.baobzi_eval_multi
 baobzi_eval_multi.restype = c_void_p
 baobzi_eval_multi.argtypes = [c_void_p, POINTER(c_double), POINTER(c_double), c_int]
 
+baobzi_stats = libbaobzi.baobzi_stats
+baobzi_stats.restype = baobzi_t
+baobzi_stats.argtypes = [c_void_p]
+
 baobzi_free = libbaobzi.baobzi_free
 baobzi_free.restype = baobzi_t
 baobzi_free.argtypes = [c_void_p]
@@ -94,3 +98,6 @@ class Baobzi:
     def save(self, filename):
         bfilename = bytes(filename, 'utf-8')
         baobzi_save(self.ptr, bfilename)
+
+    def stats(self):
+        baobzi_stats(self.ptr)

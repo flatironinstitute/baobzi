@@ -8,6 +8,7 @@ display(func_approx.eval([0.25, 0.25]))
 func_approx.save('simple2d.baobzi');
 clear func_approx
 func_approx = baobzi('restore', 'simple2d.baobzi');
+func_approx.stats()
 display(func_approx.eval([0.25, 0.25]))
 
 x = rand([1000000, 2]);

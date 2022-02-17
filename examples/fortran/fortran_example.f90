@@ -29,6 +29,7 @@ program main
   fname = trim(adjustl('fortran.baobzi'))//char(0)
 
   func_approx = baobzi_init(input, center, half_length)
+  call baobzi_stats(func_approx)
   print *, baobzi_eval(func_approx, x) - testfun(x, scale_factor)
 
   call baobzi_save(func_approx, fname)

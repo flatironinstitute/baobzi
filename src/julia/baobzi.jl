@@ -48,6 +48,15 @@ function eval_multi(func::Ptr{baobzi_t}, x)
     return res
 end
 
+function stats(func::Ptr{baobzi_t})
+    ccall(
+        (:baobzi_stats, :libbaobzi),
+        Ptr{Cvoid},
+        (Ptr{Cvoid},),
+        func
+    )
+end
+
 function free(func::Ptr{baobzi_t})
     ccall(
         (:baobzi_free, :libbaobzi),
