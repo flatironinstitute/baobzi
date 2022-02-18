@@ -289,6 +289,8 @@ class Node {
     /// @returns function approximation at x
     inline double eval(const VEC &x) const { return cheb_eval<ORDER, ISET>(x, box_, coeffs_); }
 
+    /// @brief Calculate memory usage of self (including unused space from vector allocation)
+    /// @returns size in bytes of object instance
     inline std::size_t memory_usage() const { return sizeof(*this) + coeffs_.capacity() * sizeof(double); }
 
     /// @brief MSGPACK serialization magic
@@ -383,8 +385,16 @@ struct FunctionTree {
         return *node;
     }
 
+    /// @brief Calculate total number of nodes in instance
+    /// @return number of nodes in instance
     inline const std::size_t size() const { return nodes_.size(); }
+
+    /// @brief Calculate lowest depth of any node in instance (relative subtree node)
+    /// @return lowest depth of all contained nodes
     inline const int max_depth() const { return max_depth_; }
+
+    /// @brief Calculate memory usage of self (including all contained nodes)
+    /// @returns size in bytes of object instance
     inline const std::size_t memory_usage() const {
         std::size_t memory_usage = sizeof(*this);
         for (const auto &node : nodes_)
@@ -436,8 +446,9 @@ class Function {
         uint16_t base_depth = 0;   ///< depth of subtrees
         uint64_t n_evals_root = 0; ///< number of function evals before subtree calls
         uint32_t t_elapsed = 0;    ///< time in milliseconds to create object
-    } stats_;
+    } stats_; ///< Structure containing info about self creation :D
 
+    /// @brief Calculate and print various information about object instance to stdout
     void print_stats() {
         std::size_t n_nodes = 0;
         std::size_t n_leaves = 0;
