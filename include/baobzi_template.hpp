@@ -26,27 +26,19 @@ template <int DIM, int ORDER, int ISET>
 class Function;
 
 /// @brief Structure to represent geometric portion of Baobzi nodes
-/// @tparam D number of dimensions of box
+/// @tparam DIM number of dimensions of box
 /// @tparam ISET Instruction set index (dummy variable to force alignment for different instruction sets)
-template <int D, int ISET>
+template <int DIM, int ISET>
 struct Box {
-    using VEC = Eigen::Vector<double, D>;
+    using VEC = Eigen::Vector<double, DIM>;
     VEC center;          ///< Center of box
     VEC half_length;     ///< Half the dimension of the box
     VEC inv_half_length; ///< 1.0 / half the dimension of the box
 
-    Box<D, ISET>() = default; ///< default constructor for msgpack happiness
+    Box<DIM, ISET>() = default; ///< default constructor for msgpack happiness
     /// @brief Constructor, just copies x, hl over
-    Box<D, ISET>(const VEC &x, const VEC &hl)
+    Box<DIM, ISET>(const VEC &x, const VEC &hl)
         : center(x), half_length(hl), inv_half_length(VEC::Ones().array() / hl.array()) {}
-
-    /// @brief Check if point lies inside box
-    /// @param[in] x point to check
-    /// @returns true if point in box, false otherwise
-    bool contains(const VEC &x) const {
-        VEC dx = (x - center).array().abs();
-        return !((dx > half_length).any());
-    }
 
     /// @brief MSGPACK serialization magic
     MSGPACK_DEFINE(center, half_length, inv_half_length);
@@ -144,25 +136,25 @@ inline double cheb_eval(const Eigen::Vector3d &x, const Box<3, ISET> &box,
 }
 
 /// @brief Node in baobzi::FunctionTree. If leaf, contains evaluation data, otherwise children
-/// @tparam D dimension of function
+/// @tparam DIM dimension of function
 /// @tparam ORDER order of evaluation polynomial
 /// @tparam ISET instruction set index (dummy variable to force alignment for different instruction sets)
-template <int D, int ORDER, int ISET>
+template <int DIM, int ORDER, int ISET>
 class Node {
   public:
-    using VEC = Eigen::Vector<double, D>;                          ///< D dimensional vector type
+    using VEC = Eigen::Vector<double, DIM>;                        ///< D dimensional vector type
     using CoeffVec = Eigen::Vector<double, ORDER>;                 ///< ORDER dimensional vector type
-    Box<D, ISET> box_;                                             ///< Geometric position/size of this node
+    Box<DIM, ISET> box_;                                           ///< Geometric position/size of this node
     std::vector<double, Eigen::aligned_allocator<double>> coeffs_; ///< Flattened chebyshev coeffs
-    using Func = Function<D, ORDER, ISET>;                         ///< Type of boabzi function this belongs to
+    using Func = Function<DIM, ORDER, ISET>;                       ///< Type of boabzi function this belongs to
     uint64_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
     bool leaf_ = false;            ///< Helper variable to determine if node is a leaf
 
-    Node<D, ORDER, ISET>() = default; ///< Default constructor for msgpack happiness
+    Node<DIM, ORDER, ISET>() = default; ///< Default constructor for msgpack happiness
 
     /// @brief Construct node from box (without fitting)
     /// @param [in] box box this node represents
-    Node<D, ORDER, ISET>(const Box<D, ISET> &box) : box_(box) {}
+    Node<DIM, ORDER, ISET>(const Box<DIM, ISET> &box) : box_(box) {}
 
     /// @brief check if node is leaf
     /// @return true if leaf, false otherwise
@@ -174,7 +166,7 @@ class Node {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns true if fit successful, false if not good enough
     bool fit(const baobzi_input_t *input) {
-        if constexpr (D == 1) {
+        if constexpr (DIM == 1) {
             Eigen::Vector<double, ORDER> F;
             CoeffVec xvec =
                 Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
@@ -194,7 +186,7 @@ class Node {
             leaf_ = true;
             return true;
         }
-        if constexpr (D == 2) {
+        if constexpr (DIM == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
             CoeffVec xvec =
                 Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
@@ -221,7 +213,7 @@ class Node {
             leaf_ = true;
             return true;
         }
-        if constexpr (D == 3) {
+        if constexpr (DIM == 3) {
             Eigen::Tensor<double, 3> F(ORDER, ORDER, ORDER);
 
             CoeffVec xvec =
@@ -309,9 +301,9 @@ struct FunctionTree {
     using node_t = Node<DIM, ORDER, ISET>;
     using box_t = Box<DIM, ISET>;
 
-    using VEC = Eigen::Vector<double, DIM>;     ///< D dimensional vector type
-    std::vector<node_t> nodes_;                 ///< Flat list of all nodes in Tree (leaf or otherwise)
-    int max_depth_;                             ///< Maximum depth of tree
+    using VEC = Eigen::Vector<double, DIM>; ///< D dimensional vector type
+    std::vector<node_t> nodes_;             ///< Flat list of all nodes in Tree (leaf or otherwise)
+    int max_depth_;                         ///< Maximum depth of tree
 
     /// @brief Construct tree
     /// @param[in] input parameters for fit (function, tol, etc)
@@ -434,19 +426,19 @@ class Function {
     static CoeffVec cosarray_;                  ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
 
-    box_t box_;       ///< box representing the domain of our function
+    box_t box_;      ///< box representing the domain of our function
     double tol_;     ///< Desired relative tolerance of our approximation
     VEC lower_left_; ///< Bottom 'corner' of our domain
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;                   ///< Number of subtrees in each linear dimension of our space
-    VEC bin_size_;                                         ///< Linear dimensions of the bins that our subtrees live
+    VEC inv_bin_size_; ///< Inverse linear dimensions of the bins that our subtrees live
 
     struct {
         uint16_t base_depth = 0;   ///< depth of subtrees
         uint64_t n_evals_root = 0; ///< number of function evals before subtree calls
         uint32_t t_elapsed = 0;    ///< time in milliseconds to create object
-    } stats_; ///< Structure containing info about self creation :D
+    } stats_;                      ///< Structure containing info about self creation :D
 
     /// @brief Calculate and print various information about object instance to stdout
     void print_stats() {
@@ -580,17 +572,20 @@ class Function {
                 break;
         }
 
-        for (int j = 0; j < DIM; ++j)
-            bin_size_[j] = 2.0 * box_.half_length[j] / n_subtrees_[j];
+        VEC bin_size;
+        for (int j = 0; j < DIM; ++j) {
+            bin_size[j] = 2.0 * box_.half_length[j] / n_subtrees_[j];
+            inv_bin_size_[j] = 0.5 * n_subtrees_[j] / box_.half_length[j];
+        }
         lower_left_ = box_.center - box_.half_length;
 
         subtrees_.reserve(n_subtrees_.prod());
         for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin) {
             Eigen::Vector<int, DIM> bins = get_bins(i_bin);
 
-            VEC parent_center = (bins.template cast<double>().array() + 0.5) * bin_size_.array() + lower_left_.array();
+            VEC parent_center = (bins.template cast<double>().array() + 0.5) * bin_size.array() + lower_left_.array();
 
-            Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size_};
+            Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size};
             subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box));
         }
 
@@ -620,7 +615,7 @@ class Function {
     /// @returns linear index of bin that x lives in
     inline int get_linear_bin(const Eigen::Vector<double, 1> &x) const {
         const double x_bin = x[0] - lower_left_[0];
-        return x_bin / bin_size_[0];
+        return x_bin * inv_bin_size_[0];
     }
 
     /// @brief find linear index of bin at a point
@@ -628,7 +623,7 @@ class Function {
     /// @returns linear index of bin that x lives in
     inline int get_linear_bin(const Eigen::Vector2d &x) const {
         const VEC x_bin = x - lower_left_;
-        const Eigen::Vector<int, DIM> bin = (x_bin.array() / bin_size_.array()).template cast<int>();
+        const Eigen::Vector<int, DIM> bin = (x_bin.array() * inv_bin_size_.array()).template cast<int>();
         return bin[0] + n_subtrees_[0] * bin[1];
     }
 
@@ -637,7 +632,7 @@ class Function {
     /// @returns linear index of bin that x lives in
     inline int get_linear_bin(const Eigen::Vector3d &x) const {
         const VEC x_bin = x - lower_left_;
-        const Eigen::Vector<int, DIM> bin = (x_bin.array() / bin_size_.array()).template cast<int>();
+        const Eigen::Vector<int, DIM> bin = (x_bin.array() * inv_bin_size_.array()).template cast<int>();
         return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
     }
 
@@ -689,7 +684,7 @@ class Function {
     }
 
     /// @brief msgpack serialization magic
-    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, bin_size_);
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_);
 };
 
 template <int DIM, int ORDER, int ISET>
