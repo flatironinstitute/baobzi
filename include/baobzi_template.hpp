@@ -32,16 +32,17 @@ template <int DIM, int ISET>
 struct Box {
     using VEC = Eigen::Vector<double, DIM>;
     VEC center;          ///< Center of box
-    VEC half_length;     ///< Half the dimension of the box
     VEC inv_half_length; ///< 1.0 / half the dimension of the box
 
     Box<DIM, ISET>() = default; ///< default constructor for msgpack happiness
     /// @brief Constructor, just copies x, hl over
     Box<DIM, ISET>(const VEC &x, const VEC &hl)
-        : center(x), half_length(hl), inv_half_length(VEC::Ones().array() / hl.array()) {}
+        : center(x), inv_half_length(VEC::Ones().array() / hl.array()) {}
+
+    inline VEC half_length() const { return VEC::Ones().array() / inv_half_length.array(); }
 
     /// @brief MSGPACK serialization magic
-    MSGPACK_DEFINE(center, half_length, inv_half_length);
+    MSGPACK_DEFINE(center, inv_half_length);
 };
 
 /// @brief Return an estimate of the error for a given set of coefficients
@@ -166,10 +167,11 @@ class Node {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns true if fit successful, false if not good enough
     bool fit(const baobzi_input_t *input) {
+        VEC half_length = box_.half_length();
         if constexpr (DIM == 1) {
             Eigen::Vector<double, ORDER> F;
             CoeffVec xvec =
-                Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+                Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
 
             for (int i = 0; i < ORDER; ++i)
                 F(i) = input->func(&xvec[i], input->data);
@@ -189,9 +191,9 @@ class Node {
         if constexpr (DIM == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
             CoeffVec xvec =
-                Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+                Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
             CoeffVec yvec =
-                Func::get_cheb_nodes(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
+                Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -217,11 +219,11 @@ class Node {
             Eigen::Tensor<double, 3> F(ORDER, ORDER, ORDER);
 
             CoeffVec xvec =
-                Func::get_cheb_nodes(box_.center[0] - box_.half_length[0], box_.center[0] + box_.half_length[0]);
+                Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
             CoeffVec yvec =
-                Func::get_cheb_nodes(box_.center[1] - box_.half_length[1], box_.center[1] + box_.half_length[1]);
+                Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
             CoeffVec zvec =
-                Func::get_cheb_nodes(box_.center[2] - box_.half_length[2], box_.center[2] + box_.half_length[2]);
+                Func::get_cheb_nodes(box_.center[2] - half_length[2], box_.center[2] + half_length[2]);
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -255,8 +257,8 @@ class Node {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
                         VEC point =
-                            (box_.center - box_.half_length).array() +
-                            2.0 * VEC{(double)i, (double)j, (double)k}.array() * box_.half_length.array() / ORDER;
+                            (box_.center - half_length).array() +
+                            2.0 * VEC{(double)i, (double)j, (double)k}.array() * half_length.array() / ORDER;
 
                         const double test_val = eval(point);
                         const double actual_val = input->func(point.data(), input->data);
@@ -310,7 +312,7 @@ struct FunctionTree {
     /// @param[in] box box that this tree lives in
     FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box) {
         std::queue<Box<DIM, ISET>> q;
-        VEC half_width = box.half_length * 0.5;
+        VEC half_width = box.half_length() * 0.5;
         q.push(box);
 
         uint64_t curr_child_idx = 1;
@@ -573,11 +575,12 @@ class Function {
         }
 
         VEC bin_size;
+        VEC half_length = box_.half_length();
         for (int j = 0; j < DIM; ++j) {
-            bin_size[j] = 2.0 * box_.half_length[j] / n_subtrees_[j];
-            inv_bin_size_[j] = 0.5 * n_subtrees_[j] / box_.half_length[j];
+            bin_size[j] = 2.0 * half_length[j] / n_subtrees_[j];
+            inv_bin_size_[j] = 0.5 * n_subtrees_[j] / half_length[j];
         }
-        lower_left_ = box_.center - box_.half_length;
+        lower_left_ = box_.center - half_length;
 
         subtrees_.reserve(n_subtrees_.prod());
         for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin) {
