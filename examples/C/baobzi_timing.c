@@ -20,7 +20,7 @@ double testfun_3d(const double *x, const void *data) {
 
 void time_function(const baobzi_t function, const double *x, int size, int n_runs) {
     const int ntrg = size / function->DIM;
-    double *res = (double*) malloc(sizeof(double) * ntrg);
+    double *res = (double *)malloc(sizeof(double) * ntrg);
 
     const double time = omp_get_wtime();
     for (int i_run = 0; i_run < n_runs; ++i_run) {
@@ -94,9 +94,12 @@ int main(int argc, char *argv[]) {
     srand(1);
     size_t n_points = (size_t)1E6;
     size_t n_runs = 10;
+    int order = 10;
 
-    if (argc == 2)
+    if (argc >= 2)
         n_runs = atoi(argv[1]);
+    if (argc >= 3)
+        order = atoi(argv[2]);
 
     // Generate enough points for up to 5 dimensions (for later!)
     double *x = (double *)malloc(n_points * 5 * sizeof(double));
@@ -107,9 +110,9 @@ int main(int argc, char *argv[]) {
         double scale_factor = 1.5;
         baobzi_input_t input = baobzi_input_default;
         input.dim = 2;
-        input.order = 10;
+        input.order = order;
         input.func = testfun_2d;
-        input.tol = 1E-10;                                   // Maximum relative error target
+        input.tol = 1E-10; // Maximum relative error target
         input.data = &scale_factor;
         const double hl[2] = {1.0, 1.0};                     // half the length of the domain in each dimension
         const double center[2] = {hl[0] + 0.5, hl[1] + 2.0}; // center of the domain
