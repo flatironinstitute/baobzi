@@ -368,12 +368,14 @@ struct FunctionTree {
     /// @return leaf node containing point x
     inline const node_t &find_node_traverse(const VEC &x) const {
         auto *node = &nodes_[0];
+        auto *next_node = &nodes_[node->first_child_idx]; // attempt to force preload of potential next node
         while (!node->is_leaf()) {
             uint64_t child_idx = 0;
             for (int i = 0; i < DIM; ++i)
                 child_idx = child_idx | ((x[i] > node->box_.center[i]) << i);
 
-            node = &nodes_[node->first_child_idx + child_idx];
+            node = next_node + child_idx;
+            next_node = &nodes_[node->first_child_idx];
         }
 
         return *node;
