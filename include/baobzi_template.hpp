@@ -36,8 +36,7 @@ struct Box {
 
     Box<DIM, ISET>() = default; ///< default constructor for msgpack happiness
     /// @brief Constructor, just copies x, hl over
-    Box<DIM, ISET>(const VEC &x, const VEC &hl)
-        : center(x), inv_half_length(VEC::Ones().array() / hl.array()) {}
+    Box<DIM, ISET>(const VEC &x, const VEC &hl) : center(x), inv_half_length(VEC::Ones().array() / hl.array()) {}
 
     inline VEC half_length() const { return VEC::Ones().array() / inv_half_length.array(); }
 
@@ -170,8 +169,7 @@ class Node {
         VEC half_length = box_.half_length();
         if constexpr (DIM == 1) {
             Eigen::Vector<double, ORDER> F;
-            CoeffVec xvec =
-                Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
+            CoeffVec xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
 
             for (int i = 0; i < ORDER; ++i)
                 F(i) = input->func(&xvec[i], input->data);
@@ -190,10 +188,8 @@ class Node {
         }
         if constexpr (DIM == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
-            CoeffVec xvec =
-                Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
-            CoeffVec yvec =
-                Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
+            CoeffVec xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
+            CoeffVec yvec = Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -218,12 +214,9 @@ class Node {
         if constexpr (DIM == 3) {
             Eigen::Tensor<double, 3> F(ORDER, ORDER, ORDER);
 
-            CoeffVec xvec =
-                Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
-            CoeffVec yvec =
-                Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
-            CoeffVec zvec =
-                Func::get_cheb_nodes(box_.center[2] - half_length[2], box_.center[2] + half_length[2]);
+            CoeffVec xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
+            CoeffVec yvec = Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
+            CoeffVec zvec = Func::get_cheb_nodes(box_.center[2] - half_length[2], box_.center[2] + half_length[2]);
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -256,9 +249,8 @@ class Node {
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
-                        VEC point =
-                            (box_.center - half_length).array() +
-                            2.0 * VEC{(double)i, (double)j, (double)k}.array() * half_length.array() / ORDER;
+                        VEC point = (box_.center - half_length).array() +
+                                    2.0 * VEC{(double)i, (double)j, (double)k}.array() * half_length.array() / ORDER;
 
                         const double test_val = eval(point);
                         const double actual_val = input->func(point.data(), input->data);
@@ -381,6 +373,22 @@ struct FunctionTree {
         return *node;
     }
 
+    /// @brief Get index of node at point x (relative to local nodes_ array)
+    /// @param[in] x [DIM] point to lookup
+    /// @returns index of node in nodes_ array containing x
+    inline const size_t get_node_index(const VEC &x) const {
+        uint64_t curr_index = 0;
+        while (!nodes_[curr_index].is_leaf()) {
+            uint64_t child_idx = 0;
+            for (int i = 0; i < DIM; ++i)
+                child_idx = child_idx | ((x[i] > nodes_[curr_index].box_.center[i]) << i);
+
+            curr_index = nodes_[curr_index].first_child_idx + child_idx;
+        }
+
+        return curr_index;
+    }
+
     /// @brief Calculate total number of nodes in instance
     /// @return number of nodes in instance
     inline const std::size_t size() const { return nodes_.size(); }
@@ -436,6 +444,8 @@ class Function {
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;                   ///< Number of subtrees in each linear dimension of our space
+    std::vector<int> subtree_node_offsets_;
+    std::vector<node_t *> node_pointers_;
     VEC inv_bin_size_; ///< Inverse linear dimensions of the bins that our subtrees live
 
     struct {
@@ -451,6 +461,8 @@ class Function {
         std::size_t n_subtrees = subtrees_.size();
         int max_depth = 0;
         std::size_t memory_usage = sizeof(*this);
+        memory_usage += subtree_node_offsets_.capacity() * sizeof(int);
+        memory_usage += node_pointers_.capacity() * sizeof(node_t *);
         for (const auto &subtree : subtrees_) {
             n_nodes += subtree.size();
             max_depth = std::max(max_depth, subtree.max_depth());
@@ -597,6 +609,22 @@ class Function {
         auto t_end = std::chrono::steady_clock::now();
         auto t_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
         stats_.t_elapsed = t_elapsed.count();
+
+        subtree_node_offsets_.resize(n_subtrees_.prod());
+        subtree_node_offsets_[0] = 0;
+        for (int i = 1; i < subtree_node_offsets_.size(); ++i)
+            subtree_node_offsets_[i] = subtree_node_offsets_[i - 1] + subtrees_[i - 1].size();
+
+        std::size_t n_nodes_tot = 0;
+        for (const auto &subtree : subtrees_)
+            n_nodes_tot += subtree.size();
+        node_pointers_.resize(n_nodes_tot);
+
+        int i = 0;
+        for (auto &subtree : subtrees_) {
+            for (node_t &node : subtree.nodes_)
+                node_pointers_[i++] = &node;
+        }
     }
 
     /// @brief default constructor for msgpack magic
@@ -656,12 +684,26 @@ class Function {
     /// @returns function approximation at point xp
     inline double eval(const double *xp) const { return eval(VEC(xp)); }
 
+    /// @brief get index of node (across all subnodes)
+    /// @param[in] xp [DIM] point to find the node of
+    /// @returns index in global node array
+    inline std::size_t get_global_node_index(const VEC &x) const {
+        int i_sub = get_linear_bin(x);
+        return subtree_node_offsets_[i_sub] + subtrees_[i_sub].get_node_index(x);
+    }
+
     /// @brief eval function approximation at ntrg points
     /// @param[in] xp [DIM * ntrg] array of points to evaluate function at
     /// @param[out] res [ntrg] array of results
-    inline void eval(const double *xp, double *res, int ntrg) const {
-        for (int i = 0; i < ntrg; i++)
-            res[i] = eval(VEC(xp + DIM * i));
+    inline void eval(const double *xp, double *res, int n_trg) const {
+        std::vector<std::pair<node_t *, VEC>> node_map(n_trg);
+        for (int i = 0; i < n_trg; ++i) {
+            VEC xi = VEC(xp + DIM * i);
+            node_map[i] = std::make_pair(node_pointers_[get_global_node_index(xi)], xi);
+        }
+
+        for (int i_trg = 0; i_trg < n_trg; i_trg++)
+            res[i_trg] = node_map[i_trg].first->eval(node_map[i_trg].second);
     }
 
     /// @brief eval function approximation at point
