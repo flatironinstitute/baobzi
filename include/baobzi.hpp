@@ -28,6 +28,9 @@ class Baobzi {
     /// @param[in] output_file path of file to serialize object to
     void save(const std::string &output_file) { baobzi_save(obj_, output_file.c_str()); }
 
+    /// @brief Print various stats about Baobzi object
+    void stats(const std::string &output_file) { baobzi_stats(obj_); }
+
     /// @brief Evaluate Baobzi object at point
     /// @param[in] x [dim]
     /// @return approximate value of function at point x
