@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.5)
 project(
   baobzi
-  LANGUAGES C CXX Fortran)
+  LANGUAGES C CXX)
+enable_language(Fortran OPTIONAL)
 
 set(CMAKE_CXX_STANDARD 17)
 
-get_property(gen_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-if(NOT gen_multi AND NOT (CMAKE_BUILD_TYPE OR DEFINED ENV{CMAKE_BUILD_TYPE}))
-  set(CMAKE_BUILD_TYPE Release CACHE STRING "")
+set (default_build_type "Release")
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message (STATUS "No build type specified. Setting build type to Release.")
+  set (CMAKE_BUILD_TYPE "Release" CACHE STRING "Valid options: Debug, RelWithDebInfo, Release" FORCE)
 endif()
 
 set(BAOBZI_INCLUDES
@@ -22,7 +24,6 @@ option(BAOBZI_BUILD_SHARED "Build the shared library" ON)
 option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
 option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
-option(BAOBZI_BUILD_FORTRAN "Build FORTRAN bindings" ON)
 
 file(GLOB LIB_SOURCES_GENERIC "src/*0.cpp")
 add_library(baobzi_generic OBJECT ${LIB_SOURCES_GENERIC})
@@ -50,7 +51,7 @@ set_property(TARGET baobzi_avx512 PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 set(BAOBZI_BINDING_SOURCES src/baobzi.cpp)
 
-if (BAOBZI_BUILD_FORTRAN)
+if (DEFINED CMAKE_Fortran_COMPILER)
   list(APPEND BAOBZI_BINDING_SOURCES src/baobzi.f90)
 endif()
 
@@ -69,7 +70,9 @@ if (BAOBZI_BUILD_STATIC)
 endif()
 
 if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
-  find_package(OpenMP REQUIRED)
+  if (NOT OpenMP_FOUND)
+    find_package(OpenMP REQUIRED)
+  endif()
 
   set(EXAMPLE_SOURCE_CPP "examples/c++/baobzi_timing.cpp")
   add_executable(baobzi_timing_cpp ${EXAMPLE_SOURCE_CPP})
@@ -84,7 +87,9 @@ if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
 endif()
 
 if (BAOBZI_BUILD_TESTS)
-  find_package(OpenMP REQUIRED)
+  if (NOT OpenMP_FOUND)
+    find_package(OpenMP REQUIRED)
+  endif()
   add_subdirectory(extern/catch2)
 
   add_executable(test_c tests/test_c.cpp)
