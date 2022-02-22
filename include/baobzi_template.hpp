@@ -693,9 +693,10 @@ class Function {
         return subtree_node_offsets_[i_sub] + subtrees_[i_sub].get_node_index(x);
     }
 
-    /// @brief eval function approximation at ntrg points
-    /// @param[in] xp [DIM * ntrg] array of points to evaluate function at
-    /// @param[out] res [ntrg] array of results
+    /// @brief eval function approximation at n_trg points
+    /// @param[in] xp [DIM * n_trg] array of points to evaluate function at
+    /// @param[out] res [n_trg] array of results
+    /// @param[in] n_trg number of points to evaluate
     inline void eval(const double *xp, double *res, int n_trg) const {
         std::vector<std::pair<node_t *, VEC>> node_map(n_trg);
         for (int i = 0; i < n_trg; ++i) {
@@ -717,10 +718,11 @@ class Function {
     /// @returns function approximation at point x
     inline double operator()(const double *x) const { return eval(x); }
 
-    /// @brief eval function approximation at ntrg points
-    /// @param[in] xp [DIM * ntrg] array of points to evaluate function at
-    /// @param[out] res [DIM * ntrg] array of results
-    inline void operator()(const double *xp, double *res, int ntrg) const { eval(xp, res, ntrg); }
+    /// @brief eval function approximation at n_trg points
+    /// @param[in] xp [DIM * n_trg] array of points to evaluate function at
+    /// @param[out] res [DIM * n_trg] array of results
+    /// @param[in] n_trg number of points to evaluate
+    inline void operator()(const double *xp, double *res, int n_trg) const { eval(xp, res, n_trg); }
 
     /// @brief save function approximation to file
     /// @param[in] filename path to save file at
