@@ -6,7 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-double testfun_1d(const double *x, const void *data) { return log(x[0]); }
+double testfun_1d(const double *x, const void *data) {
+    const double scale_factor = *(double *)data;
+    return scale_factor * log(x[0]);
+}
 double testfun_2d(const double *x, const void *data) {
     const double scale_factor = *(double *)data;
     return scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
@@ -107,8 +110,24 @@ int main(int argc, char *argv[]) {
         x[i] = ((double)rand()) / RAND_MAX;
 
     {
-        double scale_factor = 1.5;
+        printf("Testing on 1D function...\n");
         baobzi_input_t input = baobzi_input_default;
+        double scale_factor = 1.5;
+        input.dim = 1;
+        input.order = 6;
+        input.tol = 1E-10;
+        input.func = testfun_1d;
+        input.data = &scale_factor;
+        double hl[] = {1.0};
+        double center[] = {2.0};
+        test_func(&input, x, hl, center, n_points, n_runs);
+        printf("\n\n");
+    }
+
+    {
+        printf("Testing on 2D function...\n");
+        baobzi_input_t input = baobzi_input_default;
+        double scale_factor = 1.5;
         input.dim = 2;
         input.order = order;
         input.func = testfun_2d;
@@ -117,9 +136,11 @@ int main(int argc, char *argv[]) {
         const double hl[2] = {1.0, 1.0};                     // half the length of the domain in each dimension
         const double center[2] = {hl[0] + 0.5, hl[1] + 2.0}; // center of the domain
         test_func(&input, x, hl, center, n_points, n_runs);
+        printf("\n\n");
     }
 
     {
+        printf("Testing on 3D function...\n");
         baobzi_input_t input = baobzi_input_default;
         input.dim = 3;
         input.order = 8;
@@ -128,6 +149,7 @@ int main(int argc, char *argv[]) {
         double hl[3] = {1.0, 1.0, 1.0};
         double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};
         test_func(&input, x, hl, center, n_points, n_runs);
+        printf("\n\n");
     }
 
     return 0;

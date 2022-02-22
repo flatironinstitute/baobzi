@@ -5,7 +5,10 @@
 #include <omp.h>
 #include <random>
 
-double testfun_1d(const double *x, const void *data) { return log(x[0]); }
+double testfun_1d(const double *x, const void *data) {
+    const double scale_factor = *(double *)data;
+    return scale_factor * log(x[0]);
+}
 double testfun_2d(const double *x, const void *data) {
     const double scale_factor = *(double *)data;
     return scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
@@ -77,17 +80,27 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < n_points * 3; ++i)
         x[i] = dis(gen);
 
-    // {
-    //     aligned_vector x_1d_transformed(n_points);
-    //     Eigen::Vector<double, 1> hl_1d{2.0};
-    //     Eigen::Vector<double, 1> center_1d = hl_1d + Eigen::Vector<double, 1>{2.5};
-    //     baobzi::Function<1, 8> func_approx_1d(center_1d, hl_1d, testfun_1d, 1E-8);
-    //     for (int i = 0; i < n_points; i += 1)
-    //         x_1d_transformed[i] = hl_1d[0] * (2.0 * x[i] - 1.0) + center_1d[0];
+    {
+        double hl = 1.0;
+        double center = 2.0;
+        std::vector<double> x_transformed(n_points);
+        double scale_factor = 1.5;
+        baobzi_input_t input;
+        input.dim = 1;
+        input.order = 8;
+        input.data = &scale_factor;
+        input.tol = 1E-10;
+        input.func = testfun_1d;
 
-    //     time_function<1>(func_approx_1d, x_1d_transformed, n_runs);
-    //     print_error(func_approx_1d, x_1d_transformed);
-    // }
+        for (int i = 0; i < n_points; i++)
+            x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
+
+        baobzi::Function<1, 8> func_approx_1d(&input, &center, &hl);
+        func_approx_1d.print_stats();
+
+        time_function<2>(func_approx_1d, x_transformed, n_runs);
+        print_error(func_approx_1d, input, x_transformed);
+    }
 
     {
         Eigen::Vector2d hl{1.0, 1.0};
