@@ -630,6 +630,7 @@ class Function {
         build_cache();
     }
 
+    /// @brief Build any intermediate state necessary for computation
     void build_cache() {
         subtree_node_offsets_.resize(n_subtrees_.prod());
         subtree_node_offsets_[0] = 0;
