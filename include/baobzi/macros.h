@@ -45,6 +45,7 @@
         const msgpack::object *obj = (msgpack::object *)obj_;                                                          \
         baobzi::Function<DIM, ORDER, ISET> *f_ptr = new baobzi::Function<DIM, ORDER, ISET>();                          \
         *f_ptr = obj->as<baobzi::Function<DIM, ORDER, ISET>>();                                                        \
+        f_ptr->build_cache();                                                                                          \
         return f_ptr;                                                                                                  \
     }
 

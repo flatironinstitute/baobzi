@@ -564,21 +564,20 @@ class Function {
                 nodes[i].fit(input);
             stats_.n_evals_root += nodes.size() * (int)std::pow(ORDER, DIM);
 
-            auto add_node_children_to_queue =
-                [](std::queue<box_t> &theq, const VEC &center, const VEC &half_width) {
-                    for (unsigned child = 0; child < NChild; ++child) {
-                        VEC offset;
+            auto add_node_children_to_queue = [](std::queue<box_t> &theq, const VEC &center, const VEC &half_width) {
+                for (unsigned child = 0; child < NChild; ++child) {
+                    VEC offset;
 
-                        // Extract sign of each offset component from the bits of child
-                        // Basically: permute all possible offsets
-                        for (int j = 0; j < DIM; ++j) {
-                            double signed_hw[2] = {-half_width[j], half_width[j]};
-                            offset[j] = signed_hw[(child >> j) & 1];
-                        }
-
-                        theq.push(box_t(center + offset, half_width));
+                    // Extract sign of each offset component from the bits of child
+                    // Basically: permute all possible offsets
+                    for (int j = 0; j < DIM; ++j) {
+                        double signed_hw[2] = {-half_width[j], half_width[j]};
+                        offset[j] = signed_hw[(child >> j) & 1];
                     }
-                };
+
+                    theq.push(box_t(center + offset, half_width));
+                }
+            };
 
             double leaf_fraction = 0.0;
             for (auto &node : nodes) {
@@ -628,7 +627,10 @@ class Function {
         auto t_end = std::chrono::steady_clock::now();
         auto t_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
         stats_.t_elapsed = t_elapsed.count();
+        build_cache();
+    }
 
+    void build_cache() {
         subtree_node_offsets_.resize(n_subtrees_.prod());
         subtree_node_offsets_[0] = 0;
         for (int i = 1; i < subtree_node_offsets_.size(); ++i)
