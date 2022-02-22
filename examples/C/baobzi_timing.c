@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
         baobzi_input_t input = baobzi_input_default;
         double scale_factor = 1.5;
         input.dim = 1;
-        input.order = 6;
+        input.order = order;
         input.tol = 1E-10;
         input.func = testfun_1d;
         input.data = &scale_factor;
