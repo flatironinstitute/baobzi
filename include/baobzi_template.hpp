@@ -30,14 +30,15 @@ class Function;
 /// @tparam ISET Instruction set index (dummy variable to force alignment for different instruction sets)
 template <int DIM, int ISET>
 struct Box {
-    using VEC = Eigen::Vector<double, DIM>;
-    VEC center;          ///< Center of box
-    VEC inv_half_length; ///< 1.0 / half the dimension of the box
+    using VEC = Eigen::Vector<double, DIM>; ///< DIM dimensional vector type
+    VEC center;                             ///< Center of box
+    VEC inv_half_length;                    ///< 1.0 / half the dimension of the box
 
     Box<DIM, ISET>() = default; ///< default constructor for msgpack happiness
     /// @brief Constructor, just copies x, hl over
     Box<DIM, ISET>(const VEC &x, const VEC &hl) : center(x), inv_half_length(VEC::Ones().array() / hl.array()) {}
 
+    /// @brief return vector of box half lengths along each dimension
     inline VEC half_length() const { return VEC::Ones().array() / inv_half_length.array(); }
 
     /// @brief MSGPACK serialization magic
@@ -292,8 +293,8 @@ struct FunctionTree {
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
     static constexpr int Dim = DIM;         ///< Dimension of tree
     static constexpr int Order = ORDER;     ///< Order of tree
-    using node_t = Node<DIM, ORDER, ISET>;
-    using box_t = Box<DIM, ISET>;
+    using node_t = Node<DIM, ORDER, ISET>;  ///< DIM,ORDER node type
+    using box_t = Box<DIM, ISET>;           ///< DIM box type
 
     using VEC = Eigen::Vector<double, DIM>; ///< D dimensional vector type
     std::vector<node_t> nodes_;             ///< Flat list of all nodes in Tree (leaf or otherwise)
@@ -428,12 +429,11 @@ class Function {
     static constexpr int ISet = ISET;       ///< Instruction set (dummy param)
     static std::mutex statics_mutex;        ///< mutex for locking vandermonde/chebyshev initialization
 
-    using VEC = Eigen::Vector<double, DIM>;                ///< D dimensional vector type
+    using VEC = Eigen::Vector<double, DIM>;                ///< DIM dimensional vector type
     using CoeffVec = Eigen::Vector<double, ORDER>;         ///< Order dimensional vector type
     using VanderMat = Eigen::Matrix<double, ORDER, ORDER>; ///< VanderMonde Matrix type
-    using node_t = Node<DIM, ORDER, ISET>;
-
-    using box_t = Box<DIM, ISET>; ///< D dimensional box type
+    using node_t = Node<DIM, ORDER, ISET>;                 ///< DIM,ORDER Node type (duh)
+    using box_t = Box<DIM, ISET>;                          ///< DIM dimensional box type
 
     static CoeffVec cosarray_;                  ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
@@ -444,9 +444,10 @@ class Function {
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;                   ///< Number of subtrees in each linear dimension of our space
-    std::vector<int> subtree_node_offsets_;
-    std::vector<node_t *> node_pointers_;
-    VEC inv_bin_size_; ///< Inverse linear dimensions of the bins that our subtrees live
+    std::vector<int> subtree_node_offsets_; ///< n_subtrees array of offsets for where in the global array of node
+                                            ///< pointers the global node pointer array starts
+    std::vector<node_t *> node_pointers_;   ///< Vector of pointers to every node from every subtree
+    VEC inv_bin_size_;                      ///< Inverse linear dimensions of the bins that our subtrees live
 
     struct {
         uint16_t base_depth = 0;   ///< depth of subtrees
@@ -685,7 +686,7 @@ class Function {
     inline double eval(const double *xp) const { return eval(VEC(xp)); }
 
     /// @brief get index of node (across all subnodes)
-    /// @param[in] xp [DIM] point to find the node of
+    /// @param[in] x [DIM] point to find the node of
     /// @returns index in global node array
     inline std::size_t get_global_node_index(const VEC &x) const {
         int i_sub = get_linear_bin(x);

@@ -23,10 +23,12 @@ enum ISET { GENERIC, AVX, AVX2, AVX512 };
 
 /// @brief mmap a file
 struct mmap_wrapper {
-    char *addr;
-    int fd;
-    std::size_t buflen;
+    char *addr;         ///< Underlying buffer
+    int fd;             ///< Underlying file descriptor
+    std::size_t buflen; ///< Size of file/buffer
 
+    /// @brief Construct mmap_wrapper object
+    /// @param[in] fname path to file to map
     mmap_wrapper(const std::string &fname) {
         fd = open(fname.c_str(), O_RDONLY);
         if (fd == -1)
@@ -43,6 +45,7 @@ struct mmap_wrapper {
             throw std::runtime_error("Error mapping " + fname + " for restore.");
     }
 
+    /// @brief close file descriptor on destruction
     ~mmap_wrapper() { close(fd); }
 };
 
