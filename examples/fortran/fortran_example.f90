@@ -16,6 +16,7 @@ program main
   input%dim = 2
   input%order = 6
   input%tol = 1E-8
+  input%minimum_leaf_fraction = 0.0
 
   scale_factor = 1.0
 
