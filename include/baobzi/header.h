@@ -11,6 +11,7 @@ typedef struct {
     int dim;
     int order;
     double tol;
+    double minimum_leaf_fraction;
 } baobzi_input_t;
 
 #ifdef __cplusplus

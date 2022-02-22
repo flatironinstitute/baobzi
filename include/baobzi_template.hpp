@@ -536,6 +536,7 @@ class Function {
         VEC l(lp);
         VEC x(xp);
         std::queue<box_t> q;
+        std::queue<box_t> maybe_q;
 
         for (int i = 0; i < DIM; ++i)
             n_subtrees_[i] = l[i] / l.minCoeff();
@@ -563,9 +564,8 @@ class Function {
                 nodes[i].fit(input);
             stats_.n_evals_root += nodes.size() * (int)std::pow(ORDER, DIM);
 
-            for (auto &node : nodes) {
-                if (!node.is_leaf()) {
-                    VEC &center = node.box_.center;
+            auto add_node_children_to_queue =
+                [](std::queue<box_t> &theq, const VEC &center, const VEC &half_width) {
                     for (unsigned child = 0; child < NChild; ++child) {
                         VEC offset;
 
@@ -576,8 +576,26 @@ class Function {
                             offset[j] = signed_hw[(child >> j) & 1];
                         }
 
-                        q.push(box_t(center + offset, half_width));
+                        theq.push(box_t(center + offset, half_width));
                     }
+                };
+
+            double leaf_fraction = 0.0;
+            for (auto &node : nodes) {
+                if (!node.is_leaf()) {
+                    add_node_children_to_queue(q, node.box_.center, half_width);
+                } else {
+                    leaf_fraction += 1.0;
+                    add_node_children_to_queue(maybe_q, node.box_.center, half_width);
+                }
+            }
+
+            leaf_fraction /= nodes.size();
+            if (leaf_fraction < input->minimum_leaf_fraction) {
+                while (!maybe_q.empty()) {
+                    box_t box = maybe_q.front();
+                    maybe_q.pop();
+                    q.push(box);
                 }
             }
 

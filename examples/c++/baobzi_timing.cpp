@@ -91,6 +91,7 @@ int main(int argc, char *argv[]) {
         input.data = &scale_factor;
         input.tol = 1E-10;
         input.func = testfun_1d;
+        input.minimum_leaf_fraction = 1.0;
 
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
@@ -113,6 +114,7 @@ int main(int argc, char *argv[]) {
         input.data = &scale_factor;
         input.tol = 1E-10;
         input.func = testfun_2d;
+        input.minimum_leaf_fraction = 0.0;
 
         for (int i = 0; i < 2 * n_points; i += 2)
             for (int j = 0; j < 2; ++j)
