@@ -82,19 +82,19 @@ inline double cheb_eval(const Eigen::Vector<double, DIM> &x, const Box<DIM, ISET
 
 template <int ORDER, int ISET>
 inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1, ISET> &box,
-                        const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
-    double xd = (x[0] - box.center[0]) * box.inv_half_length[0];
+                        const std::vector<double, Eigen::aligned_allocator<double>> &c) {
+    const double x0 = (x[0] - box.center[0]) * box.inv_half_length[0];
+    const double x2 = 2 * x0;
 
-    Eigen::Vector<double, ORDER> Tn;
-    Tn[0] = 1.0;
-    Tn[1] = xd;
-    xd *= 2.0;
-    for (int i = 2; i < ORDER; ++i)
-        Tn[i] = xd * Tn[i - 1] - Tn[i - 2];
+    double c0 = c[0];
+    double c1 = c[1];
+    for (int i = 2; i < ORDER; ++i) {
+        double tmp = c1;
+        c1 = c[i] - c0;
+        c0 = tmp + c0 * x2;
+    }
 
-    Eigen::Map<const Eigen::Vector<double, ORDER>> coeffs(coeffs_raw.data());
-
-    return coeffs.dot(Tn);
+    return c1 + c0 * x0;
 }
 
 template <int ORDER, int ISET>
@@ -180,9 +180,9 @@ class Node {
             if (standard_error(coeffs) > input->tol)
                 return false;
 
-            coeffs_.resize(coeffs.size());
+            coeffs_.resize(ORDER);
             for (int i = 0; i < coeffs.size(); ++i)
-                coeffs_[i] = coeffs(i);
+                coeffs_[i] = coeffs(ORDER - i - 1);
 
             leaf_ = true;
             return true;
