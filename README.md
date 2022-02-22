@@ -104,7 +104,8 @@ int main(int argc, char *argv[]) {
         .data = NULL,
         .dim = 2,
         .order = 6,
-        .tol = 1E-10
+        .tol = 1E-10,
+        .minimum_leaf_fraction = 0.0
     };
 
     const double hl[2] = {1.0, 1.0};
@@ -143,7 +144,8 @@ int main(int argc, char *argv[]) {
         .data = NULL,
         .dim = 2,
         .order = 6,
-        .tol = 1E-10
+        .tol = 1E-10,
+        .minimum_leaf_fraction = 1.0
     };
 
     const double hl[2] = {1.0, 1.0};
@@ -178,8 +180,10 @@ def py_test_func(x):
 center = [0.0, 0.0]
 hl = [1.0, 1.0]
 point = [0.25, 0.25]
+tol = 1E-8
+minimum_leaf_fraction=0.0
 
-test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8)
+test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8, minimum_leaf_fraction)
 test.save('test.baobzi')
 print(test(point))
 del test
@@ -211,9 +215,10 @@ test_point = [0.25, 0.25]
 dim = 2
 order = 6
 tol = 1E-8
+minimum_leaf_fraction = 0.0
 output_file = "simple2d.baobzi"
 
-func_approx = baobzi.init(testfunc, dim, order, center, hl, tol)
+func_approx = baobzi.init(testfunc, dim, order, center, hl, tol, minimum_leaf_fraction)
 println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
 
 baobzi.save(func_approx, output_file)
@@ -275,6 +280,7 @@ program main
   input%dim = 2
   input%order = 6
   input%tol = 1E-8
+  input%minimum_leaf_fraction = 0.0
 
   center(:) = 0.0
   half_length(:) = 1.0
