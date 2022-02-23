@@ -72,9 +72,8 @@ inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
 /// @tparam DIM dim of chebyshev polynomial to evaluate
 /// @tparam ORDER order of chebyshev polynomial to evaluate
 /// @tparam ISET Instruction set index (dummy variable to force alignment for different instruction sets)
-/// @param[in] x position of point to evaluate
-/// @param[in] box box that x lives in
-/// @param[in] coeffs_raw flat column-major vector of coefficients
+/// @param[in] x position of point to evaluate (pre-normalized on interval from -1:1)
+/// @param[in] coeffs_raw flat vector of coefficients
 /// @returns value of interpolating function at x
 template <int DIM, int ORDER, int ISET>
 inline double cheb_eval(const Eigen::Vector<double, DIM> &x,
@@ -83,6 +82,8 @@ inline double cheb_eval(const Eigen::Vector<double, DIM> &x,
 template <int ORDER, int ISET>
 inline double cheb_eval(const Eigen::Vector<double, 1> &x,
                         const std::vector<double, Eigen::aligned_allocator<double>> &c) {
+    // note (RB): uses clenshaw's method to avoid direct calculation of recurrence relation of
+    // T_i, where res = \Sum_i T_i c_i
     const double x2 = 2 * x[0];
 
     double c0 = c[0];
@@ -99,6 +100,9 @@ inline double cheb_eval(const Eigen::Vector<double, 1> &x,
 template <int ORDER, int ISET>
 inline double cheb_eval(const Eigen::Vector2d &x,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
+    // note (RB): There is code to do this with clenshaw's method (twice), but it doesn't seem
+    // faster (isolated tests shows it's 3x faster, but that doesn't bear fruit in production
+    // and this is, imho, clearer)
     Eigen::Matrix<double, 2, ORDER> Tns;
     Tns.col(0).setOnes();
     Tns.col(1) = x;
