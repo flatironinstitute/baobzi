@@ -6,7 +6,6 @@
 #include <iostream>
 #include <mutex>
 #include <queue>
-#include <typeinfo>
 #include <vector>
 
 #include <msgpack.hpp>
@@ -459,8 +458,8 @@ class Function {
     /// @returns Memory usage of baobzi object in bytes
     std::size_t memory_usage() {
         std::size_t mem = sizeof(*this);
-        mem += subtree_node_offsets_.capacity() * sizeof(typeid(subtree_node_offsets_[0]));
-        mem += node_pointers_.capacity() * sizeof(typeid(node_pointers_[0]));
+        mem += subtree_node_offsets_.capacity() * sizeof(subtree_node_offsets_[0]);
+        mem += node_pointers_.capacity() * sizeof(node_pointers_[0]);
         for (const auto &subtree : subtrees_)
             mem += subtree.memory_usage();
         return mem;
