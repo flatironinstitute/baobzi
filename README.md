@@ -14,6 +14,7 @@ the box containing your point and evaluates using this approximant.
 * [Limitations](#limitations)
 * [Features](#features)
 * [Building/testing](#building-testing)
+* [Input parameters](#input-parameters)
 * [Running with...](#running-with)
     + [C](#c)
     + [C++](#c-1)
@@ -74,10 +75,11 @@ make -j $((2*$(nproc)))
 make install
 ```
 
-## Terminology/parameters/performance concerns
+## Input parameters
 Baobzi only has a few input parameters, but they can greatly impact the performance and are
 worth playing with for your specific function.
 
+* `func`: Function you want to be approximated
 * `dim`: Number of independent variables to your function.
 * `order`: Polynomial order used to represent a chunk of your function. Higher order is slower,
   especially in higher dimensions. An evaluation, ignoring search/cache issues, takes
