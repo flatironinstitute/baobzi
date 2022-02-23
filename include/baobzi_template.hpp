@@ -376,7 +376,7 @@ struct FunctionTree {
     /// @brief Get index of node at point x (relative to local nodes_ array)
     /// @param[in] x [DIM] point to lookup
     /// @returns index of node in nodes_ array containing x
-    inline const size_t get_node_index(const VEC &x) const {
+    inline std::size_t get_node_index(const VEC &x) const {
         uint64_t curr_index = 0;
         while (!nodes_[curr_index].is_leaf()) {
             uint64_t child_idx = 0;
@@ -391,15 +391,15 @@ struct FunctionTree {
 
     /// @brief Calculate total number of nodes in instance
     /// @return number of nodes in instance
-    inline const std::size_t size() const { return nodes_.size(); }
+    inline std::size_t size() const { return nodes_.size(); }
 
     /// @brief Calculate lowest depth of any node in instance (relative subtree node)
     /// @return lowest depth of all contained nodes
-    inline const int max_depth() const { return max_depth_; }
+    inline int max_depth() const { return max_depth_; }
 
     /// @brief Calculate memory usage of self (including all contained nodes)
     /// @returns size in bytes of object instance
-    inline const std::size_t memory_usage() const {
+    inline std::size_t memory_usage() const {
         std::size_t memory_usage = sizeof(*this);
         for (const auto &node : nodes_)
             memory_usage += node.memory_usage();
