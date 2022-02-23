@@ -6,6 +6,7 @@
 #include <iostream>
 #include <mutex>
 #include <queue>
+#include <typeinfo>
 #include <vector>
 
 #include <msgpack.hpp>
@@ -132,7 +133,6 @@ inline double cheb_eval(const Eigen::Vector3d &x, const Box<3, ISET> &box,
     using map_t = Eigen::Map<const Eigen::Matrix<double, ORDER, ORDER>>;
     for (int i = 0; i < ORDER; ++i)
         res += Tn[0][i] * Tn[1].dot(map_t(coeffs_raw.data() + i * ORDER * ORDER) * Tn[2]);
-
     return res;
 }
 
@@ -455,19 +455,27 @@ class Function {
         uint32_t t_elapsed = 0;    ///< time in milliseconds to create object
     } stats_;                      ///< Structure containing info about self creation :D
 
+    /// @brief Calculate memory_usage of this object in bytes
+    /// @returns Memory usage of baobzi object in bytes
+    std::size_t memory_usage() {
+        std::size_t mem = sizeof(*this);
+        mem += subtree_node_offsets_.capacity() * sizeof(typeid(subtree_node_offsets_[0]));
+        mem += node_pointers_.capacity() * sizeof(typeid(node_pointers_[0]));
+        for (const auto &subtree : subtrees_)
+            mem += subtree.memory_usage();
+        return mem;
+    }
+
     /// @brief Calculate and print various information about object instance to stdout
     void print_stats() {
         std::size_t n_nodes = 0;
         std::size_t n_leaves = 0;
         std::size_t n_subtrees = subtrees_.size();
         int max_depth = 0;
-        std::size_t memory_usage = sizeof(*this);
-        memory_usage += subtree_node_offsets_.capacity() * sizeof(int);
-        memory_usage += node_pointers_.capacity() * sizeof(node_t *);
+        std::size_t mem = memory_usage();
         for (const auto &subtree : subtrees_) {
             n_nodes += subtree.size();
             max_depth = std::max(max_depth, subtree.max_depth());
-            memory_usage += subtree.memory_usage();
             for (const auto &node : subtree.nodes_)
                 n_leaves += node.is_leaf();
         }
@@ -478,8 +486,7 @@ class Function {
         std::cout << "Total function evaluations required for fit: "
                   << n_nodes * (int)std::pow(ORDER, DIM) + stats_.n_evals_root << std::endl;
         std::cout << "Total time to create tree: " << stats_.t_elapsed << " milliseconds\n";
-        std::cout << "Approximate memory usage of tree: " << (double)memory_usage / (1024 * 1024) << " MiB"
-                  << std::endl;
+        std::cout << "Approximate memory usage of tree: " << (double)mem / (1024 * 1024) << " MiB" << std::endl;
     }
 
     /// @brief calculate vandermonde matrix
