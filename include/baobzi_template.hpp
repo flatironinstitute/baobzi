@@ -77,14 +77,13 @@ inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
 /// @param[in] coeffs_raw flat column-major vector of coefficients
 /// @returns value of interpolating function at x
 template <int DIM, int ORDER, int ISET>
-inline double cheb_eval(const Eigen::Vector<double, DIM> &x, const Box<DIM, ISET> &box,
+inline double cheb_eval(const Eigen::Vector<double, DIM> &x,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw);
 
 template <int ORDER, int ISET>
-inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1, ISET> &box,
+inline double cheb_eval(const Eigen::Vector<double, 1> &x,
                         const std::vector<double, Eigen::aligned_allocator<double>> &c) {
-    const double x0 = (x[0] - box.center[0]) * box.inv_half_length[0];
-    const double x2 = 2 * x0;
+    const double x2 = 2 * x[0];
 
     double c0 = c[0];
     double c1 = c[1];
@@ -94,19 +93,17 @@ inline double cheb_eval(const Eigen::Vector<double, 1> &x, const Box<1, ISET> &b
         c0 = tmp + c0 * x2;
     }
 
-    return c1 + c0 * x0;
+    return c1 + c0 * x[0];
 }
 
 template <int ORDER, int ISET>
-inline double cheb_eval(const Eigen::Vector2d &x, const Box<2, ISET> &box,
+inline double cheb_eval(const Eigen::Vector2d &x,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
-    Eigen::Vector2d xinterp = (x - box.center).array() * box.inv_half_length.array();
     Eigen::Matrix<double, 2, ORDER> Tns;
     Tns.col(0).setOnes();
-    Tns.col(1) = xinterp;
-    xinterp *= 2.0;
+    Tns.col(1) = x;
     for (int i = 2; i < ORDER; ++i)
-        Tns.col(i) = xinterp.array() * Tns.col(i - 1).array() - Tns.col(i - 2).array();
+        Tns.col(i) = 2 * x.array() * Tns.col(i - 1).array() - Tns.col(i - 2).array();
 
     Eigen::Map<const Eigen::Matrix<double, ORDER, ORDER>> coeffs(coeffs_raw.data());
 
@@ -114,18 +111,14 @@ inline double cheb_eval(const Eigen::Vector2d &x, const Box<2, ISET> &box,
 }
 
 template <int ORDER, int ISET>
-inline double cheb_eval(const Eigen::Vector3d &x, const Box<3, ISET> &box,
+inline double cheb_eval(const Eigen::Vector3d &x,
                         const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
-
-    Eigen::Vector3d xinterp = (x - box.center).array() * box.inv_half_length.array();
-
     Eigen::Vector<double, ORDER> Tn[3];
     Tn[0][0] = Tn[1][0] = Tn[2][0] = 1.0;
     for (int i = 0; i < 3; ++i) {
-        Tn[i][1] = xinterp[i];
-        xinterp[i] *= 2.0;
+        Tn[i][1] = x[i];
         for (int j = 2; j < ORDER; ++j)
-            Tn[i][j] = xinterp[i] * Tn[i][j - 1] - Tn[i][j - 2];
+            Tn[i][j] = 2 * x[i] * Tn[i][j - 1] - Tn[i][j - 2];
     }
 
     double res = 0.0;
@@ -273,7 +266,10 @@ class Node {
     /// @brief eval node at point x
     /// @param[in] x point to evaluate at
     /// @returns function approximation at x
-    inline double eval(const VEC &x) const { return cheb_eval<ORDER, ISET>(x, box_, coeffs_); }
+    inline double eval(const VEC &x) const {
+        const VEC xinterp = (x - box_.center).array() * box_.inv_half_length.array();
+        return cheb_eval<ORDER, ISET>(xinterp, coeffs_);
+    }
 
     /// @brief Calculate memory usage of self (including unused space from vector allocation)
     /// @returns size in bytes of object instance
