@@ -74,6 +74,37 @@ make -j $((2*$(nproc)))
 make install
 ```
 
+## Terminology/parameters/performance concerns
+Baobzi only has a few input parameters, but they can greatly impact the performance and are
+worth playing with for your specific function.
+
+* `dim`: Number of independent variables to your function.
+* `order`: Polynomial order used to represent a chunk of your function. Higher order is slower,
+  especially in higher dimensions. An evaluation, ignoring search/cache issues, takes
+  `O(ORDER^DIM)` time. Search isn't free though, and `baobzi` typically needs fewer
+  subdivisions for higher orders, so your function might be faster _and_ use less memory if
+  you use a higher order.
+* `data`: This parameter is only relevant to C/C++/Fortran. If the function you're fitting
+  takes parameters, pack that somehow, and `data` is simply a pointer to that packed
+  info. See examples.
+* `tol`: The maximum desired relative error between your function and the approximant. It is
+  impossible to guarantee that all function evaluations will meet this tolerance, so it's
+  important to test the results on the domain you're interested in to ensure that results are to your satisfaction.
+* `minimum_leaf_fraction`: Baobzi internally is represented by a tree. However, to speed up
+  tree lookups, that tree is divided into subtrees that start at some depth. That depth, by
+  default, is one above the first level to have a "leaf." A leaf is a terminal box where the
+  function evaluation happens (other nodes just contain pointers to their children). This
+  scheme can adversely impact performance in some cases though (such as cases where only one
+  node on a level is a leaf). This parameter sets a requirement that baobzi keeps subdividing
+  entire levels when the fraction of leaves on a given level is less than this threshold.
+
+  An easy way to think about this is if the parameter is `0.0`, then baobzi will never make a
+  leaf node a parent node, and the tree will be as small as possible (but not necessarily well
+  balanced). If the parameter is `1.0`, then baobzi will ensure that the final depth of the
+  tree is entirely filled with leaves. This tree is perfectly balanced, and therefore exactly a
+  uniform grid. Anything between will vary between these two extremes. This parameter can
+  EXTREMELY impact performance, especially on 1D trees.
+
 ## Running with...
 All examples require your project know where the `baobzi` shared object is located. In the
 example above, it's located in either the `$BAOBZI_ROOT/lib` or `$BAOBZI_ROOT/lib64` directory,
@@ -145,7 +176,7 @@ int main(int argc, char *argv[]) {
         .dim = 2,
         .order = 6,
         .tol = 1E-10,
-        .minimum_leaf_fraction = 1.0
+        .minimum_leaf_fraction = 0.0
     };
 
     const double hl[2] = {1.0, 1.0};
