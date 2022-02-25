@@ -27,7 +27,7 @@ option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
 option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
 option(BAOBZI_BUILD_FORTRAN "Build Fortran bindings" OFF)
-option(BAOBZI_BUILD_PIP_INSTALL "Don't install python bindings to shared" OFF)
+option(BAOBZI_PIP_INSTALL "Don't install python bindings to shared" OFF)
 
 file(GLOB LIB_SOURCES_GENERIC "src/*0.cpp")
 add_library(baobzi_generic OBJECT ${LIB_SOURCES_GENERIC})
