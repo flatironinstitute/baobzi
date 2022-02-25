@@ -5,10 +5,17 @@ try:
     libbaobzi = CDLL("libbaobzi.so")
 except OSError:
     import os
-    libroot = os.path.sep.join(os.path.realpath(__file__).split(os.path.sep)[:-4])
-    libpath = os.path.join(libroot, "libbaobzi.so")
-    print(libpath)
-    libbaobzi = CDLL(libpath)
+
+    libroot = os.path.sep.join(os.path.realpath(__file__).split(os.path.sep)[:-5])
+    lib = os.path.join(libroot, "lib", "libbaobzi.so")
+    lib64 = os.path.join(libroot, "lib64", "libbaobzi.so")
+    if os.path.exists(lib):
+        libbaobzi = CDLL(lib)
+    elif os.path.exists(lib64):
+        libbaobzi = CDLL(lib64)
+    else:
+        raise OSError("Unable to find 'libbaobzi.so'. Add path to its containing directory to your LD_LIBRARY_PATH variable.")
+
 
 INPUT_FUNC = CFUNCTYPE(c_double, POINTER(c_double))
 
