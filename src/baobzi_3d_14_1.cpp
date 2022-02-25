@@ -4,7 +4,7 @@
 
 namespace baobzi {
 template
-typename Function<3, 14, 1>::CoeffVec Function<3, 14, 1>::cosarray_;
+typename Function<3, 14, 1>::VecOrderD Function<3, 14, 1>::cosarray_;
 template
 Eigen::PartialPivLU<typename Function<3, 14, 1>::VanderMat> Function<3, 14, 1>::VLU_;
 }

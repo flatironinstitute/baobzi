@@ -18,7 +18,7 @@ for iset in {0..3}; do
             printf '#include "baobzi/macros.h"\n\n' >> $srcfile
             printf "namespace baobzi {\n" >> $srcfile
             printf "template\n" >> $srcfile
-            printf "typename Function<%d, %d, %d>::CoeffVec Function<%d, %d, %d>::cosarray_;\n" $dim $order $iset $dim $order $iset >> $srcfile
+            printf "typename Function<%d, %d, %d>::VecOrderD Function<%d, %d, %d>::cosarray_;\n" $dim $order $iset $dim $order $iset >> $srcfile
             printf "template\n" >> $srcfile
             printf "Eigen::PartialPivLU<typename Function<%d, %d, %d>::VanderMat> Function<%d, %d, %d>::VLU_;\n" $dim $order $iset $dim $order $iset>> $srcfile
             printf "}\n\n" >> $srcfile

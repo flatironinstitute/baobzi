@@ -21,6 +21,8 @@
 
 /// Namespace for baobzi
 namespace baobzi {
+using index_t = uint32_t;               ///< Type specifying indexing into flattened tree
+using coeff_data = std::vector<double>; ///< Structure to hold flattened coefficients
 
 template <int DIM, int ORDER, int ISET>
 class Function;
@@ -30,16 +32,17 @@ class Function;
 /// @tparam ISET Instruction set index (dummy variable to force alignment for different instruction sets)
 template <int DIM, int ISET>
 struct Box {
-    using VEC = Eigen::Vector<double, DIM>; ///< DIM dimensional vector type
-    VEC center;                             ///< Center of box
-    VEC inv_half_length;                    ///< 1.0 / half the dimension of the box
+    using VecDimD = Eigen::Vector<double, DIM>; ///< DIM dimensional vector type
+
+    VecDimD center;          ///< Center of box
+    VecDimD inv_half_length; ///< 1.0 / half the dimension of the box
 
     Box<DIM, ISET>() = default; ///< default constructor for msgpack happiness
     /// @brief Constructor, just copies x, hl over
-    Box<DIM, ISET>(const VEC &x, const VEC &hl) : center(x), inv_half_length(VEC::Ones().array() / hl.array()) {}
+    Box<DIM, ISET>(const VecDimD &x, const VecDimD &hl) : center(x), inv_half_length(VecDimD::Ones().array() / hl.array()) {}
 
     /// @brief return vector of box half lengths along each dimension
-    inline VEC half_length() const { return VEC::Ones().array() / inv_half_length.array(); }
+    inline VecDimD half_length() const { return VecDimD::Ones().array() / inv_half_length.array(); }
 
     /// @brief MSGPACK serialization magic
     MSGPACK_DEFINE(center, inv_half_length);
@@ -76,12 +79,10 @@ inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
 /// @param[in] coeffs_raw flat vector of coefficients
 /// @returns value of interpolating function at x
 template <int DIM, int ORDER, int ISET>
-inline double cheb_eval(const Eigen::Vector<double, DIM> &x,
-                        const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw);
+inline double cheb_eval(const Eigen::Vector<double, DIM> &x, const coeff_data &coeffs_raw);
 
 template <int ORDER, int ISET>
-inline double cheb_eval(const Eigen::Vector<double, 1> &x,
-                        const std::vector<double, Eigen::aligned_allocator<double>> &c) {
+inline double cheb_eval(const Eigen::Vector<double, 1> &x, const coeff_data &c) {
     // note (RB): uses clenshaw's method to avoid direct calculation of recurrence relation of
     // T_i, where res = \Sum_i T_i c_i
     const double x2 = 2 * x[0];
@@ -98,8 +99,7 @@ inline double cheb_eval(const Eigen::Vector<double, 1> &x,
 }
 
 template <int ORDER, int ISET>
-inline double cheb_eval(const Eigen::Vector2d &x,
-                        const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
+inline double cheb_eval(const Eigen::Vector2d &x, const coeff_data &coeffs_raw) {
     // note (RB): There is code to do this with clenshaw's method (twice), but it doesn't seem
     // faster (isolated tests shows it's 3x faster, but that doesn't bear fruit in production
     // and this is, imho, clearer)
@@ -115,8 +115,7 @@ inline double cheb_eval(const Eigen::Vector2d &x,
 }
 
 template <int ORDER, int ISET>
-inline double cheb_eval(const Eigen::Vector3d &x,
-                        const std::vector<double, Eigen::aligned_allocator<double>> &coeffs_raw) {
+inline double cheb_eval(const Eigen::Vector3d &x, const coeff_data &coeffs_raw) {
     Eigen::Vector<double, ORDER> Tn[3];
     Tn[0][0] = Tn[1][0] = Tn[2][0] = 1.0;
     for (int i = 0; i < 3; ++i) {
@@ -139,13 +138,13 @@ inline double cheb_eval(const Eigen::Vector3d &x,
 template <int DIM, int ORDER, int ISET>
 class Node {
   public:
-    using VEC = Eigen::Vector<double, DIM>;                        ///< D dimensional vector type
-    using CoeffVec = Eigen::Vector<double, ORDER>;                 ///< ORDER dimensional vector type
-    Box<DIM, ISET> box_;                                           ///< Geometric position/size of this node
-    std::vector<double, Eigen::aligned_allocator<double>> coeffs_; ///< Flattened chebyshev coeffs
-    using Func = Function<DIM, ORDER, ISET>;                       ///< Type of boabzi function this belongs to
-    uint64_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
-    bool leaf_ = false;            ///< Helper variable to determine if node is a leaf
+    using VecDimD = Eigen::Vector<double, DIM>;        ///< D dimensional vector type
+    using VecOrderD = Eigen::Vector<double, ORDER>; ///< ORDER dimensional vector type
+    using Func = Function<DIM, ORDER, ISET>;       ///< Type of boabzi function this belongs to
+
+    Box<DIM, ISET> box_;           ///< Geometric position/size of this node
+    coeff_data coeffs_;            ///< Flattened chebyshev coeffs
+    uint32_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
 
     Node<DIM, ORDER, ISET>() = default; ///< Default constructor for msgpack happiness
 
@@ -155,7 +154,7 @@ class Node {
 
     /// @brief check if node is leaf
     /// @return true if leaf, false otherwise
-    inline bool is_leaf() const { return leaf_; }
+    inline bool is_leaf() const { return coeffs_.size(); }
 
     /// @brief Fit node to a given tolerance. If fit succeeds, set leaf and coeffs, otherwise ... don't
     ///
@@ -163,10 +162,10 @@ class Node {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns true if fit successful, false if not good enough
     bool fit(const baobzi_input_t *input) {
-        VEC half_length = box_.half_length();
+        VecDimD half_length = box_.half_length();
         if constexpr (DIM == 1) {
             Eigen::Vector<double, ORDER> F;
-            CoeffVec xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
+            VecOrderD xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
 
             for (int i = 0; i < ORDER; ++i)
                 F(i) = input->func(&xvec[i], input->data);
@@ -180,13 +179,12 @@ class Node {
             for (int i = 0; i < coeffs.size(); ++i)
                 coeffs_[i] = coeffs(ORDER - i - 1);
 
-            leaf_ = true;
             return true;
         }
         if constexpr (DIM == 2) {
             Eigen::Matrix<double, ORDER, ORDER> F;
-            CoeffVec xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
-            CoeffVec yvec = Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
+            VecOrderD xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
+            VecOrderD yvec = Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -205,15 +203,14 @@ class Node {
             for (int i = 0; i < coeffs.size(); ++i)
                 coeffs_[i] = coeffs(i);
 
-            leaf_ = true;
             return true;
         }
         if constexpr (DIM == 3) {
             Eigen::Tensor<double, 3> F(ORDER, ORDER, ORDER);
 
-            CoeffVec xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
-            CoeffVec yvec = Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
-            CoeffVec zvec = Func::get_cheb_nodes(box_.center[2] - half_length[2], box_.center[2] + half_length[2]);
+            VecOrderD xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
+            VecOrderD yvec = Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
+            VecOrderD zvec = Func::get_cheb_nodes(box_.center[2] - half_length[2], box_.center[2] + half_length[2]);
 
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
@@ -246,8 +243,8 @@ class Node {
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
-                        VEC point = (box_.center - half_length).array() +
-                                    2.0 * VEC{(double)i, (double)j, (double)k}.array() * half_length.array() / ORDER;
+                        VecDimD point = (box_.center - half_length).array() +
+                                    2.0 * VecDimD{(double)i, (double)j, (double)k}.array() * half_length.array() / ORDER;
 
                         const double test_val = eval(point);
                         const double actual_val = input->func(point.data(), input->data);
@@ -262,7 +259,6 @@ class Node {
                 }
             }
 
-            leaf_ = true;
             return true;
         }
     }
@@ -270,8 +266,8 @@ class Node {
     /// @brief eval node at point x
     /// @param[in] x point to evaluate at
     /// @returns function approximation at x
-    inline double eval(const VEC &x) const {
-        const VEC xinterp = (x - box_.center).array() * box_.inv_half_length.array();
+    inline double eval(const VecDimD &x) const {
+        const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
         return cheb_eval<ORDER, ISET>(xinterp, coeffs_);
     }
 
@@ -280,7 +276,7 @@ class Node {
     inline std::size_t memory_usage() const { return sizeof(*this) + coeffs_.capacity() * sizeof(double); }
 
     /// @brief MSGPACK serialization magic
-    MSGPACK_DEFINE(box_, first_child_idx, leaf_, coeffs_);
+    MSGPACK_DEFINE(box_, first_child_idx, coeffs_);
 };
 
 /// @brief Represent a function in some domain as a tree of chebyshev nodes
@@ -292,22 +288,23 @@ struct FunctionTree {
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
     static constexpr int Dim = DIM;         ///< Dimension of tree
     static constexpr int Order = ORDER;     ///< Order of tree
+
     using node_t = Node<DIM, ORDER, ISET>;  ///< DIM,ORDER node type
     using box_t = Box<DIM, ISET>;           ///< DIM box type
+    using VecDimD = Eigen::Vector<double, DIM>; ///< D dimensional vector type
 
-    using VEC = Eigen::Vector<double, DIM>; ///< D dimensional vector type
-    std::vector<node_t> nodes_;             ///< Flat list of all nodes in Tree (leaf or otherwise)
-    int max_depth_;                         ///< Maximum depth of tree
+    std::vector<node_t> nodes_; ///< Flat list of all nodes in Tree (leaf or otherwise)
+    int max_depth_;             ///< Maximum depth of tree
 
     /// @brief Construct tree
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] box box that this tree lives in
     FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box) {
         std::queue<Box<DIM, ISET>> q;
-        VEC half_width = box.half_length() * 0.5;
+        VecDimD half_width = box.half_length() * 0.5;
         q.push(box);
 
-        uint64_t curr_child_idx = 1;
+        index_t curr_child_idx = 1;
         max_depth_ = 0;
         while (!q.empty()) {
             int n_next = q.size();
@@ -330,9 +327,9 @@ struct FunctionTree {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
 
-                    VEC &center = node.box_.center;
-                    for (uint64_t child = 0; child < NChild; ++child) {
-                        VEC offset;
+                    VecDimD &center = node.box_.center;
+                    for (index_t child = 0; child < NChild; ++child) {
+                        VecDimD offset;
 
                         // Extract sign of each offset component from the bits of child
                         // Basically: permute all possible offsets
@@ -358,11 +355,11 @@ struct FunctionTree {
     /// @brief Find leaf node containing a point via standard pointer traversal
     /// @param[in] x point that the node will contain
     /// @return leaf node containing point x
-    inline const node_t &find_node_traverse(const VEC &x) const {
+    inline const node_t &find_node_traverse(const VecDimD &x) const {
         auto *node = &nodes_[0];
         auto *next_node = &nodes_[node->first_child_idx]; // attempt to force preload of potential next node
         while (!node->is_leaf()) {
-            uint64_t child_idx = 0;
+            index_t child_idx = 0;
             for (int i = 0; i < DIM; ++i)
                 child_idx = child_idx | ((x[i] > node->box_.center[i]) << i);
 
@@ -376,10 +373,10 @@ struct FunctionTree {
     /// @brief Get index of node at point x (relative to local nodes_ array)
     /// @param[in] x [DIM] point to lookup
     /// @returns index of node in nodes_ array containing x
-    inline std::size_t get_node_index(const VEC &x) const {
-        uint64_t curr_index = 0;
+    inline std::size_t get_node_index(const VecDimD &x) const {
+        index_t curr_index = 0;
         while (!nodes_[curr_index].is_leaf()) {
-            uint64_t child_idx = 0;
+            index_t child_idx = 0;
             for (int i = 0; i < DIM; ++i)
                 child_idx = child_idx | ((x[i] > nodes_[curr_index].box_.center[i]) << i);
 
@@ -409,7 +406,7 @@ struct FunctionTree {
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at
     /// @returns function approximation at point x
-    inline double eval(const VEC &x) const { return find_node_traverse(x).eval(x); }
+    inline double eval(const VecDimD &x) const { return find_node_traverse(x).eval(x); }
 
     /// @brief msgpack serialization magic
     MSGPACK_DEFINE(nodes_);
@@ -422,37 +419,38 @@ struct FunctionTree {
 template <int DIM, int ORDER, int ISET = 0>
 class Function {
   public:
-    static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
-    static constexpr int Dim = DIM;         ///< Input dimension of function
-    static constexpr int Order = ORDER;     ///< Order of polynomial representation
-    static constexpr int ISet = ISET;       ///< Instruction set (dummy param)
-    static std::mutex statics_mutex;        ///< mutex for locking vandermonde/chebyshev initialization
-
-    using VEC = Eigen::Vector<double, DIM>;                ///< DIM dimensional vector type
-    using CoeffVec = Eigen::Vector<double, ORDER>;         ///< Order dimensional vector type
+    using VecDimD = Eigen::Vector<double, DIM>;                ///< DIM dimensional vector type
+    using VecOrderD = Eigen::Vector<double, ORDER>;         ///< Order dimensional vector type
     using VanderMat = Eigen::Matrix<double, ORDER, ORDER>; ///< VanderMonde Matrix type
     using node_t = Node<DIM, ORDER, ISET>;                 ///< DIM,ORDER Node type (duh)
     using box_t = Box<DIM, ISET>;                          ///< DIM dimensional box type
 
-    static CoeffVec cosarray_;                  ///< Cached array of cosine values at chebyshev nodes
+    static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
+    static constexpr int Dim = DIM;         ///< Input dimension of function
+    static constexpr int Order = ORDER;     ///< Order of polynomial representation
+    static constexpr int ISet = ISET;       ///< Instruction set (dummy param)
+
+    static std::mutex statics_mutex;            ///< mutex for locking vandermonde/chebyshev initialization
+    static VecOrderD cosarray_;                  ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
 
     box_t box_;      ///< box representing the domain of our function
     double tol_;     ///< Desired relative tolerance of our approximation
-    VEC lower_left_; ///< Bottom 'corner' of our domain
+    VecDimD lower_left_; ///< Bottom 'corner' of our domain
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;                   ///< Number of subtrees in each linear dimension of our space
     std::vector<int> subtree_node_offsets_; ///< n_subtrees array of offsets for where in the global array of node
                                             ///< pointers the global node pointer array starts
     std::vector<node_t *> node_pointers_;   ///< Vector of pointers to every node from every subtree
-    VEC inv_bin_size_;                      ///< Inverse linear dimensions of the bins that our subtrees live
+    VecDimD inv_bin_size_;                      ///< Inverse linear dimensions of the bins that our subtrees live
 
+    /// Structure containing info about self creation :D
     struct {
         uint16_t base_depth = 0;   ///< depth of subtrees
         uint64_t n_evals_root = 0; ///< number of function evals before subtree calls
         uint32_t t_elapsed = 0;    ///< time in milliseconds to create object
-    } stats_;                      ///< Structure containing info about self creation :D
+    } stats_;
 
     /// @brief Calculate memory_usage of this object in bytes
     /// @returns Memory usage of baobzi object in bytes
@@ -511,7 +509,7 @@ class Function {
     /// @param[in] lb lower bound
     /// @param[in] ub upper bound
     /// @returns vector of chebyshev nodes scaled within [lb, ub]
-    static inline CoeffVec get_cheb_nodes(double lb, double ub) {
+    static inline VecOrderD get_cheb_nodes(double lb, double ub) {
         return 0.5 * ((lb + ub) + (ub - lb) * cosarray_.array());
     }
 
@@ -535,12 +533,12 @@ class Function {
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
     Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp)
-        : box_(VEC(xp), VEC(lp)), tol_(input->tol) {
+        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
 
-        VEC l(lp);
-        VEC x(xp);
+        VecDimD l(lp);
+        VecDimD x(xp);
         std::queue<box_t> q;
         std::queue<box_t> maybe_q;
 
@@ -550,7 +548,7 @@ class Function {
         q.push(box_t(x, l));
 
         // Half-width of next children
-        VEC half_width = l * 0.5;
+        VecDimD half_width = l * 0.5;
 
         // Breadth first search. Step through each level of the tree and test fit all of the nodes
         // We exit when a level isn't completely filled with parent nodes (rather than leaves)
@@ -570,9 +568,9 @@ class Function {
                 nodes[i].fit(input);
             stats_.n_evals_root += nodes.size() * (int)std::pow(ORDER, DIM);
 
-            auto add_node_children_to_queue = [](std::queue<box_t> &theq, const VEC &center, const VEC &half_width) {
+            auto add_node_children_to_queue = [](std::queue<box_t> &theq, const VecDimD &center, const VecDimD &half_width) {
                 for (unsigned child = 0; child < NChild; ++child) {
-                    VEC offset;
+                    VecDimD offset;
 
                     // Extract sign of each offset component from the bits of child
                     // Basically: permute all possible offsets
@@ -612,8 +610,8 @@ class Function {
                 break;
         }
 
-        VEC bin_size;
-        VEC half_length = box_.half_length();
+        VecDimD bin_size;
+        VecDimD half_length = box_.half_length();
         for (int j = 0; j < DIM; ++j) {
             bin_size[j] = 2.0 * half_length[j] / n_subtrees_[j];
             inv_bin_size_[j] = 0.5 * n_subtrees_[j] / half_length[j];
@@ -624,7 +622,7 @@ class Function {
         for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin) {
             Eigen::Vector<int, DIM> bins = get_bins(i_bin);
 
-            VEC parent_center = (bins.template cast<double>().array() + 0.5) * bin_size.array() + lower_left_.array();
+            VecDimD parent_center = (bins.template cast<double>().array() + 0.5) * bin_size.array() + lower_left_.array();
 
             Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size};
             subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box));
@@ -683,7 +681,7 @@ class Function {
     /// @param[in] x [2] position to find bin
     /// @returns linear index of bin that x lives in
     inline int get_linear_bin(const Eigen::Vector2d &x) const {
-        const VEC x_bin = x - lower_left_;
+        const VecDimD x_bin = x - lower_left_;
         const Eigen::Vector<int, DIM> bin = (x_bin.array() * inv_bin_size_.array()).template cast<int>();
         return bin[0] + n_subtrees_[0] * bin[1];
     }
@@ -692,7 +690,7 @@ class Function {
     /// @param[in] x [3] position to find bin
     /// @returns linear index of bin that x lives in
     inline int get_linear_bin(const Eigen::Vector3d &x) const {
-        const VEC x_bin = x - lower_left_;
+        const VecDimD x_bin = x - lower_left_;
         const Eigen::Vector<int, DIM> bin = (x_bin.array() * inv_bin_size_.array()).template cast<int>();
         return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
     }
@@ -700,22 +698,22 @@ class Function {
     /// @brief get constant reference to leaf node that contains a point
     /// @param[in] x point of interest
     /// @returns constant reference to leaf node that contains x
-    inline const node_t &find_node(const VEC &x) const { return subtrees_[get_linear_bin(x)].find_node_traverse(x); }
+    inline const node_t &find_node(const VecDimD &x) const { return subtrees_[get_linear_bin(x)].find_node_traverse(x); }
 
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at
     /// @returns function approximation at point x
-    inline double eval(const VEC &x) const { return find_node(x).eval(x); }
+    inline double eval(const VecDimD &x) const { return find_node(x).eval(x); }
 
     /// @brief eval function approximation at point
     /// @param[in] xp [DIM] point to evaluate function at
     /// @returns function approximation at point xp
-    inline double eval(const double *xp) const { return eval(VEC(xp)); }
+    inline double eval(const double *xp) const { return eval(VecDimD(xp)); }
 
     /// @brief get index of node (across all subnodes)
     /// @param[in] x [DIM] point to find the node of
     /// @returns index in global node array
-    inline std::size_t get_global_node_index(const VEC &x) const {
+    inline std::size_t get_global_node_index(const VecDimD &x) const {
         int i_sub = get_linear_bin(x);
         return subtree_node_offsets_[i_sub] + subtrees_[i_sub].get_node_index(x);
     }
@@ -725,9 +723,9 @@ class Function {
     /// @param[out] res [n_trg] array of results
     /// @param[in] n_trg number of points to evaluate
     inline void eval(const double *xp, double *res, int n_trg) const {
-        std::vector<std::pair<node_t *, VEC>> node_map(n_trg);
+        std::vector<std::pair<node_t *, VecDimD>> node_map(n_trg);
         for (int i = 0; i < n_trg; ++i) {
-            VEC xi = VEC(xp + DIM * i);
+            VecDimD xi = VecDimD(xp + DIM * i);
             node_map[i] = std::make_pair(node_pointers_[get_global_node_index(xi)], xi);
         }
 
@@ -738,7 +736,7 @@ class Function {
     /// @brief eval function approximation at point
     /// @param[in] x [DIM] point to evaluate function at
     /// @returns function approximation at point x
-    inline double operator()(const VEC &x) const { return eval(x); }
+    inline double operator()(const VecDimD &x) const { return eval(x); }
 
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at
@@ -768,7 +766,7 @@ template <int DIM, int ORDER, int ISET>
 std::mutex Function<DIM, ORDER, ISET>::statics_mutex;
 
 template <int DIM, int ORDER, int ISET>
-typename Function<DIM, ORDER, ISET>::CoeffVec Function<DIM, ORDER, ISET>::cosarray_;
+typename Function<DIM, ORDER, ISET>::VecOrderD Function<DIM, ORDER, ISET>::cosarray_;
 
 template <int DIM, int ORDER, int ISET>
 Eigen::PartialPivLU<typename Function<DIM, ORDER, ISET>::VanderMat> Function<DIM, ORDER, ISET>::VLU_;
