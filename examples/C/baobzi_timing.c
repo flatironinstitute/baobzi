@@ -31,7 +31,7 @@ void time_function(const baobzi_t function, const double *x, int size, int n_run
     }
     const double dt = omp_get_wtime() - time;
     const long n_eval = n_runs * ntrg;
-    printf("time, Megaevals/s: %g %g\n", dt, n_eval / (dt * 1E6));
+    printf("Elapsed time: %g\nMevals/s: %g\n", dt, n_eval / (dt * 1E6));
     free(res);
 }
 
@@ -155,7 +155,6 @@ int main(int argc, char *argv[]) {
         double hl[3] = {1.0, 1.0, 1.0};
         double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};
         test_func(&input, x, hl, center, n_points, n_runs);
-        printf("\n\n");
     }
 
     return 0;

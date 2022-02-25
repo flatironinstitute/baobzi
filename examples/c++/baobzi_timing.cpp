@@ -30,7 +30,8 @@ std::vector<double> time_function(const Function &function, const std::vector<do
 
     const double dt = omp_get_wtime() - time;
     const long n_eval = n_runs * n_points;
-    std::cout << dt << " " << n_eval / (dt * 1E6) << " " << std::endl;
+    std::cout << "Elapsed time (s): " << dt << std::endl;
+    std::cout << "Mevals/s: " << n_eval / (dt * 1E6) << std::endl;
     return res;
 }
 
@@ -96,11 +97,13 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
 
+        std::cout << "Testing on 1D function...\n";
         baobzi::Function<1, 8> func_approx_1d(&input, &center, &hl);
         func_approx_1d.print_stats();
 
         time_function<2>(func_approx_1d, x_transformed, n_runs);
         print_error(func_approx_1d, input, x_transformed);
+        std::cout << "\n";
     }
 
     {
@@ -120,6 +123,7 @@ int main(int argc, char *argv[]) {
             for (int j = 0; j < 2; ++j)
                 x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
+        std::cout << "Testing on 2D function...\n";
         baobzi::Function<2, 10> func_approx_2d(&input, center2d.data(), hl.data());
         func_approx_2d.print_stats();
 
