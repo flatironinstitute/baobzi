@@ -9,5 +9,5 @@ setup(name='baobzi',
       packages=['baobzi'],
       package_dir={'baobzi': 'src/python'},
       install_requires=['numpy'],
-      cmake_options=['-DBAOBZI_BUILD_TESTS:BOOL=OFF -DBAOBZI_BUILD_EXAMPLES:BOOL=OFF -DBAOBZI_PIP_INSTALL:BOOL=ON'],
+      cmake_options=['-DBAOBZI_BUILD_TESTS:BOOL=OFF -DBAOBZI_BUILD_EXAMPLES:BOOL=OFF -DBAOBZI_PIP_INSTALL:BOOL=ON -DBAOBZI_BUILD_FORTRAN:BOOL=OFF'],
       )
