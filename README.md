@@ -22,6 +22,7 @@ the box containing your point and evaluates using this approximant.
     + [Julia](#julia)
     + [MATLAB](#matlab)
     + [Fortran](#fortran)
+* [Environment](#environment)
 * [Including in your CMake project](#including-in-your-cmake-project)
 * [Roadmap](#roadmap)
 * [Known Issues. IMPORTANT PLEASE READ](#known-issues-important-please-read)
@@ -347,6 +348,14 @@ end program main
 ```bash
 gfortran -o fortran_example -I$BAOBZI_ROOT/share/baobzi/fortran fortran_example.f90 -lbaobzi
 ```
+
+## Environment
+Most control flow of Baobzi is handled through the input structure, but there is a single
+environment variable: `BAOBZI_ARCH`.  This environment variable lets you manually set the
+instruction set used by the evaluation. There is usually no reason to use this, but in some
+cases, AVX2 will outperform AVX512, or you might want to do some testing on the impact of the
+instruction set. Valid values are (case-insensitive) `GENERIC`, `AVX`, `AVX2`, and `AVX512`.
+
 
 ## Including in your CMake project
 Here I've added a git submodule in extern/baobzi, and I build and link in the static library.
