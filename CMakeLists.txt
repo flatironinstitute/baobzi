@@ -6,6 +6,8 @@ enable_language(Fortran OPTIONAL)
 
 set(CMAKE_CXX_STANDARD 17)
 
+include(GNUInstallDirs)
+
 set (default_build_type "Release")
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message (STATUS "No build type specified. Setting build type to Release.")
@@ -24,6 +26,7 @@ option(BAOBZI_BUILD_SHARED "Build the shared library" ON)
 option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
 option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
+option(BAOBZI_BUILD_FORTRAN "Build Fortran bindings" OFF)
 option(BAOBZI_BUILD_PIP_INSTALL "Don't install python bindings to shared" OFF)
 
 file(GLOB LIB_SOURCES_GENERIC "src/*0.cpp")
@@ -52,18 +55,21 @@ set_property(TARGET baobzi_avx512 PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 set(BAOBZI_BINDING_SOURCES src/baobzi.cpp)
 
-if (DEFINED CMAKE_Fortran_COMPILER)
+if (DEFINED CMAKE_Fortran_COMPILER AND ${BAOBZI_BUILD_FORTRAN})
   list(APPEND BAOBZI_BINDING_SOURCES src/baobzi.f90)
+  install(FILES ${PROJECT_SOURCE_DIR}/src/baobzi.f90
+    ${CMAKE_CURRENT_BINARY_DIR}/baobzi.mod
+    DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/fortran)
 endif()
 
-if (BAOBZI_BUILD_SHARED)
+if (${BAOBZI_BUILD_SHARED})
   add_library(baobzi SHARED ${BAOBZI_BINDING_SOURCES})
   target_include_directories(baobzi PUBLIC ${BAOBZI_INCLUDES})
   target_link_libraries(baobzi PRIVATE baobzi_generic baobzi_avx baobzi_avx2 baobzi_avx512)
   list(APPEND INSTALL_TARGETS baobzi)
 endif()
 
-if (BAOBZI_BUILD_STATIC)
+if (${BAOBZI_BUILD_STATIC})
   add_library(baobzi_static STATIC ${BAOBZI_BINDING_SOURCES})
   target_link_libraries(baobzi_static PRIVATE baobzi_generic baobzi_avx baobzi_avx2 baobzi_avx512)
   set_target_properties(baobzi_static PROPERTIES OUTPUT_NAME baobzi)
@@ -87,7 +93,7 @@ if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
   target_link_libraries(baobzi_timing_c PUBLIC baobzi OpenMP::OpenMP_CXX m)
 endif()
 
-if (BAOBZI_BUILD_TESTS)
+if (${BAOBZI_BUILD_TESTS})
   if (NOT OpenMP_FOUND)
     find_package(OpenMP REQUIRED)
   endif()
@@ -102,7 +108,7 @@ if (BAOBZI_BUILD_TESTS)
   catch_discover_tests(test_c)
 endif()
 
-if (BAOBZI_BUILD_MATLAB)
+if (${BAOBZI_BUILD_MATLAB})
   find_package(Matlab REQUIRED)
   matlab_add_mex(NAME baobzi_mex SRC src/matlab/baobzi_mex.cpp LINK_TO baobzi)
   target_include_directories(baobzi_mex PUBLIC ${BAOBZI_INCLUDES})
@@ -111,18 +117,15 @@ if (BAOBZI_BUILD_MATLAB)
   install(TARGETS baobzi_mex DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/matlab)
 endif()
 
-include(GNUInstallDirs)
+
 install(TARGETS ${INSTALL_TARGETS})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 install(FILES ${PROJECT_SOURCE_DIR}/src/julia/baobzi.jl
   DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/julia)
-if (NOT BOABZI_PIP_INSTALL)
+if (NOT ${BOABZI_PIP_INSTALL})
   install(FILES ${PROJECT_SOURCE_DIR}/src/python/__init__.py
     RENAME baobzi.py
     DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/python)
 endif()
-install(FILES ${PROJECT_SOURCE_DIR}/src/baobzi.f90
-  ${CMAKE_CURRENT_BINARY_DIR}/baobzi.mod
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/fortran)
