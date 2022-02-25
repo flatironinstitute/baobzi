@@ -27,7 +27,6 @@ option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
 option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
 option(BAOBZI_BUILD_FORTRAN "Build Fortran bindings" OFF)
-option(BAOBZI_PIP_INSTALL "Don't install python bindings to shared" OFF)
 
 file(GLOB LIB_SOURCES_GENERIC "src/*0.cpp")
 add_library(baobzi_generic OBJECT ${LIB_SOURCES_GENERIC})
@@ -124,7 +123,7 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 
 install(FILES ${PROJECT_SOURCE_DIR}/src/julia/baobzi.jl
   DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/julia)
-if (NOT ${BOABZI_PIP_INSTALL})
+if (NOT DEFINED SKBUILD)
   install(FILES ${PROJECT_SOURCE_DIR}/src/python/__init__.py
     RENAME baobzi.py
     DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/python)
