@@ -66,12 +66,12 @@ and 3M evals/s on a simple 3D example.
 ```bash
 # At FI -- module load gcc cmake matlab
 export BAOBZI_ROOT=$HOME/local/baobzi
-git clone --recursive https://github.com/blackwer/baobzi.git
+git clone --recursive https://github.com/flatironinstitute/baobzi.git
 cd baobzi
 mkdir build
 cd build
 # Don't supply -march!!! Builds with CPU dispatch
-cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=$BAOBZI_ROOT ..
+cmake -DBAOBZI_BUILD_MATLAB=True -DCMAKE_INSTALL_PREFIX=$BAOBZI_ROOT ..
 make -j $((2*$(nproc)))
 make install
 ```
