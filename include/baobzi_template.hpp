@@ -285,7 +285,7 @@ class Node {
     inline std::size_t memory_usage() const { return sizeof(*this); }
 
     /// @brief MSGPACK serialization magic
-    MSGPACK_DEFINE(box_, first_child_idx);
+    MSGPACK_DEFINE(box_, first_child_idx, coeff_offset);
 };
 
 /// @brief Represent a function in some domain as a tree of chebyshev nodes
