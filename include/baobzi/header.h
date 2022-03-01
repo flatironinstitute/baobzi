@@ -12,6 +12,7 @@ typedef struct {
     int order;
     double tol;
     double minimum_leaf_fraction;
+    int split_multi_eval;
 } baobzi_input_t;
 
 #ifdef __cplusplus

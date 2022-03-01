@@ -463,6 +463,8 @@ class Function {
 
     std::vector<double> coeffs_; ///< Flat vector of all chebyshev coefficients from all leaf nodes
 
+    bool split_multi_eval_ = true; ///< Split node-search and evaluation when evaluating multiple points
+
     /// Structure containing info about self creation :D
     struct {
         uint16_t base_depth = 0;   ///< depth of subtrees
@@ -552,7 +554,7 @@ class Function {
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
     Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp)
-        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol) {
+        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), split_multi_eval_(input->split_multi_eval) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
 
@@ -746,14 +748,18 @@ class Function {
     /// @param[out] res [n_trg] array of results
     /// @param[in] n_trg number of points to evaluate
     inline void eval(const double *xp, double *res, int n_trg) const {
-        std::vector<std::pair<node_t *, VecDimD>> node_map(n_trg);
-        for (int i = 0; i < n_trg; ++i) {
-            VecDimD xi = VecDimD(xp + DIM * i);
-            node_map[i] = std::make_pair(node_pointers_[get_global_node_index(xi)], xi);
-        }
+        if (split_multi_eval_) {
+            std::vector<std::pair<node_t *, VecDimD>> node_map(n_trg);
+            for (int i = 0; i < n_trg; ++i) {
+                VecDimD xi = VecDimD(xp + DIM * i);
+                node_map[i] = std::make_pair(node_pointers_[get_global_node_index(xi)], xi);
+            }
 
-        for (int i_trg = 0; i_trg < n_trg; i_trg++)
-            res[i_trg] = node_map[i_trg].first->eval(node_map[i_trg].second, coeffs_.data());
+            for (int i_trg = 0; i_trg < n_trg; i_trg++)
+                res[i_trg] = node_map[i_trg].first->eval(node_map[i_trg].second, coeffs_.data());
+        } else
+            for (int i_trg = 0; i_trg < n_trg; i_trg++)
+                res[i_trg] = eval(VecDimD(xp + DIM * i_trg));
     }
 
     /// @brief eval function approximation at point

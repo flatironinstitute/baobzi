@@ -119,6 +119,7 @@ int main(int argc, char *argv[]) {
         input.func = testfun_1d;
         input.data = &scale_factor;
         input.minimum_leaf_fraction = 1.0;
+        input.split_multi_eval = 0;
 
         double hl[] = {1.0};
         double center[] = {2.0};
@@ -136,6 +137,7 @@ int main(int argc, char *argv[]) {
         input.tol = 1E-10; // Maximum relative error target
         input.data = &scale_factor;
         input.minimum_leaf_fraction = 0.0;
+        input.split_multi_eval = 1;
 
         const double hl[2] = {1.0, 1.0};                     // half the length of the domain in each dimension
         const double center[2] = {hl[0] + 0.5, hl[1] + 2.0}; // center of the domain
@@ -151,6 +153,7 @@ int main(int argc, char *argv[]) {
         input.tol = 1E-12;
         input.func = testfun_3d;
         input.minimum_leaf_fraction = 0.0;
+        input.split_multi_eval = 1;
 
         double hl[3] = {1.0, 1.0, 1.0};
         double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};

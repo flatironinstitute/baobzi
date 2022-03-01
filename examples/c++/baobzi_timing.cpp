@@ -93,12 +93,13 @@ int main(int argc, char *argv[]) {
         input.tol = 1E-10;
         input.func = testfun_1d;
         input.minimum_leaf_fraction = 1.0;
+        input.split_multi_eval = 0;
 
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
 
         std::cout << "Testing on 1D function...\n";
-        baobzi::Function<1, 8> func_approx_1d(&input, &center, &hl);
+        baobzi::Function<1, 6> func_approx_1d(&input, &center, &hl);
         func_approx_1d.print_stats();
 
         time_function<2>(func_approx_1d, x_transformed, n_runs);
@@ -118,6 +119,7 @@ int main(int argc, char *argv[]) {
         input.tol = 1E-10;
         input.func = testfun_2d;
         input.minimum_leaf_fraction = 0.0;
+        input.split_multi_eval = 1;
 
         for (int i = 0; i < 2 * n_points; i += 2)
             for (int j = 0; j < 2; ++j)

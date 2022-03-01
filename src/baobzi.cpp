@@ -18,7 +18,7 @@
 #include <sys/stat.h>
 
 const baobzi_input_t baobzi_input_default = {
-    .func = NULL, .data = NULL, .dim = 0, .order = 0, .tol = 0.0, .minimum_leaf_fraction = 0.0};
+    .func = NULL, .data = NULL, .dim = 0, .order = 0, .tol = 0.0, .minimum_leaf_fraction = 0.0, .split_multi_eval = 1};
 
 /// @brief mmap a file
 struct mmap_wrapper {
