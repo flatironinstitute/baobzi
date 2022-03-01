@@ -788,7 +788,7 @@ class Function {
     }
 
     /// @brief msgpack serialization magic
-    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, coeffs_);
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, coeffs_, split_multi_eval_);
 };
 
 template <int DIM, int ORDER, int ISET>

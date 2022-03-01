@@ -9,6 +9,7 @@ module baobzi
     integer(c_int) :: order = 0
     real(c_double) :: tol = 0
     real(c_double) :: minimum_leaf_fraction = 0
+    integer(c_int) :: split_multi_eval = 0
   end type baobzi_input_t
 
   interface

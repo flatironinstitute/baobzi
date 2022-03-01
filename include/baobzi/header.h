@@ -1,7 +1,7 @@
 #ifndef BAOBZI_HEADER_H
 #define BAOBZI_HEADER_H
 
-#define BAOBZI_HEADER_VERSION 3
+#define BAOBZI_HEADER_VERSION 4
 
 typedef double (*baobzi_input_func_t)(const double *, const void *);
 
