@@ -20,8 +20,6 @@
 const baobzi_input_t baobzi_input_default = {
     .func = NULL, .data = NULL, .dim = 0, .order = 0, .tol = 0.0, .minimum_leaf_fraction = 0.0};
 
-enum ISET { GENERIC, AVX, AVX2, AVX512 };
-
 /// @brief mmap a file
 struct mmap_wrapper {
     char *addr;         ///< Underlying buffer
@@ -51,7 +49,10 @@ struct mmap_wrapper {
 };
 
 extern "C" {
+
 int get_iset() {
+    enum ISET { GENERIC, AVX, AVX2, AVX512 };
+
     int iset = ISET::GENERIC;
     if (__builtin_cpu_supports("avx"))
         iset = ISET::AVX;
@@ -60,6 +61,7 @@ int get_iset() {
     if (__builtin_cpu_supports("avx512f"))
         iset = ISET::AVX512;
 
+#ifdef __x86_64__
     const char *iset_str_const = getenv("BAOBZI_ARCH");
     if (iset_str_const) {
         std::string iset_str(iset_str_const);
@@ -77,6 +79,7 @@ int get_iset() {
         else
             std::cout << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
     }
+#endif
 
     return iset;
 }
