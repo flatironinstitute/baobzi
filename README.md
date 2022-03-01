@@ -107,6 +107,19 @@ worth playing with for your specific function.
   tree is entirely filled with leaves. This tree is perfectly balanced, and therefore exactly a
   uniform grid. Anything between will vary between these two extremes. This parameter can
   EXTREMELY impact performance, especially on 1D trees.
+* `split_multi_eval`: When evaluating a vector of points, `baobzi` can currently use one of two
+  strategies which can dramatically impact performance, depending on the tree and computer. The
+  default is to split the evaluation of the points into two stages, one where the boxes are
+  calculated in one pass, and then the points are evaluated with them in a second. This tends
+  to help when there are a large number of nodes, as it increases the chance of a cache hit by
+  not ever loading in extra evaluation data. However it requires making a temporary data
+  structure to hold this, which costs time/memory.
+
+  The second is to just brute force evaluate the points as they appear in the target
+  order. This typically works very well in 1D, for small trees, but otherwise has poor performance.
+
+  Setting this parameter to 1 uses the typically faster 'split' model, while setting it to 0
+  will use the direct model.
 
 ## Running with...
 All examples require your project know where the `baobzi` shared object is located. In the
@@ -139,7 +152,8 @@ int main(int argc, char *argv[]) {
         .dim = 2,
         .order = 6,
         .tol = 1E-10,
-        .minimum_leaf_fraction = 0.0
+        .minimum_leaf_fraction = 0.0,
+        .split_multi_eval = 0
     };
 
     const double hl[2] = {1.0, 1.0};
@@ -179,7 +193,8 @@ int main(int argc, char *argv[]) {
         .dim = 2,
         .order = 6,
         .tol = 1E-10,
-        .minimum_leaf_fraction = 0.0
+        .minimum_leaf_fraction = 0.0,
+        .split_multi_eval = 0
     };
 
     const double hl[2] = {1.0, 1.0};
@@ -215,9 +230,10 @@ center = [0.0, 0.0]
 hl = [1.0, 1.0]
 point = [0.25, 0.25]
 tol = 1E-8
-minimum_leaf_fraction=0.0
+minimum_leaf_fraction = 0.0 # optional/default
+split_multi_eval = 1 # optional/default
 
-test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8, minimum_leaf_fraction)
+test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8, minimum_leaf_fraction, split_multi_eval)
 test.save('test.baobzi')
 print(test(point))
 del test
@@ -249,10 +265,11 @@ test_point = [0.25, 0.25]
 dim = 2
 order = 6
 tol = 1E-8
-minimum_leaf_fraction = 0.0
+minimum_leaf_fraction = 0.0 # optional/default
+split_multi_eval = 1 # optional/default
 output_file = "simple2d.baobzi"
 
-func_approx = baobzi.init(testfunc, dim, order, center, hl, tol, minimum_leaf_fraction)
+func_approx = baobzi.init(testfunc, dim, order, center, hl, tol, minimum_leaf_fraction, split_multi_eval)
 println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
 
 baobzi.save(func_approx, output_file)
@@ -315,6 +332,7 @@ program main
   input%order = 6
   input%tol = 1E-8
   input%minimum_leaf_fraction = 0.0
+  input%split_multi_eval = 0
 
   center(:) = 0.0
   half_length(:) = 1.0
