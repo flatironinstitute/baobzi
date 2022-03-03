@@ -469,7 +469,7 @@ class Function {
 
     /// @brief Calculate memory_usage of this object in bytes
     /// @returns Memory usage of baobzi object in bytes
-    std::size_t memory_usage() {
+    std::size_t memory_usage() const {
         std::size_t mem = sizeof(*this);
         mem += subtree_node_offsets_.capacity() * sizeof(subtree_node_offsets_[0]);
         mem += node_pointers_.capacity() * sizeof(node_pointers_[0]);
@@ -480,7 +480,7 @@ class Function {
     }
 
     /// @brief Calculate and print various information about object instance to stdout
-    void print_stats() {
+    void print_stats() const {
         std::size_t n_nodes = 0;
         std::size_t n_leaves = 0;
         std::size_t n_subtrees = subtrees_.size();
@@ -771,7 +771,7 @@ class Function {
 
     /// @brief save function approximation to file
     /// @param[in] filename path to save file at
-    void save(const char *filename) {
+    void save(const char *filename) const {
         std::ofstream ofs(filename, std::ofstream::binary | std::ofstream::out);
         baobzi_header_t params{Dim, Order, BAOBZI_HEADER_VERSION};
         msgpack::pack(ofs, params);
