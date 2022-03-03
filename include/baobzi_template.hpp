@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <mutex>
+#include <numeric>
 #include <queue>
 #include <vector>
 
@@ -664,16 +665,15 @@ class Function {
         for (int i = 1; i < subtree_node_offsets_.size(); ++i)
             subtree_node_offsets_[i] = subtree_node_offsets_[i - 1] + subtrees_[i - 1].size();
 
-        std::size_t n_nodes_tot = 0;
-        for (const auto &subtree : subtrees_)
-            n_nodes_tot += subtree.size();
+        auto n_nodes_tot = std::accumulate(subtrees_.begin(), subtrees_.end(), (std::size_t)0,
+                                           [](size_t prior, auto &subtree) { return prior + subtree.size(); });
+
         node_pointers_.resize(n_nodes_tot);
 
         int i = 0;
-        for (auto &subtree : subtrees_) {
+        for (auto &subtree : subtrees_)
             for (node_t &node : subtree.nodes_)
                 node_pointers_[i++] = &node;
-        }
     }
 
     /// @brief default constructor for msgpack magic
