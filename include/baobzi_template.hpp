@@ -326,20 +326,14 @@ struct FunctionTree {
                 q.pop();
 
                 nodes_.push_back(node_t(box));
-            }
 
-            for (size_t i = 0; i < n_next; ++i) {
                 auto &node = nodes_[i + node_index];
                 std::vector new_coeffs = node.fit(input);
+
                 if (node.is_leaf()) {
                     node.coeff_offset = coeffs.size();
                     coeffs.insert(std::end(coeffs), std::begin(new_coeffs), std::end(new_coeffs));
-                }
-            }
-
-            for (int i = 0; i < n_next; ++i) {
-                auto &node = nodes_[i + node_index];
-                if (!node.is_leaf()) {
+                } else if (!node.is_leaf()) {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
 
@@ -578,18 +572,6 @@ class Function {
         while (!q.empty()) {
             int n_next = q.size();
 
-            std::vector<node_t> nodes;
-            for (int i = 0; i < n_next; ++i) {
-                box_t box = q.front();
-                q.pop();
-
-                nodes.emplace_back(node_t(box));
-            }
-
-            for (int i = 0; i < nodes.size(); ++i)
-                nodes[i].fit(input);
-            stats_.n_evals_root += nodes.size() * (int)std::pow(ORDER, DIM);
-
             auto add_node_children_to_queue = [](std::queue<box_t> &theq, const VecDimD &center,
                                                  const VecDimD &half_width) {
                 for (unsigned child = 0; child < NChild; ++child) {
@@ -606,8 +588,16 @@ class Function {
                 }
             };
 
+            std::vector<node_t> nodes;
             double leaf_fraction = 0.0;
-            for (auto &node : nodes) {
+            for (int i = 0; i < n_next; ++i) {
+                box_t box = q.front();
+                q.pop();
+
+                nodes.emplace_back(node_t(box));
+                auto &node = nodes.back();
+                node.fit(input);
+
                 if (!node.is_leaf()) {
                     add_node_children_to_queue(q, node.box_.center, half_width);
                 } else {
@@ -615,6 +605,7 @@ class Function {
                     add_node_children_to_queue(maybe_q, node.box_.center, half_width);
                 }
             }
+            stats_.n_evals_root += nodes.size() * std::pow(ORDER, DIM);
 
             leaf_fraction /= nodes.size();
             if (leaf_fraction < input->minimum_leaf_fraction) {
