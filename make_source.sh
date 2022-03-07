@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 mkdir -p include/baobzi
 
@@ -8,9 +8,9 @@ declfile=include/baobzi/baobzi_decls.h
 
 rm -f $casefile $declfile $casefile_restore
 
-dims=({1..3})
-isets=({0..3})
-orders=({6..16..2})
+dims=$(seq 1 3)
+isets=$(seq 0 3)
+orders=$(seq 6 2 16)
 
 for iset in ${isets[@]}; do
     srcfile=src/baobzi_${iset}.cpp
@@ -18,7 +18,12 @@ for iset in ${isets[@]}; do
     printf '#include "baobzi_template.hpp"\n' > $srcfile
     printf '#include "baobzi.h"\n' >> $srcfile
     printf '#include "baobzi/macros.h"\n\n' >> $srcfile
-    printf "namespace baobzi {\n" >> $srcfile
+    printf 'namespace baobzi {\n' >> $srcfile
+
+    if (( $iset > 0 )); then
+        printf '#ifdef BAOBZI_CPU_DISPATCH\n' >> $casefile_restore
+        printf '#ifdef BAOBZI_CPU_DISPATCH\n' >> $casefile
+    fi
 
     for dim in ${dims[@]}; do
         for order in ${orders[@]}; do
@@ -41,4 +46,9 @@ for iset in ${isets[@]}; do
         done
     done
     printf '}\n' >> $srcfile
+
+    if (( $iset > 0 )); then
+        printf '#endif\n' >> $casefile_restore
+        printf '#endif\n' >> $casefile
+    fi
 done

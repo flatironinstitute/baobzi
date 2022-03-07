@@ -54,12 +54,14 @@ int get_iset() {
     enum ISET { GENERIC, AVX, AVX2, AVX512 };
 
     int iset = ISET::GENERIC;
+#ifndef __APPLE__
     if (__builtin_cpu_supports("avx"))
         iset = ISET::AVX;
     if (__builtin_cpu_supports("avx2"))
         iset = ISET::AVX2;
     if (__builtin_cpu_supports("avx512f"))
         iset = ISET::AVX512;
+#endif
 
 #ifdef __x86_64__
     const char *iset_str_const = getenv("BAOBZI_ARCH");
