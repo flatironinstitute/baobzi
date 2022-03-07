@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 project(
   baobzi
   LANGUAGES C CXX)
+enable_language(Fortran OPTIONAL)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -23,14 +24,8 @@ option(BAOBZI_BUILD_SHARED "Build the shared library" ON)
 option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
 option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
-option(BAOBZI_BUILD_FORTRAN "Build FORTRAN bindings" OFF)
 option(BAOBZI_CPU_DISPATCH "Use CPU dispatch for generic binary" ON)
 
-# OpenMP detection (seemingly erroneously) checks if enable_language was called, even if it's
-# optional. If no fortran compiler was found, openmp gets angry.
-if (BAOBZI_BUILD_FORTRAN)
-  enable_language(Fortran OPTIONAL)
-endif()
 
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm64")
   set(BAOBZI_CPU_DISPATCH OFF)
@@ -40,16 +35,19 @@ if (BAOBZI_CPU_DISPATCH)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBAOBZI_CPU_DISPATCH")
 endif()
 
+if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm64" AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
+  set(NATIVE_ARCH_FLAG -mcpu=apple-m1)
+else()
+  set(NATIVE_ARCH_FLAG -march=native)
+endif()
+
+
 file(GLOB LIB_SOURCES_GENERIC "src/*0.cpp")
 add_library(baobzi_generic OBJECT ${LIB_SOURCES_GENERIC})
 target_include_directories(baobzi_generic PUBLIC ${BAOBZI_INCLUDES})
 target_compile_options(baobzi_generic PRIVATE)
 if (NOT BAOBZI_CPU_DISPATCH)
-  if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm64" AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
-    target_compile_options(baobzi_generic PRIVATE -mcpu=apple-m1)
-  else()
-    target_compile_options(baobzi_generic PRIVATE -march=native)
-  endif()
+  target_compile_options(baobzi_generic PRIVATE ${NATIVE_ARCH_FLAG})
 endif()
 
 set_property(TARGET baobzi_generic PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -105,20 +103,16 @@ if (BAOBZI_BUILD_STATIC)
 endif()
 
 if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
-  if (NOT OpenMP_FOUND)
-    find_package(OpenMP REQUIRED)
-  endif()
-
   set(EXAMPLE_SOURCE_CPP "examples/c++/baobzi_timing.cpp")
   add_executable(baobzi_timing_cpp ${EXAMPLE_SOURCE_CPP})
   target_include_directories(baobzi_timing_cpp PUBLIC ${BAOBZI_INCLUDES})
-  target_link_libraries(baobzi_timing_cpp PUBLIC OpenMP::OpenMP_CXX)
-  target_compile_options(baobzi_timing_cpp PUBLIC -march=native)
+  target_link_libraries(baobzi_timing_cpp PUBLIC)
+  target_compile_options(baobzi_timing_cpp PUBLIC ${NATIVE_ARCH_FLAG})
 
   set(EXAMPLE_SOURCE_C "examples/C/baobzi_timing.c")
   add_executable(baobzi_timing_c ${EXAMPLE_SOURCE_C})
   target_include_directories(baobzi_timing_c PUBLIC ${BAOBZI_INCLUDES})
-  target_link_libraries(baobzi_timing_c PUBLIC baobzi OpenMP::OpenMP_CXX m)
+  target_link_libraries(baobzi_timing_c PUBLIC baobzi ${NATIVE_ARCH_FLAG} m)
 endif()
 
 if (BAOBZI_BUILD_TESTS)

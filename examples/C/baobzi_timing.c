@@ -1,10 +1,20 @@
 #include <baobzi.h>
 
 #include <math.h>
-#include <omp.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+
+struct timespec get_wtime() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts;
+}
+
+double get_wtime_diff(const struct timespec *ts, const struct timespec *tf) {
+    return (tf->tv_sec - ts->tv_sec) + (tf->tv_nsec - ts->tv_nsec) * 1E-9;
+}
 
 double testfun_1d(const double *x, const void *data) {
     const double scale_factor = *(double *)data;
@@ -25,11 +35,12 @@ void time_function(const baobzi_t function, const double *x, int size, int n_run
     const int ntrg = size / function->DIM;
     double *res = (double *)malloc(sizeof(double) * ntrg);
 
-    const double time = omp_get_wtime();
+    const struct timespec st = get_wtime();
     for (int i_run = 0; i_run < n_runs; ++i_run) {
         baobzi_eval_multi(function, x, res, ntrg);
     }
-    const double dt = omp_get_wtime() - time;
+    const struct timespec ft = get_wtime();
+    const double dt = get_wtime_diff(&st, &ft);
     const long n_eval = n_runs * ntrg;
     printf("Elapsed time: %g\nMevals/s: %g\n", dt, n_eval / (dt * 1E6));
     free(res);
