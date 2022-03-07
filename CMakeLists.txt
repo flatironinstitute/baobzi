@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.5)
 project(
   baobzi
   LANGUAGES C CXX)
-enable_language(Fortran OPTIONAL)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -24,6 +23,13 @@ option(BAOBZI_BUILD_SHARED "Build the shared library" ON)
 option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
 option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
+option(BAOBZI_BUILD_FORTRAN "Build FORTRAN bindings" OFF)
+
+# OpenMP detection (seemingly erroneously) checks if enable_language was called, even if it's
+# optional. If no fortran compiler was found, openmp gets angry.
+if (BAOBZI_BUILD_FORTRAN)
+  enable_language(Fortran OPTIONAL)
+endif()
 
 file(GLOB LIB_SOURCES_GENERIC "src/*0.cpp")
 add_library(baobzi_generic OBJECT ${LIB_SOURCES_GENERIC})
@@ -87,13 +93,10 @@ if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
 endif()
 
 if (BAOBZI_BUILD_TESTS)
-  if (NOT OpenMP_FOUND)
-    find_package(OpenMP REQUIRED)
-  endif()
   add_subdirectory(extern/catch2)
 
   add_executable(test_c tests/test_c.cpp)
-  target_link_libraries(test_c PUBLIC Catch2::Catch2WithMain baobzi OpenMP::OpenMP_CXX)
+  target_link_libraries(test_c PUBLIC Catch2::Catch2WithMain baobzi)
 
   list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
   include(CTest)
