@@ -2,8 +2,18 @@
 
 #include <fstream>
 #include <iostream>
-#include <omp.h>
+#include <time.h>
 #include <random>
+
+struct timespec get_wtime() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts;
+}
+
+double get_wtime_diff(const struct timespec *ts, const struct timespec *tf) {
+    return (tf->tv_sec - ts->tv_sec) + (tf->tv_nsec - ts->tv_nsec) * 1E-9;
+}
 
 double testfun_1d(const double *x, const void *data) {
     const double scale_factor = *(double *)data;
@@ -24,11 +34,12 @@ template <int DIM, typename Function>
 std::vector<double> time_function(const Function &function, const std::vector<double> &x, int n_runs) {
     const size_t n_points = x.size() / DIM;
     std::vector<double> res(n_points);
-    const double time = omp_get_wtime();
+    const auto st = get_wtime();
     for (int i_run = 0; i_run < n_runs; ++i_run)
         function(x.data(), res.data(), n_points);
+    const auto ft = get_wtime();
 
-    const double dt = omp_get_wtime() - time;
+    const double dt = get_wtime_diff(&st, &ft);
     const long n_eval = n_runs * n_points;
     std::cout << "Elapsed time (s): " << dt << std::endl;
     std::cout << "Mevals/s: " << n_eval / (dt * 1E6) << std::endl;
