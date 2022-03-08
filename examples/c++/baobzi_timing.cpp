@@ -2,8 +2,18 @@
 
 #include <fstream>
 #include <iostream>
-#include <omp.h>
+#include <time.h>
 #include <random>
+
+struct timespec get_wtime() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts;
+}
+
+double get_wtime_diff(const struct timespec *ts, const struct timespec *tf) {
+    return (tf->tv_sec - ts->tv_sec) + (tf->tv_nsec - ts->tv_nsec) * 1E-9;
+}
 
 double testfun_1d(const double *x, const void *data) {
     const double scale_factor = *(double *)data;
@@ -24,11 +34,12 @@ template <int DIM, typename Function>
 std::vector<double> time_function(const Function &function, const std::vector<double> &x, int n_runs) {
     const size_t n_points = x.size() / DIM;
     std::vector<double> res(n_points);
-    const double time = omp_get_wtime();
+    const auto st = get_wtime();
     for (int i_run = 0; i_run < n_runs; ++i_run)
         function(x.data(), res.data(), n_points);
+    const auto ft = get_wtime();
 
-    const double dt = omp_get_wtime() - time;
+    const double dt = get_wtime_diff(&st, &ft);
     const long n_eval = n_runs * n_points;
     std::cout << "Elapsed time (s): " << dt << std::endl;
     std::cout << "Mevals/s: " << n_eval / (dt * 1E6) << std::endl;
@@ -93,12 +104,13 @@ int main(int argc, char *argv[]) {
         input.tol = 1E-10;
         input.func = testfun_1d;
         input.minimum_leaf_fraction = 1.0;
+        input.split_multi_eval = 0;
 
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
 
         std::cout << "Testing on 1D function...\n";
-        baobzi::Function<1, 8> func_approx_1d(&input, &center, &hl);
+        baobzi::Function<1, 6> func_approx_1d(&input, &center, &hl);
         func_approx_1d.print_stats();
 
         time_function<2>(func_approx_1d, x_transformed, n_runs);
@@ -118,6 +130,7 @@ int main(int argc, char *argv[]) {
         input.tol = 1E-10;
         input.func = testfun_2d;
         input.minimum_leaf_fraction = 0.0;
+        input.split_multi_eval = 1;
 
         for (int i = 0; i < 2 * n_points; i += 2)
             for (int j = 0; j < 2; ++j)

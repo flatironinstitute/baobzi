@@ -4,9 +4,10 @@ center = [0.0, 1.0];
 hl = [3.0, 0.99999];
 tol = 1E-10;
 minimum_leaf_fraction = 0.0;
+split_multi_eval = 1;
 
-hreal = baobzi('new', 'hankelreal', dim, order, center, hl, tol, minimum_leaf_fraction);
-himag = baobzi('new', 'hankelimag', dim, order, center, hl, tol, minimum_leaf_fraction);
+hreal = baobzi('new', 'hankelreal', dim, order, center, hl, tol, minimum_leaf_fraction, split_multi_eval);
+himag = baobzi('new', 'hankelimag', dim, order, center, hl, tol, minimum_leaf_fraction, split_multi_eval);
 
 % Get a interweaving array to evaluate on the grid
 x = (center(1) - hl(1)):0.001:(center(1) + hl(1)); x(end) = [];

@@ -18,9 +18,7 @@
 #include <sys/stat.h>
 
 const baobzi_input_t baobzi_input_default = {
-    .func = NULL, .data = NULL, .dim = 0, .order = 0, .tol = 0.0, .minimum_leaf_fraction = 0.0};
-
-enum ISET { GENERIC, AVX, AVX2, AVX512 };
+    .func = NULL, .data = NULL, .dim = 0, .order = 0, .tol = 0.0, .minimum_leaf_fraction = 0.0, .split_multi_eval = 1};
 
 /// @brief mmap a file
 struct mmap_wrapper {
@@ -51,8 +49,12 @@ struct mmap_wrapper {
 };
 
 extern "C" {
+
 int get_iset() {
+    enum ISET { GENERIC, AVX, AVX2, AVX512 };
+
     int iset = ISET::GENERIC;
+#ifdef __x86_64__
     if (__builtin_cpu_supports("avx"))
         iset = ISET::AVX;
     if (__builtin_cpu_supports("avx2"))
@@ -77,6 +79,7 @@ int get_iset() {
         else
             std::cout << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
     }
+#endif
 
     return iset;
 }

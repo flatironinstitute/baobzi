@@ -10,12 +10,13 @@ mutable struct baobzi_input_t
     order::Cint
     tol::Cdouble
     minimum_leaf_fraction::Cdouble
+    split_multi_eval::Cint
 end
 
-function init(fin, dim, order, center, half_length, tol, minimum_leaf_fraction=0.0)
+function init(fin, dim, order, center, half_length, tol, minimum_leaf_fraction=0.0, split_multi_eval=1)
     fanon = (x, p) -> fin(x)
     fbind = @cfunction($fanon, Cdouble, (Ptr{Cdouble}, Ptr{Cvoid},))
-    input = baobzi_input_t(fbind.ptr, C_NULL, dim, order, tol, minimum_leaf_fraction)
+    input = baobzi_input_t(fbind.ptr, C_NULL, dim, order, tol, minimum_leaf_fraction, split_multi_eval)
 
     output_ptr = ccall(
         (:baobzi_init, :libbaobzi),

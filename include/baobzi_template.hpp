@@ -8,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <mutex>
+#include <numeric>
 #include <queue>
 #include <vector>
 
@@ -325,20 +326,14 @@ struct FunctionTree {
                 q.pop();
 
                 nodes_.push_back(node_t(box));
-            }
 
-            for (size_t i = 0; i < n_next; ++i) {
                 auto &node = nodes_[i + node_index];
                 std::vector new_coeffs = node.fit(input);
+
                 if (node.is_leaf()) {
                     node.coeff_offset = coeffs.size();
                     coeffs.insert(std::end(coeffs), std::begin(new_coeffs), std::end(new_coeffs));
-                }
-            }
-
-            for (int i = 0; i < n_next; ++i) {
-                auto &node = nodes_[i + node_index];
-                if (!node.is_leaf()) {
+                } else if (!node.is_leaf()) {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
 
@@ -463,6 +458,8 @@ class Function {
 
     std::vector<double> coeffs_; ///< Flat vector of all chebyshev coefficients from all leaf nodes
 
+    bool split_multi_eval_ = true; ///< Split node-search and evaluation when evaluating multiple points
+
     /// Structure containing info about self creation :D
     struct {
         uint16_t base_depth = 0;   ///< depth of subtrees
@@ -472,7 +469,7 @@ class Function {
 
     /// @brief Calculate memory_usage of this object in bytes
     /// @returns Memory usage of baobzi object in bytes
-    std::size_t memory_usage() {
+    std::size_t memory_usage() const {
         std::size_t mem = sizeof(*this);
         mem += subtree_node_offsets_.capacity() * sizeof(subtree_node_offsets_[0]);
         mem += node_pointers_.capacity() * sizeof(node_pointers_[0]);
@@ -483,7 +480,7 @@ class Function {
     }
 
     /// @brief Calculate and print various information about object instance to stdout
-    void print_stats() {
+    void print_stats() const {
         std::size_t n_nodes = 0;
         std::size_t n_leaves = 0;
         std::size_t n_subtrees = subtrees_.size();
@@ -552,7 +549,7 @@ class Function {
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
     Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp)
-        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol) {
+        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), split_multi_eval_(input->split_multi_eval) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
 
@@ -575,18 +572,6 @@ class Function {
         while (!q.empty()) {
             int n_next = q.size();
 
-            std::vector<node_t> nodes;
-            for (int i = 0; i < n_next; ++i) {
-                box_t box = q.front();
-                q.pop();
-
-                nodes.emplace_back(node_t(box));
-            }
-
-            for (int i = 0; i < nodes.size(); ++i)
-                nodes[i].fit(input);
-            stats_.n_evals_root += nodes.size() * (int)std::pow(ORDER, DIM);
-
             auto add_node_children_to_queue = [](std::queue<box_t> &theq, const VecDimD &center,
                                                  const VecDimD &half_width) {
                 for (unsigned child = 0; child < NChild; ++child) {
@@ -603,8 +588,16 @@ class Function {
                 }
             };
 
+            std::vector<node_t> nodes;
             double leaf_fraction = 0.0;
-            for (auto &node : nodes) {
+            for (int i = 0; i < n_next; ++i) {
+                box_t box = q.front();
+                q.pop();
+
+                nodes.emplace_back(node_t(box));
+                auto &node = nodes.back();
+                node.fit(input);
+
                 if (!node.is_leaf()) {
                     add_node_children_to_queue(q, node.box_.center, half_width);
                 } else {
@@ -612,6 +605,7 @@ class Function {
                     add_node_children_to_queue(maybe_q, node.box_.center, half_width);
                 }
             }
+            stats_.n_evals_root += nodes.size() * std::pow(ORDER, DIM);
 
             leaf_fraction /= nodes.size();
             if (leaf_fraction < input->minimum_leaf_fraction) {
@@ -662,16 +656,15 @@ class Function {
         for (int i = 1; i < subtree_node_offsets_.size(); ++i)
             subtree_node_offsets_[i] = subtree_node_offsets_[i - 1] + subtrees_[i - 1].size();
 
-        std::size_t n_nodes_tot = 0;
-        for (const auto &subtree : subtrees_)
-            n_nodes_tot += subtree.size();
+        auto n_nodes_tot = std::accumulate(subtrees_.begin(), subtrees_.end(), (std::size_t)0,
+                                           [](size_t prior, auto &subtree) { return prior + subtree.size(); });
+
         node_pointers_.resize(n_nodes_tot);
 
         int i = 0;
-        for (auto &subtree : subtrees_) {
+        for (auto &subtree : subtrees_)
             for (node_t &node : subtree.nodes_)
                 node_pointers_[i++] = &node;
-        }
     }
 
     /// @brief default constructor for msgpack magic
@@ -746,14 +739,18 @@ class Function {
     /// @param[out] res [n_trg] array of results
     /// @param[in] n_trg number of points to evaluate
     inline void eval(const double *xp, double *res, int n_trg) const {
-        std::vector<std::pair<node_t *, VecDimD>> node_map(n_trg);
-        for (int i = 0; i < n_trg; ++i) {
-            VecDimD xi = VecDimD(xp + DIM * i);
-            node_map[i] = std::make_pair(node_pointers_[get_global_node_index(xi)], xi);
-        }
+        if (split_multi_eval_) {
+            std::vector<std::pair<node_t *, VecDimD>> node_map(n_trg);
+            for (int i = 0; i < n_trg; ++i) {
+                VecDimD xi = VecDimD(xp + DIM * i);
+                node_map[i] = std::make_pair(node_pointers_[get_global_node_index(xi)], xi);
+            }
 
-        for (int i_trg = 0; i_trg < n_trg; i_trg++)
-            res[i_trg] = node_map[i_trg].first->eval(node_map[i_trg].second, coeffs_.data());
+            for (int i_trg = 0; i_trg < n_trg; i_trg++)
+                res[i_trg] = node_map[i_trg].first->eval(node_map[i_trg].second, coeffs_.data());
+        } else
+            for (int i_trg = 0; i_trg < n_trg; i_trg++)
+                res[i_trg] = eval(VecDimD(xp + DIM * i_trg));
     }
 
     /// @brief eval function approximation at point
@@ -774,7 +771,7 @@ class Function {
 
     /// @brief save function approximation to file
     /// @param[in] filename path to save file at
-    void save(const char *filename) {
+    void save(const char *filename) const {
         std::ofstream ofs(filename, std::ofstream::binary | std::ofstream::out);
         baobzi_header_t params{Dim, Order, BAOBZI_HEADER_VERSION};
         msgpack::pack(ofs, params);
@@ -782,7 +779,7 @@ class Function {
     }
 
     /// @brief msgpack serialization magic
-    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, coeffs_);
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, coeffs_, split_multi_eval_);
 };
 
 template <int DIM, int ORDER, int ISET>

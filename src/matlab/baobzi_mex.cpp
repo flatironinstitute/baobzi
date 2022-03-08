@@ -37,7 +37,7 @@ double matfun_wrapper(const double *x, const void *data_) {
 class baobzi {
   public:
     baobzi(const std::string &matfun, int dim, int order, const double *center, const double *half_length,
-           const double tol, const double minimum_leaf_fraction)
+           const double tol, const double minimum_leaf_fraction, const int split_multi_eval)
         : data_({matfun, dim, order}) {
 
         baobzi_input_t input = {
@@ -47,6 +47,7 @@ class baobzi {
             .order = order,
             .tol = tol,
             .minimum_leaf_fraction = minimum_leaf_fraction,
+            .split_multi_eval = split_multi_eval,
         };
 
         // to prevent matlab from segfaulting if your function doesn't exist, try to call it once
@@ -96,8 +97,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         // Check parameters
         if (nlhs != 1)
             mexErrMsgTxt("New: One output expected.");
-        if (nrhs != 8)
-            mexErrMsgTxt("New: Eight inputs expected.");
+        if (nrhs != 9)
+            mexErrMsgTxt("New: Nine inputs expected.");
 
         std::string baobzi_fit_fcn = to_string(prhs[1]);
 
@@ -107,9 +108,10 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         double *half_length = mxGetPr(prhs[5]);
         double tol = mxGetPr(prhs[6])[0];
         double minimum_leaf_fraction = mxGetPr(prhs[7])[0];
+        int split_multi_eval = mxGetPr(prhs[8])[0];
 
         // Return a handle to a new C++ instance
-        plhs[0] = convertPtr2Mat<baobzi>(new baobzi(baobzi_fit_fcn, dim, order, center, half_length, tol, minimum_leaf_fraction));
+        plhs[0] = convertPtr2Mat<baobzi>(new baobzi(baobzi_fit_fcn, dim, order, center, half_length, tol, minimum_leaf_fraction, split_multi_eval));
         return;
     }
 

@@ -27,9 +27,9 @@ class BAOBZI_STRUCT(Structure):
 
 
 class BAOBZI_INPUT_STRUCT(Structure):
-    _fields_ = (("func", INPUT_FUNC), ("data", c_void_p), ("dim", c_int),
-                ("order", c_int), ("tol", c_double), ("minimum_leaf_fraction", c_double),)
-
+    _fields_ = [("func", INPUT_FUNC), ("data", c_void_p), ("dim", c_int),
+                ("order", c_int), ("tol", c_double), ("minimum_leaf_fraction", c_double),
+                ("split_multi_eval", c_int),]
 
 baobzi_t = POINTER(BAOBZI_STRUCT)
 
