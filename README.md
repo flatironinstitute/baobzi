@@ -13,6 +13,7 @@ the box containing your point and evaluates using this approximant.
 * [Example use cases](#example-use-cases)
 * [Limitations](#limitations)
 * [Features](#features)
+* [Quick install](#quick-install)
 * [Building/testing](#building-testing)
 * [Input parameters](#input-parameters)
 * [Running with...](#running-with)
@@ -53,6 +54,29 @@ the box containing your point and evaluates using this approximant.
   optional static library supported for building C/C++ codes where you don't want to load in
   the shared `baobzi` object, but would rather throw it right in your binary. See [Including in
   your CMake project](#including-in-your-cmake-project).
+
+## Quick install
+### Python/Conda
+There are currently no wheels, which means `conda`/`pip` have to do source builds of `Baobzi` (though
+this should change hopefully soon). To do with standard `pip` install, first, make sure you have
+a modern `gcc`/`g++` in your path, and `cmake >= 3.10`.
+```bash
+# create a virtualenv, if you want
+python3 -m venv --system-site-packages myenv
+source myenv/bin/activate
+pip install git+https://github.com/flatironinstitute/baobzi.git
+
+python -c 'from baobzi import Baobzi'
+```
+
+If you use `conda`, you can install `gcc`, `g++`, and cmake via the `conda-forge` repo, and then use `pip` to install `baobzi`.
+```bash
+conda create -y -n baobzi -c conda-forge gcc gxx cmake numpy
+conda activate baobzi
+pip install git+https://github.com/flatironinstitute/baobzi.git
+
+python -c 'from baobzi import Baobzi'
+```
 
 ## Building/testing
 Baobzi's only dependencies are cmake >= 3.5, and a C/C++17 compiler (gcc only really,

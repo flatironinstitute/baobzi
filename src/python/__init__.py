@@ -1,21 +1,35 @@
 from ctypes import CDLL, CFUNCTYPE, POINTER, c_double, c_void_p, c_uint16, c_int, c_char_p, Structure, pointer
 import numpy as np
 
-libbaobzi = CDLL("libbaobzi.so")
+try:
+    libbaobzi = CDLL("libbaobzi.so")
+except OSError:
+    import os
+
+    libroot = os.path.sep.join(os.path.realpath(__file__).split(os.path.sep)[:-5])
+    lib = os.path.join(libroot, "lib", "libbaobzi.so")
+    lib64 = os.path.join(libroot, "lib64", "libbaobzi.so")
+    if os.path.exists(lib):
+        libbaobzi = CDLL(lib)
+    elif os.path.exists(lib64):
+        libbaobzi = CDLL(lib64)
+    else:
+        raise OSError("Unable to find 'libbaobzi.so'. Add path to its containing directory to your LD_LIBRARY_PATH variable.")
+
+
 INPUT_FUNC = CFUNCTYPE(c_double, POINTER(c_double))
 
 
 class BAOBZI_STRUCT(Structure):
-    _fields_ = [("obj", c_void_p), ("dim", c_int), ("order", c_int),
-                ("f_", INPUT_FUNC), ("eval", c_void_p), ("save", c_void_p),
-                ("free", c_void_p)]
+    _fields_ = (("obj", c_void_p), ("dim", c_int), ("order", c_int),
+                ("f_", INPUT_FUNC), ("eval", c_void_p), ("eval_multi", c_void_p),
+                ("stats", c_void_p), ("save", c_void_p), ("free", c_void_p),)
 
 
 class BAOBZI_INPUT_STRUCT(Structure):
     _fields_ = [("func", INPUT_FUNC), ("data", c_void_p), ("dim", c_int),
                 ("order", c_int), ("tol", c_double), ("minimum_leaf_fraction", c_double),
                 ("split_multi_eval", c_int),]
-
 
 baobzi_t = POINTER(BAOBZI_STRUCT)
 
