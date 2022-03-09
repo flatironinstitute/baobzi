@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.14)
 project(
   baobzi
   LANGUAGES C CXX
@@ -21,6 +21,31 @@ set(BAOBZI_INCLUDES
   ${PROJECT_SOURCE_DIR}/extern/eigen
   ${PROJECT_SOURCE_DIR}/extern/catch2/src
   )
+
+if (NOT EXISTS ${PROJECT_SOURCE_DIR}/extern/msgpack-c/README.md)
+  include(FetchContent)
+  FetchContent_Declare(
+    msgpack-c
+    URL https://github.com/msgpack/msgpack-c/archive/refs/tags/cpp-3.3.0.tar.gz
+    URL_HASH SHA256=754c3ace499a63e45b77ef4bcab4ee602c2c414f58403bce826b76ffc2f77d0b
+    )
+  FetchContent_Declare(
+    eigen
+    URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+    URL_HASH SHA256=8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72
+    )
+  FetchContent_Declare(
+    catch2
+    URL https://github.com/catchorg/Catch2/archive/refs/tags/v3.0.0-preview4.tar.gz
+    URL_HASH SHA256=2458d47d923b65ab611656cb7669d1810bcc4faa62e4c054a7405b1914cd4aee
+    )
+  FetchContent_Populate(msgpack-c)
+  list(APPEND BAOBZI_INCLUDES ${msgpack-c_SOURCE_DIR}/include)
+  FetchContent_Populate(eigen)
+  list(APPEND BAOBZI_INCLUDES ${eigen_SOURCE_DIR})
+
+  FetchContent_MakeAvailable(Catch2)
+endif()
 
 option(BAOBZI_BUILD_STATIC "Build the static library" OFF)
 option(BAOBZI_BUILD_SHARED "Build the shared library" ON)
@@ -122,12 +147,15 @@ if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
 endif()
 
 if (BAOBZI_BUILD_TESTS)
-  add_subdirectory(extern/catch2)
+  if (NOT catch2_POPULATED)
+    add_subdirectory(extern/catch2)
+  endif()
 
   add_executable(test_c tests/test_c.cpp)
   target_link_libraries(test_c PUBLIC Catch2::Catch2WithMain baobzi)
 
   list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
+  list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
   include(CTest)
   include(Catch)
   catch_discover_tests(test_c)
