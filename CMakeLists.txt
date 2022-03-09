@@ -34,17 +34,19 @@ if (NOT EXISTS ${PROJECT_SOURCE_DIR}/extern/msgpack-c/README.md)
     URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
     URL_HASH SHA256=8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72
     )
-  FetchContent_Declare(
-    catch2
-    URL https://github.com/catchorg/Catch2/archive/refs/tags/v3.0.0-preview4.tar.gz
-    URL_HASH SHA256=2458d47d923b65ab611656cb7669d1810bcc4faa62e4c054a7405b1914cd4aee
-    )
   FetchContent_Populate(msgpack-c)
   list(APPEND BAOBZI_INCLUDES ${msgpack-c_SOURCE_DIR}/include)
   FetchContent_Populate(eigen)
   list(APPEND BAOBZI_INCLUDES ${eigen_SOURCE_DIR})
 
-  FetchContent_MakeAvailable(Catch2)
+  if (BAOBZI_BUILD_TESTS)
+    FetchContent_Declare(
+      catch2
+      URL https://github.com/catchorg/Catch2/archive/refs/tags/v3.0.0-preview4.tar.gz
+      URL_HASH SHA256=2458d47d923b65ab611656cb7669d1810bcc4faa62e4c054a7405b1914cd4aee
+      )
+    FetchContent_MakeAvailable(Catch2)
+  endif()
 endif()
 
 option(BAOBZI_BUILD_STATIC "Build the static library" OFF)
