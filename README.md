@@ -59,7 +59,7 @@ the box containing your point and evaluates using this approximant.
 ### Python/Conda
 There are currently no wheels, which means `conda`/`pip` have to do source builds of `Baobzi` (though
 this should change hopefully soon). To do with standard `pip` install, first, make sure you have
-a modern `gcc`/`g++` in your path, and `cmake >= 3.10`.
+a modern `gcc`/`g++` in your path, and `cmake >= 3.14`.
 ```bash
 # create a virtualenv, if you want
 python3 -m venv --system-site-packages myenv
@@ -79,7 +79,7 @@ python -c 'from baobzi import Baobzi'
 ```
 
 ## Building/testing
-Baobzi's only dependencies are cmake >= 3.5, and a C/C++17 compiler (gcc only really,
+Baobzi's only dependencies are cmake >= 3.14, and a C/C++17 compiler (gcc only really,
 currently). I get the best performance out of g++-11 right now. While there is a header only
 library for C++, it can be quite finicky. Therefore, for optimal performance, I currently
 suggest using the C shared/static library interface with gcc rather than the C++ header
