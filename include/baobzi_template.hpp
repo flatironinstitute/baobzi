@@ -1,8 +1,10 @@
 #ifndef BAOBZI_TEMPLATE_HPP
 #define BAOBZI_TEMPLATE_HPP
+#define _USE_MATH_DEFINES
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
