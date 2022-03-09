@@ -1,21 +1,32 @@
 from ctypes import CDLL, CFUNCTYPE, POINTER, c_double, c_void_p, c_uint16, c_int, c_char_p, Structure, pointer
+from ctypes.util import find_library
 import numpy as np
 
-try:
-    libbaobzi = CDLL("libbaobzi.so")
-except OSError:
+baobzi_path = find_library('baobzi')
+
+if not baobzi_path:
     import os
-
+    from sys import platform
     libroot = os.path.sep.join(os.path.realpath(__file__).split(os.path.sep)[:-5])
-    lib = os.path.join(libroot, "lib", "libbaobzi.so")
-    lib64 = os.path.join(libroot, "lib64", "libbaobzi.so")
-    if os.path.exists(lib):
-        libbaobzi = CDLL(lib)
-    elif os.path.exists(lib64):
-        libbaobzi = CDLL(lib64)
+    if platform == 'linux':
+        extension = ".so"
+    elif platform == 'darwin':
+        extension = ".dylib"
+    elif platform == 'win32':
+        extension = '.dll'
     else:
-        raise OSError("Unable to find 'libbaobzi.so'. Add path to its containing directory to your LD_LIBRARY_PATH variable.")
+        raise RuntimeError("Invalid operating platform found.")
+    lib = os.path.join(libroot, "lib", "libbaobzi" + extension)
+    lib64 = os.path.join(libroot, "lib64", "libbaobzi" + extension)
+    if os.path.exists(lib):
+        baobzi_path = lib
+    elif os.path.exists(lib64):
+        baobzi_path = lib64
 
+if not baobzi_path:
+    raise OSError("Unable to find 'libbaobzi'. Add path to its containing directory to your LD_LIBRARY_PATH variable.")
+
+libbaobzi = CDLL(baobzi_path)
 
 INPUT_FUNC = CFUNCTYPE(c_double, POINTER(c_double))
 
