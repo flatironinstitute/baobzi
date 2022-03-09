@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(
   baobzi
-  LANGUAGES C CXX)
+  LANGUAGES C CXX
+  )
 enable_language(Fortran OPTIONAL)
 
 set(CMAKE_CXX_STANDARD 17)
