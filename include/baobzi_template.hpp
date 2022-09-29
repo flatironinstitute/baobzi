@@ -145,6 +145,7 @@ inline double cheb_eval(const Eigen::Vector3d &x, const double *coeffs_raw) {
 template <int DIM, int ORDER, int ISET>
 class Node {
   public:
+    using NodeT = Node<DIM, ORDER, ISET>;
     using VecDimD = Eigen::Vector<double, DIM>;     ///< D dimensional vector type
     using VecOrderD = Eigen::Vector<double, ORDER>; ///< ORDER dimensional vector type
     using Func = Function<DIM, ORDER, ISET>;        ///< Type of boabzi function this belongs to
@@ -158,6 +159,28 @@ class Node {
     /// @brief Construct node from box (without fitting)
     /// @param [in] box box this node represents
     Node<DIM, ORDER, ISET>(const Box<DIM, ISET> &box) : box_(box) {}
+
+    std::pair<NodeT, NodeT> split(const double *coeffs) {
+        NodeT a, b;
+
+        if constexpr (DIM == 1) {
+            VecDimD hl = box_.half_length() * 0.5;
+            Box<DIM, ISET> box_a(box_.center - hl, hl);
+            Box<DIM, ISET> box_b(box_.center + hl, hl);
+
+            VecOrderD xvec_a = Func::get_cheb_nodes(-1.0, 0.0);
+            VecOrderD xvec_b = Func::get_cheb_nodes(0.0, 1.0);
+            VecOrderD cvec_a, cvec_b;
+            for (int i = 0; i < ORDER; ++i) {
+                cvec_a[i] = cheb_eval<ORDER, ISET>(xvec_a, coeffs + coeff_offset);
+                cvec_b[i] = cheb_eval<ORDER, ISET>(xvec_b, coeffs + coeff_offset);
+            }
+
+            VecOrderD coeffs_a = Func::VLU_.solve(cvec_a);
+            VecOrderD coeffs_b = Func::VLU_.solve(cvec_b);
+        }
+        return std::make_pair(a, b);
+    }
 
     /// @brief check if node is leaf
     /// @return true if leaf, false otherwise
@@ -435,8 +458,10 @@ class Function {
     using VecDimD = Eigen::Vector<double, DIM>;            ///< DIM dimensional vector type
     using VecOrderD = Eigen::Vector<double, ORDER>;        ///< Order dimensional vector type
     using VanderMat = Eigen::Matrix<double, ORDER, ORDER>; ///< VanderMonde Matrix type
-    using node_t = Node<DIM, ORDER, ISET>;                 ///< DIM,ORDER Node type (duh)
-    using box_t = Box<DIM, ISET>;                          ///< DIM dimensional box type
+    using SplitOperator =
+        std::pair<Eigen::Matrix<double, ORDER, ORDER>, Eigen::Matrix<double, ORDER, ORDER>>; ///< Split Operator
+    using node_t = Node<DIM, ORDER, ISET>; ///< DIM,ORDER Node type (duh)
+    using box_t = Box<DIM, ISET>;          ///< DIM dimensional box type
 
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
     static constexpr int Dim = DIM;         ///< Input dimension of function
@@ -446,6 +471,7 @@ class Function {
     static std::mutex statics_mutex;            ///< mutex for locking vandermonde/chebyshev initialization
     static VecOrderD cosarray_;                 ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
+    static SplitOperator split_operator_;
 
     box_t box_;          ///< box representing the domain of our function
     double tol_;         ///< Desired relative tolerance of our approximation
@@ -506,17 +532,17 @@ class Function {
 
     /// @brief calculate vandermonde matrix
     /// @return Vandermonde matrix for chebyshev polynomials with order=ORDER
-    static VanderMat calc_vandermonde() {
+    static VanderMat calc_vandermonde(const VecOrderD &x) {
         VanderMat V;
 
         for (int j = 0; j < ORDER; ++j) {
             V(0, j) = 1;
-            V(1, j) = cosarray_(j);
+            V(1, j) = x(j);
         }
 
         for (int i = 2; i < ORDER; ++i) {
             for (int j = 0; j < ORDER; ++j) {
-                V(i, j) = double(2) * V(i - 1, j) * cosarray_(j) - V(i - 2, j);
+                V(i, j) = double(2) * V(i - 1, j) * x(j) - V(i - 2, j);
             }
         }
 
@@ -533,7 +559,7 @@ class Function {
 
     /// @brief initialize static class variables
     ///
-    /// Modifies baobzi::Function::cosarray_, baobzi::Function::VLU_
+    /// Modifies baobzi::Function::cosarray_, baobzi::Function::VLU_, baobzi::Function::split_operator_
     static void init_statics() {
         static bool is_initialized = false;
         std::lock_guard<std::mutex> lock(statics_mutex);
@@ -542,7 +568,8 @@ class Function {
 
         for (int i = 0; i < ORDER; ++i)
             cosarray_[ORDER - i - 1] = cos(M_PI * (i + 0.5) / ORDER);
-        VLU_ = Eigen::PartialPivLU<VanderMat>(calc_vandermonde());
+        VLU_ = Eigen::PartialPivLU<VanderMat>(calc_vandermonde(cosarray_));
+        split_operator_ = calc_splitter();
         is_initialized = true;
     }
 
@@ -780,6 +807,25 @@ class Function {
         msgpack::pack(ofs, *this);
     }
 
+    /// @brief calculate operator(s) that take one Node/Panel and split it into two equally sized panels
+    /// @return std::pair of linear operators that transform a panel into the "left" and "right" coefficients
+    static SplitOperator calc_splitter() {
+        if constexpr (DIM == 1) {
+            SplitOperator splitter;
+
+            VecOrderD xvec_a = get_cheb_nodes(-1.0, 0.0);
+            VecOrderD xvec_b = get_cheb_nodes(0.0, 1.0);
+
+            VanderMat Va = calc_vandermonde(xvec_a);
+            VanderMat Vb = calc_vandermonde(xvec_b);
+
+            splitter.first = (VLU_.solve(Va)).reverse();
+            splitter.second = (VLU_.solve(Vb)).reverse();
+
+            return splitter;
+        }
+    }
+
     /// @brief msgpack serialization magic
     MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, coeffs_, split_multi_eval_);
 };
@@ -792,6 +838,9 @@ typename Function<DIM, ORDER, ISET>::VecOrderD Function<DIM, ORDER, ISET>::cosar
 
 template <int DIM, int ORDER, int ISET>
 Eigen::PartialPivLU<typename Function<DIM, ORDER, ISET>::VanderMat> Function<DIM, ORDER, ISET>::VLU_;
+
+template <int DIM, int ORDER, int ISET>
+typename Function<DIM, ORDER, ISET>::SplitOperator Function<DIM, ORDER, ISET>::split_operator_;
 } // namespace baobzi
 
 #endif
