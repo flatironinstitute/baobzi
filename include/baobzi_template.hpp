@@ -27,6 +27,11 @@
 
 /// Namespace for baobzi
 namespace baobzi {
+enum OP {
+    ADD,
+    SUBTRACT,
+};
+
 using index_t = uint32_t;    ///< Type specifying indexing into flattened tree
 using coeff_data = double *; ///< Array to hold flattened coefficients
 
@@ -352,7 +357,7 @@ struct FunctionTree {
                 nodes_.push_back(node_t(box));
 
                 auto &node = nodes_[i + node_index];
-                std::vector new_coeffs = node.fit(input);
+                std::vector<double> new_coeffs = node.fit(input);
 
                 if (node.is_leaf()) {
                     node.coeff_offset = coeffs_.size();
@@ -384,7 +389,109 @@ struct FunctionTree {
         }
     }
 
-    FunctionTree<DIM, ORDER, ISET>() = default; ///< Default constructor for msgpack happiness
+    FunctionTree<DIM, ORDER, ISET>(const FunctionTree<DIM, ORDER, ISET> &A, const FunctionTree<DIM, ORDER, ISET> &B,
+                                   const OP &op) {
+        max_depth_ = std::max(A.max_depth(), B.max_depth());
+
+        if constexpr (DIM == 1) {
+            using node_pair = struct node_pair {
+                Box<DIM, ISET> box;
+                Eigen::VectorXd a_coeffs;
+                Eigen::VectorXd b_coeffs;
+                const node_t *a = nullptr;
+                const node_t *b = nullptr;
+            };
+
+            std::queue<node_pair> q;
+
+            auto &[Sl, Sr] = Function<DIM, ORDER, ISET>::split_operator_;
+
+            q.push(node_pair{
+                .box = A.nodes_[0].box_,
+                .a_coeffs =
+                    A.nodes_[0].is_leaf() ? Eigen::Map<const Eigen::VectorXd>(&A.coeffs_[0], ORDER) : Eigen::VectorXd(),
+                .b_coeffs =
+                    B.nodes_[0].is_leaf() ? Eigen::Map<const Eigen::VectorXd>(&B.coeffs_[0], ORDER) : Eigen::VectorXd(),
+                .a = &A.nodes_[0],
+                .b = &B.nodes_[0],
+            });
+
+            index_t curr_child_idx = 1;
+            while (!q.empty()) {
+                const auto el = q.back();
+                q.pop();
+
+                nodes_.push_back(node_t(el.box));
+                auto &node = nodes_.back();
+
+                if (el.a_coeffs.size() && el.b_coeffs.size()) {
+                    node.coeff_offset = coeffs_.size();
+
+                    coeffs_.resize(coeffs_.size() + ORDER);
+                    Eigen::Map<Eigen::Vector<double, ORDER>> new_coeffs(coeffs_.data() + coeffs_.size() - ORDER);
+
+                    switch (op) {
+                    case ADD: {
+                        new_coeffs = el.a_coeffs + el.b_coeffs;
+                        break;
+                    }
+                    case SUBTRACT: {
+                        new_coeffs = el.a_coeffs - el.b_coeffs;
+                        break;
+                    }
+                    }
+                    continue;
+                }
+                node.first_child_idx = curr_child_idx;
+                curr_child_idx += 2;
+
+                Eigen::VectorXd la_coeffs, ra_coeffs, lb_coeffs, rb_coeffs;
+                const node_t *la_node = nullptr, *ra_node = nullptr, *lb_node = nullptr, *rb_node = nullptr;
+                if (el.a_coeffs.size()) {
+                    la_coeffs = Sl * el.a_coeffs;
+                    ra_coeffs = Sr * el.a_coeffs;
+                } else {
+                    la_node = &A.nodes_[el.a->first_child_idx];
+                    ra_node = &A.nodes_[el.a->first_child_idx + 1];
+                    if (la_node->is_leaf())
+                        la_coeffs = Eigen::Map<const Eigen::VectorXd>(A.coeffs_.data() + la_node->coeff_offset, ORDER);
+                    if (ra_node->is_leaf())
+                        ra_coeffs = Eigen::Map<const Eigen::VectorXd>(A.coeffs_.data() + ra_node->coeff_offset, ORDER);
+                }
+
+                if (el.b_coeffs.size()) {
+                    lb_coeffs = Sl * el.b_coeffs;
+                    rb_coeffs = Sr * el.b_coeffs;
+                } else {
+                    lb_node = &B.nodes_[el.b->first_child_idx];
+                    rb_node = &B.nodes_[el.b->first_child_idx + 1];
+                    if (lb_node->is_leaf())
+                        lb_coeffs = Eigen::Map<const Eigen::VectorXd>(B.coeffs_.data() + lb_node->coeff_offset, ORDER);
+                    if (rb_node->is_leaf())
+                        rb_coeffs = Eigen::Map<const Eigen::VectorXd>(B.coeffs_.data() + rb_node->coeff_offset, ORDER);
+                }
+
+                auto new_hl = 0.5 * el.box.half_length();
+                q.push({
+                    .box = box_t(el.box.center - new_hl, new_hl),
+                    .a_coeffs = la_coeffs,
+                    .b_coeffs = lb_coeffs,
+                    .a = la_node,
+                    .b = lb_node,
+                });
+
+                q.push({
+                    .box = box_t(el.box.center + new_hl, new_hl),
+                    .a_coeffs = ra_coeffs,
+                    .b_coeffs = rb_coeffs,
+                    .a = ra_node,
+                    .b = rb_node,
+                });
+            }
+        }
+    }
+
+    FunctionTree<DIM, ORDER, ISET>() {} ///< Default constructor for msgpack happiness
 
     /// @brief Find leaf node containing a point via standard pointer traversal
     /// @param[in] x point that the node will contain
@@ -830,6 +937,29 @@ class Function {
             return splitter;
         }
         __builtin_unreachable();
+    }
+
+    Function<DIM, ORDER, ISET> shallow_copy() {
+        Function<DIM, ORDER, ISET> other;
+        other.n_subtrees_ = n_subtrees_;
+        other.lower_left_ = lower_left_;
+        other.inv_bin_size_ = inv_bin_size_;
+        other.box_ = box_;
+        other.inv_bin_size_ = inv_bin_size_;
+        other.split_multi_eval_ = split_multi_eval_;
+        return other;
+    }
+
+    Function<DIM, ORDER, ISET> operator+(const Function<DIM, ORDER, ISET> &B) {
+        const auto &A = *this;
+        Function<DIM, ORDER, ISET> C = shallow_copy();
+
+        C.subtrees_.resize(n_subtrees_.prod());
+        for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin)
+            C.subtrees_[i_bin] = FunctionTree<DIM, ORDER, ISET>(A.subtrees_[i_bin], B.subtrees_[i_bin], ADD);
+
+        C.build_cache();
+        return C;
     }
 
     /// @brief msgpack serialization magic
