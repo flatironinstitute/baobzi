@@ -328,15 +328,14 @@ struct FunctionTree {
     using box_t = Box<DIM, ISET>;               ///< DIM box type
     using VecDimD = Eigen::Vector<double, DIM>; ///< D dimensional vector type
 
-    std::vector<node_t> nodes_; ///< Flat list of all nodes in Tree (leaf or otherwise)
-    int max_depth_;             ///< Maximum depth of tree
+    std::vector<node_t> nodes_;  ///< Flat list of all nodes in Tree (leaf or otherwise)
+    std::vector<double> coeffs_; ///< Flat list of all coeffs in Tree
+    int max_depth_;              ///< Maximum depth of tree
 
     /// @brief Construct tree
     /// @param[in] input parameters for fit (function, tol, etc)
-    /// @param[in] coeffs flat/global coefficient vector
     /// @param[in] box box that this tree lives in
-    FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box,
-                                   std::vector<double> &coeffs) {
+    FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box) {
         std::queue<Box<DIM, ISET>> q;
         VecDimD half_width = box.half_length() * 0.5;
         q.push(box);
@@ -356,8 +355,8 @@ struct FunctionTree {
                 std::vector new_coeffs = node.fit(input);
 
                 if (node.is_leaf()) {
-                    node.coeff_offset = coeffs.size();
-                    coeffs.insert(std::end(coeffs), std::begin(new_coeffs), std::end(new_coeffs));
+                    node.coeff_offset = coeffs_.size();
+                    coeffs_.insert(std::end(coeffs_), std::begin(new_coeffs), std::end(new_coeffs));
                 } else if (!node.is_leaf()) {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
@@ -435,6 +434,8 @@ struct FunctionTree {
         std::size_t memory_usage = sizeof(*this);
         for (const auto &node : nodes_)
             memory_usage += node.memory_usage();
+        memory_usage += coeffs_.capacity() * sizeof(double);
+
         return memory_usage;
     }
 
@@ -445,7 +446,7 @@ struct FunctionTree {
     inline double eval(const VecDimD &x, const double *coeffs) const { return find_node_traverse(x).eval(x, coeffs); }
 
     /// @brief msgpack serialization magic
-    MSGPACK_DEFINE(nodes_);
+    MSGPACK_DEFINE(nodes_, coeffs_);
 };
 
 /// @brief Represents a function in some domain as a grid of baobzi::FunctionTree objects
@@ -484,8 +485,6 @@ class Function {
     std::vector<node_t *> node_pointers_;   ///< Vector of pointers to every node from every subtree
     VecDimD inv_bin_size_;                  ///< Inverse linear dimensions of the bins that our subtrees live
 
-    std::vector<double> coeffs_; ///< Flat vector of all chebyshev coefficients from all leaf nodes
-
     bool split_multi_eval_ = true; ///< Split node-search and evaluation when evaluating multiple points
 
     /// Structure containing info about self creation :D
@@ -501,7 +500,6 @@ class Function {
         std::size_t mem = sizeof(*this);
         mem += subtree_node_offsets_.capacity() * sizeof(subtree_node_offsets_[0]);
         mem += node_pointers_.capacity() * sizeof(node_pointers_[0]);
-        mem += coeffs_.capacity() * sizeof(double);
         for (const auto &subtree : subtrees_)
             mem += subtree.memory_usage();
         return mem;
@@ -669,7 +667,7 @@ class Function {
                 (bins.template cast<double>().array() + 0.5) * bin_size.array() + lower_left_.array();
 
             Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size};
-            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box, coeffs_));
+            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box));
         }
 
         auto t_end = std::chrono::steady_clock::now();
@@ -738,17 +736,13 @@ class Function {
         return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
     }
 
-    /// @brief get constant reference to leaf node that contains a point
-    /// @param[in] x point of interest
-    /// @returns constant reference to leaf node that contains x
-    inline const node_t &find_node(const VecDimD &x) const {
-        return subtrees_[get_linear_bin(x)].find_node_traverse(x);
-    }
-
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at
     /// @returns function approximation at point x
-    inline double eval(const VecDimD &x) const { return find_node(x).eval(x, coeffs_.data()); }
+    inline double eval(const VecDimD &x) const {
+        const int i_sub = get_linear_bin(x);
+        return subtrees_[i_sub].find_node_traverse(x).eval(x, subtrees_[i_sub].coeffs_.data());
+    }
 
     /// @brief eval function approximation at point
     /// @param[in] xp [DIM] point to evaluate function at
@@ -769,17 +763,28 @@ class Function {
     /// @param[in] n_trg number of points to evaluate
     inline void eval(const double *xp, double *res, int n_trg) const {
         if (split_multi_eval_) {
-            std::vector<std::pair<node_t *, VecDimD>> node_map(n_trg);
+            struct payload {
+                int subtree;
+                node_t *node;
+                VecDimD x;
+            };
+            std::vector<payload> node_map(n_trg);
             for (int i = 0; i < n_trg; ++i) {
-                VecDimD xi = VecDimD(xp + DIM * i);
-                node_map[i] = std::make_pair(node_pointers_[get_global_node_index(xi)], xi);
+                const VecDimD xi = VecDimD(xp + DIM * i);
+                const int i_sub = get_linear_bin(xi);
+
+                node_map[i] = {i_sub, node_pointers_[i_sub], xi};
             }
 
-            for (int i_trg = 0; i_trg < n_trg; i_trg++)
-                res[i_trg] = node_map[i_trg].first->eval(node_map[i_trg].second, coeffs_.data());
-        } else
+            for (int i_trg = 0; i_trg < n_trg; i_trg++) {
+                const auto &[subtree_i, node, x] = node_map[i_trg];
+                const auto &coeffs = subtrees_[subtree_i].coeffs_;
+                res[i_trg] = node->eval(x, coeffs.data());
+            }
+        } else {
             for (int i_trg = 0; i_trg < n_trg; i_trg++)
                 res[i_trg] = eval(VecDimD(xp + DIM * i_trg));
+        }
     }
 
     /// @brief eval function approximation at point
@@ -824,10 +829,11 @@ class Function {
 
             return splitter;
         }
+        __builtin_unreachable();
     }
 
     /// @brief msgpack serialization magic
-    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, coeffs_, split_multi_eval_);
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, split_multi_eval_);
 };
 
 template <int DIM, int ORDER, int ISET>
