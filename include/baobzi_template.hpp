@@ -939,7 +939,7 @@ class Function {
         __builtin_unreachable();
     }
 
-    Function<DIM, ORDER, ISET> shallow_copy() {
+    Function<DIM, ORDER, ISET> shallow_copy() const {
         Function<DIM, ORDER, ISET> other;
         other.n_subtrees_ = n_subtrees_;
         other.lower_left_ = lower_left_;
@@ -950,7 +950,7 @@ class Function {
         return other;
     }
 
-    Function<DIM, ORDER, ISET> operator+(const Function<DIM, ORDER, ISET> &B) {
+    Function<DIM, ORDER, ISET> operator+(const Function<DIM, ORDER, ISET> &B) const {
         const auto &A = *this;
         Function<DIM, ORDER, ISET> C = shallow_copy();
 
@@ -962,9 +962,78 @@ class Function {
         return C;
     }
 
+    Function<DIM, ORDER, ISET> operator-(const Function<DIM, ORDER, ISET> &B) const {
+        const auto &A = *this;
+        Function<DIM, ORDER, ISET> C = shallow_copy();
+
+        C.subtrees_.resize(n_subtrees_.prod());
+        for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin)
+            C.subtrees_[i_bin] = FunctionTree<DIM, ORDER, ISET>(A.subtrees_[i_bin], B.subtrees_[i_bin], SUBTRACT);
+
+        C.build_cache();
+        return C;
+    }
+
+    template <typename T>
+    Function<DIM, ORDER, ISET> operator*(const T &scale_factor) const {
+        Function<DIM, ORDER, ISET> copy = *this;
+
+        for (auto &subtree : copy.subtrees_) {
+            Eigen::Map<Eigen::VectorXd> coeffs(subtree.coeffs_.data(), subtree.coeffs_.size());
+            coeffs *= scale_factor;
+        }
+
+        return copy;
+    }
+
+    template <typename T>
+    Function<DIM, ORDER, ISET> operator+(const T &shift) const {
+        Function<DIM, ORDER, ISET> copy = *this;
+
+        for (auto &subtree : copy.subtrees_) {
+            auto &coeffs = subtree.coeffs_;
+            for (int i = ORDER - 1; i < coeffs.size(); i += ORDER)
+                coeffs[i] += shift;
+        }
+
+        return copy;
+    }
+
+    template <typename T>
+    Function<DIM, ORDER, ISET> operator/(const T &divisor) const {
+        Function<DIM, ORDER, ISET> copy = *this;
+
+        for (auto &subtree : copy.subtrees_) {
+            Eigen::Map<Eigen::VectorXd> coeffs(subtree.coeffs_.data(), subtree.coeffs_.size());
+            coeffs /= divisor;
+        }
+
+        return copy;
+    }
+
+    template <typename T>
+    Function<DIM, ORDER, ISET> operator-(const T &shift) const {
+        return *this + (-shift);
+    }
+
     /// @brief msgpack serialization magic
     MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, split_multi_eval_);
 };
+
+template <typename T, int DIM, int ORDER, int ISET>
+Function<DIM, ORDER, ISET> operator*(const T &scale_factor, const Function<DIM, ORDER, ISET> &fun) {
+    return fun * scale_factor;
+}
+
+template <typename T, int DIM, int ORDER, int ISET>
+Function<DIM, ORDER, ISET> operator+(const T &shift, const Function<DIM, ORDER, ISET> &fun) {
+    return fun + shift;
+}
+
+template <typename T, int DIM, int ORDER, int ISET>
+Function<DIM, ORDER, ISET> operator-(const T &shift, const Function<DIM, ORDER, ISET> &fun) {
+    return fun - shift;
+}
 
 template <int DIM, int ORDER, int ISET>
 std::mutex Function<DIM, ORDER, ISET>::statics_mutex;
