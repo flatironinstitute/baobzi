@@ -922,9 +922,8 @@ class Function {
     /// @brief calculate operator(s) that take one Node/Panel and split it into two equally sized panels
     /// @return std::pair of linear operators that transform a panel into the "left" and "right" coefficients
     static SplitOperator calc_splitter() {
+        SplitOperator splitter;
         if constexpr (DIM == 1) {
-            SplitOperator splitter;
-
             VecOrderD xvec_a = get_cheb_nodes(-1.0, 0.0);
             VecOrderD xvec_b = get_cheb_nodes(0.0, 1.0);
 
@@ -933,10 +932,9 @@ class Function {
 
             splitter.first = (VLU_.solve(Va)).reverse();
             splitter.second = (VLU_.solve(Vb)).reverse();
-
-            return splitter;
         }
-        __builtin_unreachable();
+
+        return splitter;
     }
 
     Function<DIM, ORDER, ISET> shallow_copy() const {
@@ -951,6 +949,7 @@ class Function {
     }
 
     Function<DIM, ORDER, ISET> operator+(const Function<DIM, ORDER, ISET> &B) const {
+        static_assert(DIM == 1, "Baobzi: Function addition only defined for 1D functions");
         const auto &A = *this;
         Function<DIM, ORDER, ISET> C = shallow_copy();
 
@@ -963,6 +962,7 @@ class Function {
     }
 
     Function<DIM, ORDER, ISET> operator-(const Function<DIM, ORDER, ISET> &B) const {
+        static_assert(DIM == 1, "Baobzi: Function subtraction only defined for 1D functions");
         const auto &A = *this;
         Function<DIM, ORDER, ISET> C = shallow_copy();
 
@@ -987,19 +987,6 @@ class Function {
     }
 
     template <typename T>
-    Function<DIM, ORDER, ISET> operator+(const T &shift) const {
-        Function<DIM, ORDER, ISET> copy = *this;
-
-        for (auto &subtree : copy.subtrees_) {
-            auto &coeffs = subtree.coeffs_;
-            for (int i = ORDER - 1; i < coeffs.size(); i += ORDER)
-                coeffs[i] += shift;
-        }
-
-        return copy;
-    }
-
-    template <typename T>
     Function<DIM, ORDER, ISET> operator/(const T &divisor) const {
         Function<DIM, ORDER, ISET> copy = *this;
 
@@ -1012,7 +999,21 @@ class Function {
     }
 
     template <typename T>
-    Function<DIM, ORDER, ISET> operator-(const T &shift) const {
+    Function<DIM, ORDER, ISET> operator+(const T &shift) const {
+        static_assert(DIM == 1, "Baobzi: Scalar addition only defined for 1D functions");
+        Function<DIM, ORDER, ISET> copy = *this;
+
+        for (auto &subtree : copy.subtrees_) {
+            auto &coeffs = subtree.coeffs_;
+            for (int i = ORDER - 1; i < coeffs.size(); i += ORDER)
+                coeffs[i] += shift;
+        }
+
+        return copy;
+    }
+
+    template <typename T>
+    Function<1, ORDER, ISET> operator-(const T &shift) const {
         return *this + (-shift);
     }
 
