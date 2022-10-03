@@ -27,10 +27,6 @@
 
 /// Namespace for baobzi
 namespace baobzi {
-enum OP {
-    ADD,
-    SUBTRACT,
-};
 
 using index_t = uint32_t;    ///< Type specifying indexing into flattened tree
 using coeff_data = double *; ///< Array to hold flattened coefficients
@@ -196,14 +192,15 @@ class Node {
     /// Modifies: Node::leaf_, Node::coeffs_
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns true if fit successful, false if not good enough
-    std::vector<double> fit(const baobzi_input_t *input) {
+    std::vector<double> fit(const baobzi_input_t *input, const std::function<double(double *, void *)> &func) {
         VecDimD half_length = box_.half_length();
+
         if constexpr (DIM == 1) {
             Eigen::Vector<double, ORDER> F;
             VecOrderD xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
 
             for (int i = 0; i < ORDER; ++i)
-                F(i) = input->func(&xvec[i], input->data);
+                F(i) = func(&xvec[i], input->data);
 
             Eigen::Vector<double, ORDER> coeffs = Func::VLU_.solve(F);
 
@@ -225,7 +222,7 @@ class Node {
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
                     double x[2] = {xvec[i], yvec[j]};
-                    F(i, j) = input->func(x, input->data);
+                    F(i, j) = func(x, input->data);
                 }
             }
 
@@ -253,7 +250,7 @@ class Node {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
                         double x[3] = {xvec[i], yvec[j], zvec[k]};
-                        F(i, j, k) = input->func(x, input->data);
+                        F(i, j, k) = func(x, input->data);
                     }
                 }
             }
@@ -287,7 +284,7 @@ class Node {
                             2.0 * VecDimD{(double)i, (double)j, (double)k}.array() * half_length.array() / ORDER;
 
                         const double test_val = eval(point, coeffs.data());
-                        const double actual_val = input->func(point.data(), input->data);
+                        const double actual_val = func(point.data(), input->data);
                         const double rel_error = std::abs((actual_val - test_val) / actual_val);
 
                         if (fabs(actual_val) > 1E-16 && rel_error > input->tol) {
@@ -340,7 +337,8 @@ struct FunctionTree {
     /// @brief Construct tree
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] box box that this tree lives in
-    FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box) {
+    FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box,
+                                   std::function<double(double *, void *)> func) {
         std::queue<Box<DIM, ISET>> q;
         VecDimD half_width = box.half_length() * 0.5;
         q.push(box);
@@ -357,7 +355,7 @@ struct FunctionTree {
                 nodes_.push_back(node_t(box));
 
                 auto &node = nodes_[i + node_index];
-                std::vector<double> new_coeffs = node.fit(input);
+                std::vector<double> new_coeffs = node.fit(input, func);
 
                 if (node.is_leaf()) {
                     node.coeff_offset = coeffs_.size();
@@ -389,107 +387,113 @@ struct FunctionTree {
         }
     }
 
-    FunctionTree<DIM, ORDER, ISET>(const FunctionTree<DIM, ORDER, ISET> &A, const FunctionTree<DIM, ORDER, ISET> &B,
-                                   const OP &op) {
-        max_depth_ = std::max(A.max_depth(), B.max_depth());
+    // FunctionTree<DIM, ORDER, ISET>(const FunctionTree<DIM, ORDER, ISET> &A, const FunctionTree<DIM, ORDER, ISET> &B,
+    //                                const OP &op) {
+    //     max_depth_ = std::max(A.max_depth(), B.max_depth());
 
-        if constexpr (DIM == 1) {
-            using node_pair = struct node_pair {
-                Box<DIM, ISET> box;
-                Eigen::VectorXd a_coeffs;
-                Eigen::VectorXd b_coeffs;
-                const node_t *a = nullptr;
-                const node_t *b = nullptr;
-            };
+    //     if constexpr (DIM == 1) {
+    //         using node_pair = struct node_pair {
+    //             Box<DIM, ISET> box;
+    //             Eigen::VectorXd a_coeffs;
+    //             Eigen::VectorXd b_coeffs;
+    //             const node_t *a = nullptr;
+    //             const node_t *b = nullptr;
+    //         };
 
-            std::queue<node_pair> q;
+    //         std::queue<node_pair> q;
 
-            auto &[Sl, Sr] = Function<DIM, ORDER, ISET>::split_operator_;
+    //         auto &[Sl, Sr] = Function<DIM, ORDER, ISET>::split_operator_;
 
-            q.push(node_pair{
-                .box = A.nodes_[0].box_,
-                .a_coeffs =
-                    A.nodes_[0].is_leaf() ? Eigen::Map<const Eigen::VectorXd>(&A.coeffs_[0], ORDER) : Eigen::VectorXd(),
-                .b_coeffs =
-                    B.nodes_[0].is_leaf() ? Eigen::Map<const Eigen::VectorXd>(&B.coeffs_[0], ORDER) : Eigen::VectorXd(),
-                .a = &A.nodes_[0],
-                .b = &B.nodes_[0],
-            });
+    //         q.push(node_pair{
+    //             .box = A.nodes_[0].box_,
+    //             .a_coeffs =
+    //                 A.nodes_[0].is_leaf() ? Eigen::Map<const Eigen::VectorXd>(&A.coeffs_[0], ORDER) :
+    //                 Eigen::VectorXd(),
+    //             .b_coeffs =
+    //                 B.nodes_[0].is_leaf() ? Eigen::Map<const Eigen::VectorXd>(&B.coeffs_[0], ORDER) :
+    //                 Eigen::VectorXd(),
+    //             .a = &A.nodes_[0],
+    //             .b = &B.nodes_[0],
+    //         });
 
-            index_t curr_child_idx = 1;
-            while (!q.empty()) {
-                const auto el = q.back();
-                q.pop();
+    //         index_t curr_child_idx = 1;
+    //         while (!q.empty()) {
+    //             const auto el = q.back();
+    //             q.pop();
 
-                nodes_.push_back(node_t(el.box));
-                auto &node = nodes_.back();
+    //             nodes_.push_back(node_t(el.box));
+    //             auto &node = nodes_.back();
 
-                if (el.a_coeffs.size() && el.b_coeffs.size()) {
-                    node.coeff_offset = coeffs_.size();
+    //             if (el.a_coeffs.size() && el.b_coeffs.size()) {
+    //                 node.coeff_offset = coeffs_.size();
 
-                    coeffs_.resize(coeffs_.size() + ORDER);
-                    Eigen::Map<Eigen::Vector<double, ORDER>> new_coeffs(coeffs_.data() + coeffs_.size() - ORDER);
+    //                 coeffs_.resize(coeffs_.size() + ORDER);
+    //                 Eigen::Map<Eigen::Vector<double, ORDER>> new_coeffs(coeffs_.data() + coeffs_.size() - ORDER);
 
-                    switch (op) {
-                    case ADD: {
-                        new_coeffs = el.a_coeffs + el.b_coeffs;
-                        break;
-                    }
-                    case SUBTRACT: {
-                        new_coeffs = el.a_coeffs - el.b_coeffs;
-                        break;
-                    }
-                    }
-                    continue;
-                }
-                node.first_child_idx = curr_child_idx;
-                curr_child_idx += 2;
+    //                 switch (op) {
+    //                 case ADD: {
+    //                     new_coeffs = el.a_coeffs + el.b_coeffs;
+    //                     break;
+    //                 }
+    //                 case SUBTRACT: {
+    //                     new_coeffs = el.a_coeffs - el.b_coeffs;
+    //                     break;
+    //                 }
+    //                 }
+    //                 continue;
+    //             }
+    //             node.first_child_idx = curr_child_idx;
+    //             curr_child_idx += 2;
 
-                Eigen::VectorXd la_coeffs, ra_coeffs, lb_coeffs, rb_coeffs;
-                const node_t *la_node = nullptr, *ra_node = nullptr, *lb_node = nullptr, *rb_node = nullptr;
-                if (el.a_coeffs.size()) {
-                    la_coeffs = Sl * el.a_coeffs;
-                    ra_coeffs = Sr * el.a_coeffs;
-                } else {
-                    la_node = &A.nodes_[el.a->first_child_idx];
-                    ra_node = &A.nodes_[el.a->first_child_idx + 1];
-                    if (la_node->is_leaf())
-                        la_coeffs = Eigen::Map<const Eigen::VectorXd>(A.coeffs_.data() + la_node->coeff_offset, ORDER);
-                    if (ra_node->is_leaf())
-                        ra_coeffs = Eigen::Map<const Eigen::VectorXd>(A.coeffs_.data() + ra_node->coeff_offset, ORDER);
-                }
+    //             Eigen::VectorXd la_coeffs, ra_coeffs, lb_coeffs, rb_coeffs;
+    //             const node_t *la_node = nullptr, *ra_node = nullptr, *lb_node = nullptr, *rb_node = nullptr;
+    //             if (el.a_coeffs.size()) {
+    //                 la_coeffs = Sl * el.a_coeffs;
+    //                 ra_coeffs = Sr * el.a_coeffs;
+    //             } else {
+    //                 la_node = &A.nodes_[el.a->first_child_idx];
+    //                 ra_node = &A.nodes_[el.a->first_child_idx + 1];
+    //                 if (la_node->is_leaf())
+    //                     la_coeffs = Eigen::Map<const Eigen::VectorXd>(A.coeffs_.data() + la_node->coeff_offset,
+    //                     ORDER);
+    //                 if (ra_node->is_leaf())
+    //                     ra_coeffs = Eigen::Map<const Eigen::VectorXd>(A.coeffs_.data() + ra_node->coeff_offset,
+    //                     ORDER);
+    //             }
 
-                if (el.b_coeffs.size()) {
-                    lb_coeffs = Sl * el.b_coeffs;
-                    rb_coeffs = Sr * el.b_coeffs;
-                } else {
-                    lb_node = &B.nodes_[el.b->first_child_idx];
-                    rb_node = &B.nodes_[el.b->first_child_idx + 1];
-                    if (lb_node->is_leaf())
-                        lb_coeffs = Eigen::Map<const Eigen::VectorXd>(B.coeffs_.data() + lb_node->coeff_offset, ORDER);
-                    if (rb_node->is_leaf())
-                        rb_coeffs = Eigen::Map<const Eigen::VectorXd>(B.coeffs_.data() + rb_node->coeff_offset, ORDER);
-                }
+    //             if (el.b_coeffs.size()) {
+    //                 lb_coeffs = Sl * el.b_coeffs;
+    //                 rb_coeffs = Sr * el.b_coeffs;
+    //             } else {
+    //                 lb_node = &B.nodes_[el.b->first_child_idx];
+    //                 rb_node = &B.nodes_[el.b->first_child_idx + 1];
+    //                 if (lb_node->is_leaf())
+    //                     lb_coeffs = Eigen::Map<const Eigen::VectorXd>(B.coeffs_.data() + lb_node->coeff_offset,
+    //                     ORDER);
+    //                 if (rb_node->is_leaf())
+    //                     rb_coeffs = Eigen::Map<const Eigen::VectorXd>(B.coeffs_.data() + rb_node->coeff_offset,
+    //                     ORDER);
+    //             }
 
-                auto new_hl = 0.5 * el.box.half_length();
-                q.push({
-                    .box = box_t(el.box.center - new_hl, new_hl),
-                    .a_coeffs = la_coeffs,
-                    .b_coeffs = lb_coeffs,
-                    .a = la_node,
-                    .b = lb_node,
-                });
+    //             auto new_hl = 0.5 * el.box.half_length();
+    //             q.push({
+    //                 .box = box_t(el.box.center - new_hl, new_hl),
+    //                 .a_coeffs = la_coeffs,
+    //                 .b_coeffs = lb_coeffs,
+    //                 .a = la_node,
+    //                 .b = lb_node,
+    //             });
 
-                q.push({
-                    .box = box_t(el.box.center + new_hl, new_hl),
-                    .a_coeffs = ra_coeffs,
-                    .b_coeffs = rb_coeffs,
-                    .a = ra_node,
-                    .b = rb_node,
-                });
-            }
-        }
-    }
+    //             q.push({
+    //                 .box = box_t(el.box.center + new_hl, new_hl),
+    //                 .a_coeffs = ra_coeffs,
+    //                 .b_coeffs = rb_coeffs,
+    //                 .a = ra_node,
+    //                 .b = rb_node,
+    //             });
+    //         }
+    //     }
+    // }
 
     FunctionTree<DIM, ORDER, ISET>() {} ///< Default constructor for msgpack happiness
 
@@ -584,6 +588,7 @@ class Function {
     box_t box_;          ///< box representing the domain of our function
     double tol_;         ///< Desired relative tolerance of our approximation
     VecDimD lower_left_; ///< Bottom 'corner' of our domain
+    baobzi_input_t input_;
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;                   ///< Number of subtrees in each linear dimension of our space
@@ -682,8 +687,9 @@ class Function {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
-    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp)
-        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), split_multi_eval_(input->split_multi_eval) {
+    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp,
+                               const std::function<double(double *, void *)> &func)
+        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), input_(*input), split_multi_eval_(input->split_multi_eval) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
 
@@ -730,7 +736,7 @@ class Function {
 
                 nodes.emplace_back(node_t(box));
                 auto &node = nodes.back();
-                node.fit(input);
+                node.fit(input, func);
 
                 if (!node.is_leaf()) {
                     add_node_children_to_queue(q, node.box_.center, half_width);
@@ -751,7 +757,7 @@ class Function {
             }
 
             half_width *= 0.5;
-            if ((1 << (DIM * (stats_.base_depth + 1))) == q.size()) {
+            if ((unsigned int)(1 << (DIM * (stats_.base_depth + 1))) == q.size()) {
                 n_subtrees_ *= 2;
                 stats_.base_depth++;
             } else
@@ -774,7 +780,7 @@ class Function {
                 (bins.template cast<double>().array() + 0.5) * bin_size.array() + lower_left_.array();
 
             Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size};
-            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box));
+            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box, func));
         }
 
         auto t_end = std::chrono::steady_clock::now();
@@ -783,11 +789,16 @@ class Function {
         build_cache();
     }
 
+    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp) {
+        const auto func = [&input](double *x, void *data) { return input->func(x, input->data); };
+        *this = Function<DIM, ORDER, ISET>(input, xp, lp, func);
+    }
+
     /// @brief Build any intermediate state necessary for computation
     void build_cache() {
         subtree_node_offsets_.resize(n_subtrees_.prod());
         subtree_node_offsets_[0] = 0;
-        for (int i = 1; i < subtree_node_offsets_.size(); ++i)
+        for (std::size_t i = 1; i < subtree_node_offsets_.size(); ++i)
             subtree_node_offsets_[i] = subtree_node_offsets_[i - 1] + subtrees_[i - 1].size();
 
         auto n_nodes_tot = std::accumulate(subtrees_.begin(), subtrees_.end(), (std::size_t)0,
@@ -945,33 +956,60 @@ class Function {
         other.box_ = box_;
         other.inv_bin_size_ = inv_bin_size_;
         other.split_multi_eval_ = split_multi_eval_;
+        other.input_ = input_;
+        other.input_.func = nullptr;
+        other.input_.data = nullptr;
+
         return other;
+    }
+
+    std::pair<baobzi_input_t, box_t> operator_helper(const Function<DIM, ORDER, ISET> &B) const {
+        const auto &A = *this;
+        double lbound =
+            std::max(A.box_.center[0] - A.box_.half_length()[0], B.box_.center[0] - B.box_.half_length()[0]);
+        double rbound =
+            std::min(A.box_.center[0] + A.box_.half_length()[0], B.box_.center[0] + B.box_.half_length()[0]);
+        box_t new_box{VecDimD(0.5 * (rbound + lbound)), VecDimD(0.5 * (rbound - lbound))};
+        baobzi_input_t new_input = input_;
+        new_input.func = nullptr;
+        new_input.data = nullptr;
+        return {new_input, new_box};
     }
 
     Function<DIM, ORDER, ISET> operator+(const Function<DIM, ORDER, ISET> &B) const {
         static_assert(DIM == 1, "Baobzi: Function addition only defined for 1D functions");
         const auto &A = *this;
-        Function<DIM, ORDER, ISET> C = shallow_copy();
+        auto [new_input, new_box] = operator_helper(B);
+        const auto func = [&A, &B](double *x, void *data) { return A(x) + B(x); };
 
-        C.subtrees_.resize(n_subtrees_.prod());
-        for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin)
-            C.subtrees_[i_bin] = FunctionTree<DIM, ORDER, ISET>(A.subtrees_[i_bin], B.subtrees_[i_bin], ADD);
+        return Function<DIM, ORDER, ISET>(&new_input, new_box.center.data(), new_box.half_length().data(), func);
+    }
 
-        C.build_cache();
-        return C;
+    Function<DIM, ORDER, ISET> operator*(const Function<DIM, ORDER, ISET> &B) const {
+        static_assert(DIM == 1, "Baobzi: Function multiplication only defined for 1D functions");
+        const auto &A = *this;
+        auto [new_input, new_box] = operator_helper(B);
+        const auto func = [&A, &B](double *x, void *data) { return A(x) * B(x); };
+
+        return Function<DIM, ORDER, ISET>(&new_input, new_box.center.data(), new_box.half_length().data(), func);
+    }
+
+    Function<DIM, ORDER, ISET> operator/(const Function<DIM, ORDER, ISET> &B) const {
+        static_assert(DIM == 1, "Baobzi: Function division only defined for 1D functions");
+        const auto &A = *this;
+        auto [new_input, new_box] = operator_helper(B);
+        const auto func = [&A, &B](double *x, void *data) { return A(x) / B(x); };
+
+        return Function<DIM, ORDER, ISET>(&new_input, new_box.center.data(), new_box.half_length().data(), func);
     }
 
     Function<DIM, ORDER, ISET> operator-(const Function<DIM, ORDER, ISET> &B) const {
         static_assert(DIM == 1, "Baobzi: Function subtraction only defined for 1D functions");
         const auto &A = *this;
-        Function<DIM, ORDER, ISET> C = shallow_copy();
+        auto [new_input, new_box] = operator_helper(B);
+        const auto func = [&A, &B](double *x, void *data) { return A(x) - B(x); };
 
-        C.subtrees_.resize(n_subtrees_.prod());
-        for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin)
-            C.subtrees_[i_bin] = FunctionTree<DIM, ORDER, ISET>(A.subtrees_[i_bin], B.subtrees_[i_bin], SUBTRACT);
-
-        C.build_cache();
-        return C;
+        return Function<DIM, ORDER, ISET>(&new_input, new_box.center.data(), new_box.half_length().data(), func);
     }
 
     template <typename T>
@@ -1005,7 +1043,7 @@ class Function {
 
         for (auto &subtree : copy.subtrees_) {
             auto &coeffs = subtree.coeffs_;
-            for (int i = ORDER - 1; i < coeffs.size(); i += ORDER)
+            for (std::size_t i = ORDER - 1; i < coeffs.size(); i += ORDER)
                 coeffs[i] += shift;
         }
 
@@ -1018,7 +1056,7 @@ class Function {
     }
 
     /// @brief msgpack serialization magic
-    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, split_multi_eval_);
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, split_multi_eval_, input_);
 };
 
 template <typename T, int DIM, int ORDER, int ISET>
