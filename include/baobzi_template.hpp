@@ -161,28 +161,6 @@ class Node {
     /// @param [in] box box this node represents
     Node<DIM, ORDER, ISET>(const Box<DIM, ISET> &box) : box_(box) {}
 
-    std::pair<NodeT, NodeT> split(const double *coeffs) {
-        NodeT a, b;
-
-        if constexpr (DIM == 1) {
-            VecDimD hl = box_.half_length() * 0.5;
-            Box<DIM, ISET> box_a(box_.center - hl, hl);
-            Box<DIM, ISET> box_b(box_.center + hl, hl);
-
-            VecOrderD xvec_a = Func::get_cheb_nodes(-1.0, 0.0);
-            VecOrderD xvec_b = Func::get_cheb_nodes(0.0, 1.0);
-            VecOrderD cvec_a, cvec_b;
-            for (int i = 0; i < ORDER; ++i) {
-                cvec_a[i] = cheb_eval<ORDER, ISET>(xvec_a, coeffs + coeff_offset);
-                cvec_b[i] = cheb_eval<ORDER, ISET>(xvec_b, coeffs + coeff_offset);
-            }
-
-            VecOrderD coeffs_a = Func::VLU_.solve(cvec_a);
-            VecOrderD coeffs_b = Func::VLU_.solve(cvec_b);
-        }
-        return std::make_pair(a, b);
-    }
-
     /// @brief check if node is leaf
     /// @return true if leaf, false otherwise
     inline bool is_leaf() const { return coeff_offset != std::numeric_limits<uint64_t>::max(); }
@@ -387,114 +365,6 @@ struct FunctionTree {
         }
     }
 
-    // FunctionTree<DIM, ORDER, ISET>(const FunctionTree<DIM, ORDER, ISET> &A, const FunctionTree<DIM, ORDER, ISET> &B,
-    //                                const OP &op) {
-    //     max_depth_ = std::max(A.max_depth(), B.max_depth());
-
-    //     if constexpr (DIM == 1) {
-    //         using node_pair = struct node_pair {
-    //             Box<DIM, ISET> box;
-    //             Eigen::VectorXd a_coeffs;
-    //             Eigen::VectorXd b_coeffs;
-    //             const node_t *a = nullptr;
-    //             const node_t *b = nullptr;
-    //         };
-
-    //         std::queue<node_pair> q;
-
-    //         auto &[Sl, Sr] = Function<DIM, ORDER, ISET>::split_operator_;
-
-    //         q.push(node_pair{
-    //             .box = A.nodes_[0].box_,
-    //             .a_coeffs =
-    //                 A.nodes_[0].is_leaf() ? Eigen::Map<const Eigen::VectorXd>(&A.coeffs_[0], ORDER) :
-    //                 Eigen::VectorXd(),
-    //             .b_coeffs =
-    //                 B.nodes_[0].is_leaf() ? Eigen::Map<const Eigen::VectorXd>(&B.coeffs_[0], ORDER) :
-    //                 Eigen::VectorXd(),
-    //             .a = &A.nodes_[0],
-    //             .b = &B.nodes_[0],
-    //         });
-
-    //         index_t curr_child_idx = 1;
-    //         while (!q.empty()) {
-    //             const auto el = q.back();
-    //             q.pop();
-
-    //             nodes_.push_back(node_t(el.box));
-    //             auto &node = nodes_.back();
-
-    //             if (el.a_coeffs.size() && el.b_coeffs.size()) {
-    //                 node.coeff_offset = coeffs_.size();
-
-    //                 coeffs_.resize(coeffs_.size() + ORDER);
-    //                 Eigen::Map<Eigen::Vector<double, ORDER>> new_coeffs(coeffs_.data() + coeffs_.size() - ORDER);
-
-    //                 switch (op) {
-    //                 case ADD: {
-    //                     new_coeffs = el.a_coeffs + el.b_coeffs;
-    //                     break;
-    //                 }
-    //                 case SUBTRACT: {
-    //                     new_coeffs = el.a_coeffs - el.b_coeffs;
-    //                     break;
-    //                 }
-    //                 }
-    //                 continue;
-    //             }
-    //             node.first_child_idx = curr_child_idx;
-    //             curr_child_idx += 2;
-
-    //             Eigen::VectorXd la_coeffs, ra_coeffs, lb_coeffs, rb_coeffs;
-    //             const node_t *la_node = nullptr, *ra_node = nullptr, *lb_node = nullptr, *rb_node = nullptr;
-    //             if (el.a_coeffs.size()) {
-    //                 la_coeffs = Sl * el.a_coeffs;
-    //                 ra_coeffs = Sr * el.a_coeffs;
-    //             } else {
-    //                 la_node = &A.nodes_[el.a->first_child_idx];
-    //                 ra_node = &A.nodes_[el.a->first_child_idx + 1];
-    //                 if (la_node->is_leaf())
-    //                     la_coeffs = Eigen::Map<const Eigen::VectorXd>(A.coeffs_.data() + la_node->coeff_offset,
-    //                     ORDER);
-    //                 if (ra_node->is_leaf())
-    //                     ra_coeffs = Eigen::Map<const Eigen::VectorXd>(A.coeffs_.data() + ra_node->coeff_offset,
-    //                     ORDER);
-    //             }
-
-    //             if (el.b_coeffs.size()) {
-    //                 lb_coeffs = Sl * el.b_coeffs;
-    //                 rb_coeffs = Sr * el.b_coeffs;
-    //             } else {
-    //                 lb_node = &B.nodes_[el.b->first_child_idx];
-    //                 rb_node = &B.nodes_[el.b->first_child_idx + 1];
-    //                 if (lb_node->is_leaf())
-    //                     lb_coeffs = Eigen::Map<const Eigen::VectorXd>(B.coeffs_.data() + lb_node->coeff_offset,
-    //                     ORDER);
-    //                 if (rb_node->is_leaf())
-    //                     rb_coeffs = Eigen::Map<const Eigen::VectorXd>(B.coeffs_.data() + rb_node->coeff_offset,
-    //                     ORDER);
-    //             }
-
-    //             auto new_hl = 0.5 * el.box.half_length();
-    //             q.push({
-    //                 .box = box_t(el.box.center - new_hl, new_hl),
-    //                 .a_coeffs = la_coeffs,
-    //                 .b_coeffs = lb_coeffs,
-    //                 .a = la_node,
-    //                 .b = lb_node,
-    //             });
-
-    //             q.push({
-    //                 .box = box_t(el.box.center + new_hl, new_hl),
-    //                 .a_coeffs = ra_coeffs,
-    //                 .b_coeffs = rb_coeffs,
-    //                 .a = ra_node,
-    //                 .b = rb_node,
-    //             });
-    //         }
-    //     }
-    // }
-
     FunctionTree<DIM, ORDER, ISET>() {} ///< Default constructor for msgpack happiness
 
     /// @brief Find leaf node containing a point via standard pointer traversal
@@ -570,10 +440,8 @@ class Function {
     using VecDimD = Eigen::Vector<double, DIM>;            ///< DIM dimensional vector type
     using VecOrderD = Eigen::Vector<double, ORDER>;        ///< Order dimensional vector type
     using VanderMat = Eigen::Matrix<double, ORDER, ORDER>; ///< VanderMonde Matrix type
-    using SplitOperator =
-        std::pair<Eigen::Matrix<double, ORDER, ORDER>, Eigen::Matrix<double, ORDER, ORDER>>; ///< Split Operator
-    using node_t = Node<DIM, ORDER, ISET>; ///< DIM,ORDER Node type (duh)
-    using box_t = Box<DIM, ISET>;          ///< DIM dimensional box type
+    using node_t = Node<DIM, ORDER, ISET>;                 ///< DIM,ORDER Node type (duh)
+    using box_t = Box<DIM, ISET>;                          ///< DIM dimensional box type
 
     static constexpr int NChild = 1 << DIM; ///< Number of children each node potentially has (2^D)
     static constexpr int Dim = DIM;         ///< Input dimension of function
@@ -583,7 +451,6 @@ class Function {
     static std::mutex statics_mutex;            ///< mutex for locking vandermonde/chebyshev initialization
     static VecOrderD cosarray_;                 ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
-    static SplitOperator split_operator_;
 
     box_t box_;          ///< box representing the domain of our function
     double tol_;         ///< Desired relative tolerance of our approximation
@@ -679,7 +546,6 @@ class Function {
         for (int i = 0; i < ORDER; ++i)
             cosarray_[ORDER - i - 1] = cos(M_PI * (i + 0.5) / ORDER);
         VLU_ = Eigen::PartialPivLU<VanderMat>(calc_vandermonde(cosarray_));
-        split_operator_ = calc_splitter();
         is_initialized = true;
     }
 
@@ -930,24 +796,6 @@ class Function {
         msgpack::pack(ofs, *this);
     }
 
-    /// @brief calculate operator(s) that take one Node/Panel and split it into two equally sized panels
-    /// @return std::pair of linear operators that transform a panel into the "left" and "right" coefficients
-    static SplitOperator calc_splitter() {
-        SplitOperator splitter;
-        if constexpr (DIM == 1) {
-            VecOrderD xvec_a = get_cheb_nodes(-1.0, 0.0);
-            VecOrderD xvec_b = get_cheb_nodes(0.0, 1.0);
-
-            VanderMat Va = calc_vandermonde(xvec_a);
-            VanderMat Vb = calc_vandermonde(xvec_b);
-
-            splitter.first = (VLU_.solve(Va)).reverse();
-            splitter.second = (VLU_.solve(Vb)).reverse();
-        }
-
-        return splitter;
-    }
-
     Function<DIM, ORDER, ISET> shallow_copy() const {
         Function<DIM, ORDER, ISET> other;
         other.n_subtrees_ = n_subtrees_;
@@ -1083,8 +931,6 @@ typename Function<DIM, ORDER, ISET>::VecOrderD Function<DIM, ORDER, ISET>::cosar
 template <int DIM, int ORDER, int ISET>
 Eigen::PartialPivLU<typename Function<DIM, ORDER, ISET>::VanderMat> Function<DIM, ORDER, ISET>::VLU_;
 
-template <int DIM, int ORDER, int ISET>
-typename Function<DIM, ORDER, ISET>::SplitOperator Function<DIM, ORDER, ISET>::split_operator_;
 } // namespace baobzi
 
 #endif
