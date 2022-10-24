@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
+#include <sstream>
 #include <iostream>
 
 const baobzi_input_t baobzi_input_default = {
