@@ -55,11 +55,9 @@ class baobzi {
         obj_ = baobzi_init(&input, center, half_length);
     }
     baobzi(const char *infile) {
-        baobzi_header_t header = baobzi_read_header_from_file(infile);
-        data_.dim = header.dim;
-        data_.order = header.dim;
-
         obj_ = baobzi_restore(infile);
+        data_.dim = obj_->DIM;
+        data_.order = obj_->ORDER;
     }
 
     ~baobzi() {

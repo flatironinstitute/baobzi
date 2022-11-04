@@ -67,11 +67,6 @@ baobzi_t baobzi_free(baobzi_t func);
 /// @returns initialized baobzi C object
 baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length);
 
-/// @brief read dim/order/version info from file
-/// @param[in] fname path to input file
-/// @returns file header
-baobzi_header_t baobzi_read_header_from_file(const char *fname);
-
 #include "baobzi/baobzi_decls.h"
 
 #ifdef __cplusplus
