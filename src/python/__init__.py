@@ -40,7 +40,7 @@ class BAOBZI_STRUCT(Structure):
 class BAOBZI_INPUT_STRUCT(Structure):
     _fields_ = [("func", INPUT_FUNC), ("data", c_void_p), ("dim", c_int),
                 ("order", c_int), ("tol", c_double), ("minimum_leaf_fraction", c_double),
-                ("split_multi_eval", c_int),]
+                ("split_multi_eval", c_int),("min_depth", c_int)]
 
 baobzi_t = POINTER(BAOBZI_STRUCT)
 
@@ -86,6 +86,7 @@ class Baobzi:
                  half_length=None,
                  tol=None,
                  minimum_leaf_fraction=0.0,
+                 min_depth=0,
                  filename=None):
         self.ptr = None
         if filename:
@@ -100,7 +101,7 @@ class Baobzi:
                 )
             self.dim = dim
             self.order = order
-            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order, tol, minimum_leaf_fraction)
+            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order, tol, minimum_leaf_fraction, min_depth)
 
             self.ptr = baobzi_init(pointer(inputdata),
                                    center.ctypes.data_as(POINTER(c_double)),

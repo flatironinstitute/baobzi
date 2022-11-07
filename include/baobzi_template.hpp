@@ -59,7 +59,7 @@ struct Box {
 /// @brief Return an estimate of the error for a given set of coefficients
 /// @param[in] coeffs one or two dimensional Vector/Matrix of coefficients
 /// @returns estimation of error given those coefficients
-inline double standard_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
+inline double tail_error(const Eigen::Ref<Eigen::MatrixXd> &coeffs) {
     double maxcoeff = 0.0;
     double scaling_factor = 1.0;
     if (coeffs.cols() == 1) {
@@ -182,14 +182,13 @@ class Node {
 
             Eigen::Vector<double, ORDER> coeffs = Func::VLU_.solve(F);
 
-            if (standard_error(coeffs) > input->tol)
+            if (tail_error(coeffs) > input->tol)
                 return std::vector<double>();
 
             std::vector<double> coeffs_stl(coeffs.size());
             for (int i = 0; i < coeffs.size(); ++i)
                 coeffs_stl[i] = coeffs(ORDER - i - 1);
 
-            coeff_offset = 0;
             return coeffs_stl;
         }
         if constexpr (DIM == 2) {
@@ -207,7 +206,7 @@ class Node {
             Eigen::Matrix<double, ORDER, ORDER> coeffs = Func::VLU_.solve(F);
             coeffs = Func::VLU_.solve(coeffs.transpose()).transpose();
 
-            if (standard_error(coeffs) > input->tol)
+            if (tail_error(coeffs) > input->tol)
                 return std::vector<double>();
 
             std::vector<double> coeffs_stl(coeffs.size());
@@ -335,10 +334,10 @@ struct FunctionTree {
                 auto &node = nodes_[i + node_index];
                 std::vector<double> new_coeffs = node.fit(input, func);
 
-                if (node.is_leaf()) {
+                if (new_coeffs.size()) {
                     node.coeff_offset = coeffs_.size();
                     coeffs_.insert(std::end(coeffs_), std::begin(new_coeffs), std::end(new_coeffs));
-                } else if (!node.is_leaf()) {
+                } else {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
 
@@ -357,7 +356,6 @@ struct FunctionTree {
                     }
                 }
             }
-
             if (!q.empty())
                 max_depth_++;
 
@@ -372,14 +370,14 @@ struct FunctionTree {
     /// @return leaf node containing point x
     inline const node_t &find_node_traverse(const VecDimD &x) const {
         auto *node = &nodes_[0];
-        auto *next_node = &nodes_[node->first_child_idx]; // attempt to force preload of potential next node
+        auto *next_node = nodes_.data() + node->first_child_idx; // attempt to force preload of potential next node
         while (!node->is_leaf()) {
             index_t child_idx = 0;
             for (int i = 0; i < DIM; ++i)
                 child_idx = child_idx | ((x[i] > node->box_.center[i]) << i);
 
             node = next_node + child_idx;
-            next_node = &nodes_[node->first_child_idx];
+            next_node = nodes_.data() + node->first_child_idx;
         }
 
         return *node;
@@ -470,7 +468,7 @@ class Function {
     struct {
         uint16_t base_depth = 0;   ///< depth of subtrees
         uint64_t n_evals_root = 0; ///< number of function evals before subtree calls
-        uint32_t t_elapsed = 0;    ///< time in milliseconds to create object
+        float t_elapsed = 0;       ///< time in milliseconds to create object
     } stats_;
 
     /// @brief Calculate memory_usage of this object in bytes
@@ -553,8 +551,8 @@ class Function {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
-    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp,
-                               const std::function<double(double *, void *)> &func)
+    template <class T>
+    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp, T &func)
         : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), input_(*input), split_multi_eval_(input->split_multi_eval) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
@@ -575,6 +573,7 @@ class Function {
         // Breadth first search. Step through each level of the tree and test fit all of the nodes
         // We exit when a level isn't completely filled with parent nodes (rather than leaves)
         // This way we can always avoid redundant traversals by jumping straight to a root node of a subtree
+        int depth = 0;
         while (!q.empty()) {
             int n_next = q.size();
 
@@ -602,9 +601,9 @@ class Function {
 
                 nodes.emplace_back(node_t(box));
                 auto &node = nodes.back();
-                node.fit(input, func);
+                auto coeffs = node.fit(input, func);
 
-                if (!node.is_leaf()) {
+                if (stats_.base_depth < input->min_depth || !coeffs.size()) {
                     add_node_children_to_queue(q, node.box_.center, half_width);
                 } else {
                     leaf_fraction += 1.0;
@@ -650,7 +649,7 @@ class Function {
         }
 
         auto t_end = std::chrono::steady_clock::now();
-        auto t_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start);
+        auto t_elapsed = std::chrono::duration_cast<std::chrono::microseconds>(t_end - t_start) / 1000.0;
         stats_.t_elapsed = t_elapsed.count();
         build_cache();
     }
@@ -775,6 +774,14 @@ class Function {
     /// @param[in] x [DIM] point to evaluate function at
     /// @returns function approximation at point x
     inline double operator()(const VecDimD &x) const { return eval(x); }
+
+    /// @brief eval function approximation at point
+    /// @param[in] x [DIM] point to evaluate function at
+    /// @returns function approximation at point x
+    inline double operator()(const double &x) const {
+        static_assert(DIM == 1, "Baobzi: Function evaluation for scalar double");
+        return eval(VecDimD{x});
+    }
 
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at
@@ -904,7 +911,7 @@ class Function {
     }
 
     /// @brief msgpack serialization magic
-    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, split_multi_eval_, input_);
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, split_multi_eval_);
 };
 
 template <typename T, int DIM, int ORDER, int ISET>
