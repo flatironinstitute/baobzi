@@ -471,6 +471,10 @@ class Function {
         float t_elapsed = 0;       ///< time in milliseconds to create object
     } stats_;
 
+    inline std::pair<VecDimD, VecDimD> get_bounds() const {
+        return std::pair{lower_left_, lower_left_ + 2.0 * box_.half_length()};
+    }
+
     /// @brief Calculate memory_usage of this object in bytes
     /// @returns Memory usage of baobzi object in bytes
     std::size_t memory_usage() const {
