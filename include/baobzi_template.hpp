@@ -28,6 +28,12 @@
 /// Namespace for baobzi
 namespace baobzi {
 
+using raw_leaf_node = struct {
+    double a;
+    double L;
+    const double *coeffs;
+};
+
 using index_t = uint32_t;    ///< Type specifying indexing into flattened tree
 using coeff_data = double *; ///< Array to hold flattened coefficients
 
@@ -742,6 +748,23 @@ class Function {
     inline std::size_t get_global_node_index(const VecDimD &x) const {
         int i_sub = get_linear_bin(x);
         return subtree_node_offsets_[i_sub] + subtrees_[i_sub].get_node_index(x);
+    }
+
+    std::vector<raw_leaf_node> get_leaves() const {
+        std::vector<raw_leaf_node> leaves;
+
+        for (const auto &subtree : subtrees_) {
+            for (const auto &node : subtree.nodes_) {
+                if (!node.is_leaf())
+                    continue;
+
+                double L = 2.0 * node.box_.half_length()[0];
+                double a = node.box_.center[0] - 0.5 * L;
+                const double *coeffs = node.coeff_offset + subtree.coeffs_.data();
+                leaves.emplace_back(raw_leaf_node{a, L, coeffs});
+            }
+        }
+        return leaves;
     }
 
     /// @brief eval function approximation at n_trg points
