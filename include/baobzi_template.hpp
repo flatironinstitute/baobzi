@@ -176,7 +176,8 @@ class Node {
     /// Modifies: Node::leaf_, Node::coeffs_
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns true if fit successful, false if not good enough
-    std::vector<double> fit(const baobzi_input_t *input, const std::function<double(double *, void *)> &func) {
+    std::vector<double> fit(const baobzi_input_t *input, const std::function<double(double *, void *)> &func,
+                            const std::vector<double> &sample_points = std::vector<double>()) {
         VecDimD half_length = box_.half_length();
 
         if constexpr (DIM == 1) {
@@ -195,6 +196,22 @@ class Node {
             for (int i = 0; i < coeffs.size(); ++i)
                 coeffs_stl[i] = coeffs(ORDER - i - 1);
 
+            for (auto point : sample_points) {
+                const double a = box_.center[0] - half_length[0];
+                const double b = box_.center[0] + half_length[0];
+                if (point < a || point >= b)
+                    continue;
+
+                const double actual_val = func(&point, input->data);
+                const double test_val = eval(VecDimD{point}, coeffs_stl.data());
+                if (actual_val == 0.0)
+                    continue;
+
+                if (std::abs(actual_val) < 1E-16 || std::abs(test_val / actual_val - 1.0) > input->tol)
+                    return std::vector<double>();
+
+                std::cout << test_val << " " << actual_val << std::endl;
+            }
             return coeffs_stl;
         }
         if constexpr (DIM == 2) {
@@ -321,7 +338,8 @@ struct FunctionTree {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] box box that this tree lives in
     FunctionTree<DIM, ORDER, ISET>(const baobzi_input_t *input, const Box<DIM, ISET> &box,
-                                   std::function<double(double *, void *)> func) {
+                                   std::function<double(double *, void *)> func,
+                                   const std::vector<double> &sample_points = std::vector<double>()) {
         std::queue<Box<DIM, ISET>> q;
         VecDimD half_width = box.half_length() * 0.5;
         q.push(box);
@@ -338,7 +356,7 @@ struct FunctionTree {
                 nodes_.push_back(node_t(box));
 
                 auto &node = nodes_[i + node_index];
-                std::vector<double> new_coeffs = node.fit(input, func);
+                std::vector<double> new_coeffs = node.fit(input, func, sample_points);
 
                 if (new_coeffs.size()) {
                     node.coeff_offset = coeffs_.size();
@@ -463,10 +481,8 @@ class Function {
 
     std::vector<FunctionTree<DIM, ORDER, ISET>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;                   ///< Number of subtrees in each linear dimension of our space
-    std::vector<int> subtree_node_offsets_; ///< n_subtrees array of offsets for where in the global array of node
-                                            ///< pointers the global node pointer array starts
-    std::vector<node_t *> node_pointers_;   ///< Vector of pointers to every node from every subtree
-    VecDimD inv_bin_size_;                  ///< Inverse linear dimensions of the bins that our subtrees live
+    std::vector<node_t *> node_pointers_;                  ///< Vector of pointers to every node from every subtree
+    VecDimD inv_bin_size_; ///< Inverse linear dimensions of the bins that our subtrees live
 
     bool split_multi_eval_ = true; ///< Split node-search and evaluation when evaluating multiple points
 
@@ -485,7 +501,6 @@ class Function {
     /// @returns Memory usage of baobzi object in bytes
     std::size_t memory_usage() const {
         std::size_t mem = sizeof(*this);
-        mem += subtree_node_offsets_.capacity() * sizeof(subtree_node_offsets_[0]);
         mem += node_pointers_.capacity() * sizeof(node_pointers_[0]);
         for (const auto &subtree : subtrees_)
             mem += subtree.memory_usage();
@@ -562,7 +577,8 @@ class Function {
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
     template <class T>
-    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp, T &func)
+    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp, T &func,
+                               const std::vector<double> &sample_points = std::vector<double>())
         : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), input_(*input), split_multi_eval_(input->split_multi_eval) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
@@ -611,7 +627,7 @@ class Function {
 
                 nodes.emplace_back(node_t(box));
                 auto &node = nodes.back();
-                auto coeffs = node.fit(input, func);
+                auto coeffs = node.fit(input, func, sample_points);
 
                 if (stats_.base_depth < input->min_depth || !coeffs.size()) {
                     add_node_children_to_queue(q, node.box_.center, half_width);
@@ -655,7 +671,7 @@ class Function {
                 (bins.template cast<double>().array() + 0.5) * bin_size.array() + lower_left_.array();
 
             Box<DIM, ISET> root_box = {parent_center, 0.5 * bin_size};
-            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box, func));
+            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET>(input, root_box, func, sample_points));
         }
 
         auto t_end = std::chrono::steady_clock::now();
@@ -664,18 +680,14 @@ class Function {
         build_cache();
     }
 
-    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp) {
+    Function<DIM, ORDER, ISET>(const baobzi_input_t *input, const double *xp, const double *lp,
+                               const std::vector<double> &sample_points = std::vector<double>()) {
         const auto func = [&input](double *x, void *data) { return input->func(x, input->data); };
-        *this = Function<DIM, ORDER, ISET>(input, xp, lp, func);
+        *this = Function<DIM, ORDER, ISET>(input, xp, lp, func, sample_points);
     }
 
     /// @brief Build any intermediate state necessary for computation
     void build_cache() {
-        subtree_node_offsets_.resize(n_subtrees_.prod());
-        subtree_node_offsets_[0] = 0;
-        for (std::size_t i = 1; i < subtree_node_offsets_.size(); ++i)
-            subtree_node_offsets_[i] = subtree_node_offsets_[i - 1] + subtrees_[i - 1].size();
-
         auto n_nodes_tot = std::accumulate(subtrees_.begin(), subtrees_.end(), (std::size_t)0,
                                            [](size_t prior, auto &subtree) { return prior + subtree.size(); });
 
@@ -741,14 +753,6 @@ class Function {
     /// @param[in] xp [DIM] point to evaluate function at
     /// @returns function approximation at point xp
     inline double eval(const double *xp) const { return eval(VecDimD(xp)); }
-
-    /// @brief get index of node (across all subnodes)
-    /// @param[in] x [DIM] point to find the node of
-    /// @returns index in global node array
-    inline std::size_t get_global_node_index(const VecDimD &x) const {
-        int i_sub = get_linear_bin(x);
-        return subtree_node_offsets_[i_sub] + subtrees_[i_sub].get_node_index(x);
-    }
 
     std::vector<raw_leaf_node> get_leaves() const {
         std::vector<raw_leaf_node> leaves;
