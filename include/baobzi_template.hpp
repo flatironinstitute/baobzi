@@ -203,14 +203,12 @@ class Node {
                     continue;
 
                 const double actual_val = func(&point, input->data);
-                const double test_val = eval(VecDimD{point}, coeffs_stl.data());
                 if (actual_val == 0.0)
                     continue;
+                const double test_val = eval(VecDimD{point}, coeffs.data());
 
-                if (std::abs(actual_val) < 1E-16 || std::abs(test_val / actual_val - 1.0) > input->tol)
+                if (std::abs((test_val - actual_val) / actual_val) > input->tol)
                     return std::vector<double>();
-
-                std::cout << test_val << " " << actual_val << std::endl;
             }
             return coeffs_stl;
         }
