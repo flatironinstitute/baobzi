@@ -34,6 +34,11 @@ using raw_leaf_node = struct {
     const double *coeffs;
 };
 
+struct leaf_compare {
+    bool operator()(baobzi::raw_leaf_node a, baobzi::raw_leaf_node b) { return a.a < b.a; };
+    bool operator()(baobzi::raw_leaf_node a, double b) { return a.a < b; };
+};
+
 using index_t = uint32_t;    ///< Type specifying indexing into flattened tree
 using coeff_data = double *; ///< Array to hold flattened coefficients
 
@@ -766,6 +771,8 @@ class Function {
                 leaves.emplace_back(raw_leaf_node{a, L, coeffs});
             }
         }
+
+        std::sort(leaves.begin(), leaves.end(), leaf_compare());
         return leaves;
     }
 
