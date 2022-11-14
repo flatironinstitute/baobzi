@@ -577,6 +577,30 @@ class Function {
         is_initialized = true;
     }
 
+    Function<DIM, ORDER, ISET>(const std::string &filename) {
+        std::ifstream ifs(filename, std::ofstream::binary | std::ofstream::in);
+        ifs.seekg(0, ifs.end);
+        size_t length = ifs.tellg();
+        ifs.seekg(0, ifs.beg);
+
+        std::size_t offset = 0;
+        std::vector<char> buf(length);
+        ifs.read(buf.data(), length);
+
+        msgpack::object_handle oh;
+        msgpack::unpack(oh, buf.data(), length, offset);
+
+        // fixme, should compare header
+        baobzi_header_t header = oh.get().as<baobzi_header_t>();
+        if (header.version != BAOBZI_HEADER_VERSION) {
+            std::cerr << "WARNING: Baobzi versions doesn't match for file " + filename << std::endl;
+            return;
+        }
+
+        msgpack::unpack(oh, buf.data(), length, offset);
+        *this = oh.get().as<Function<DIM, ORDER, ISET>>();
+    }
+
     /// @brief Construct our Function object (fits recursively, can be slow)
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] xp [dim] center of function domain
