@@ -210,7 +210,9 @@ class Node {
                 const double actual_val = func(&point, input->data);
                 if (actual_val == 0.0)
                     continue;
-                const double test_val = eval(VecDimD{point}, coeffs.data());
+                coeff_offset = 0;
+                const double test_val = eval(VecDimD{point}, coeffs_stl.data());
+                coeff_offset = std::numeric_limits<decltype(coeff_offset)>::max();
 
                 if (std::abs((test_val - actual_val) / actual_val) > input->tol)
                     return std::vector<double>();
