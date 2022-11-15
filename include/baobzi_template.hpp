@@ -599,6 +599,7 @@ class Function {
 
         msgpack::unpack(oh, buf.data(), length, offset);
         *this = oh.get().as<Function<DIM, ORDER, ISET>>();
+        this->build_cache();
     }
 
     /// @brief Construct our Function object (fits recursively, can be slow)
