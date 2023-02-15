@@ -3,7 +3,6 @@ project(
   baobzi
   LANGUAGES C CXX
   )
-enable_language(Fortran OPTIONAL)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -117,11 +116,14 @@ endif()
 
 set(BAOBZI_BINDING_SOURCES src/baobzi.cpp)
 
-if (DEFINED CMAKE_Fortran_COMPILER AND ${BAOBZI_BUILD_FORTRAN})
-  list(APPEND BAOBZI_BINDING_SOURCES src/baobzi.f90)
-  install(FILES ${PROJECT_SOURCE_DIR}/src/baobzi.f90
-    ${CMAKE_CURRENT_BINARY_DIR}/baobzi.mod
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/fortran)
+if (${BAOBZI_BUILD_FORTRAN})
+  enable_language(Fortran)
+  if (DEFINED CMAKE_Fortran_COMPILER)
+    list(APPEND BAOBZI_BINDING_SOURCES src/baobzi.f90)
+    install(FILES ${PROJECT_SOURCE_DIR}/src/baobzi.f90
+      ${CMAKE_CURRENT_BINARY_DIR}/baobzi.mod
+      DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/fortran)
+  endif()
 endif()
 
 if (${BAOBZI_BUILD_SHARED})
