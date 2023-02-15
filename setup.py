@@ -1,7 +1,7 @@
 from skbuild import setup
 
 setup(name='baobzi',
-      version='0.9.3',
+      version='0.9.4',
       description='An adaptive fast function approximator based on tree search',
       author='Robert Blackwell',
       author_email='rblackwell@flatironinstitute.org',
