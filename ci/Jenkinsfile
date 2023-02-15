@@ -1,0 +1,44 @@
+pipeline {
+    agent none
+    options {
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '8', daysToKeepStr: '20'))
+        timeout(time: 1, unit: 'HOURS')
+    }
+    stages {
+        stage('main') {
+            agent {
+                docker { image 'quay.io/pypa/manylinux2014_x86_64' }
+            }
+            environment {
+                HOME = "${WORKSPACE}"
+                LC_ALL = "C"
+            }
+            steps {
+                sh 'git submodule update --init --recursive'
+                sh 'cmake -B build . -DCMAKE_BUILD_TYPE=Release'
+                sh 'cd build && make -j4'
+                sh 'cd build && ctest --output-on-failure'
+            }
+        }
+    }
+    post {
+        failure {
+            emailext subject: '$PROJECT_NAME - Build #$BUILD_NUMBER - $BUILD_STATUS',
+	        body: '''$PROJECT_NAME - Build #$BUILD_NUMBER - $BUILD_STATUS
+Check console output at $BUILD_URL to view full results.
+Building $BRANCH_NAME for $CAUSE
+$JOB_DESCRIPTION
+Changes:
+$CHANGES
+End of build log:
+${BUILD_LOG,maxLines=200}
+''',
+	        recipientProviders: [
+		[$class: 'DevelopersRecipientProvider'],
+	    ],
+	        replyTo: '$DEFAULT_REPLYTO',
+	        to: 'rblackwell@flatironinstitute.org'
+        }
+    }
+}
