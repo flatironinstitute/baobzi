@@ -246,13 +246,14 @@ g++ -o test_baobzi.cpp -lbaobzi
 ```python3
 # simple2d.py
 from baobzi import Baobzi
+import numpy as np
 
 def py_test_func(x):
     return x[0] * x[1]
 
-center = [0.0, 0.0]
-hl = [1.0, 1.0]
-point = [0.25, 0.25]
+center = np.array([0.0, 0.0])
+hl = np.array([1.0, 1.0])
+point = np.array([0.25, 0.25])
 tol = 1E-8
 minimum_leaf_fraction = 0.0 # optional/default
 split_multi_eval = 1 # optional/default
