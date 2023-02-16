@@ -86,6 +86,7 @@ class Baobzi:
                  half_length=None,
                  tol=None,
                  minimum_leaf_fraction=0.0,
+                 split_multi_eval=1,
                  filename=None):
         self.ptr = None
         if filename:
@@ -100,7 +101,7 @@ class Baobzi:
                 )
             self.dim = dim
             self.order = order
-            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order, tol, minimum_leaf_fraction)
+            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order, tol, minimum_leaf_fraction, split_multi_eval)
 
             self.ptr = baobzi_init(pointer(inputdata),
                                    center.ctypes.data_as(POINTER(c_double)),
