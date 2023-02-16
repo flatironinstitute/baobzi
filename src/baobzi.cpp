@@ -1,7 +1,6 @@
 #include <msgpack.hpp>
 
 #include "baobzi.h"
-#include "baobzi.hpp"
 
 #include <tuple>
 
