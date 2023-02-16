@@ -57,28 +57,23 @@ the box containing your point and evaluates using this approximant.
 
 ## Quick install
 ### Python/Conda
-There are currently no wheels, which means `conda`/`pip` have to do source builds of `Baobzi` (though
-this should change hopefully soon). To do with standard `pip` install, first, make sure you have
-a modern `gcc`/`g++` in your path, and `cmake >= 3.14`.
 ```bash
-# create a virtualenv, if you want
+# create a virtualenv if you want
+# I advise --system-site-packages when file quotas can a problem
 python3 -m venv --system-site-packages myenv
 source myenv/bin/activate
-pip install git+https://github.com/flatironinstitute/baobzi.git
-
-python -c 'from baobzi import Baobzi'
+pip install baobzi
 ```
 
-If you use `conda`, you can install `gcc`, `g++`, and cmake via the `conda-forge` repo, and then use `pip` to install `baobzi`.
+Or with conda
 ```bash
-conda create -y -n baobzi -c conda-forge gcc gxx cmake numpy
+# create a conda environment, if you want
+conda create -y -n baobzi
 conda activate baobzi
-pip install git+https://github.com/flatironinstitute/baobzi.git
-
-python -c 'from baobzi import Baobzi'
+pip install baobzi
 ```
 
-## Building/testing
+## Building/testing/other languages
 Baobzi's only dependencies are cmake >= 3.14, and a C/C++17 compiler (gcc only really,
 currently). I get the best performance out of g++-11 right now. While there is a header only
 library for C++, it can be quite finicky. Therefore, for optimal performance, I currently
