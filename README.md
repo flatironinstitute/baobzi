@@ -139,6 +139,7 @@ worth playing with for your specific function.
 
   Setting this parameter to 1 uses the typically faster 'split' model, while setting it to 0
   will use the direct model.
+* `max_depth`: Maximum depth allowed for tree before interpolation considered failed.
 
 ## Running with...
 All examples require your project know where the `baobzi` shared object is located. In the
@@ -172,7 +173,8 @@ int main(int argc, char *argv[]) {
         .order = 6,
         .tol = 1E-10,
         .minimum_leaf_fraction = 0.0,
-        .split_multi_eval = 0
+        .split_multi_eval = 0,
+        .max_depth = 50
     };
 
     const double hl[2] = {1.0, 1.0};
@@ -213,7 +215,8 @@ int main(int argc, char *argv[]) {
         .order = 6,
         .tol = 1E-10,
         .minimum_leaf_fraction = 0.0,
-        .split_multi_eval = 0
+        .split_multi_eval = 0,
+        .max_depth = 50
     };
 
     const double hl[2] = {1.0, 1.0};
@@ -252,8 +255,9 @@ point = np.array([0.25, 0.25])
 tol = 1E-8
 minimum_leaf_fraction = 0.0 # optional/default
 split_multi_eval = 1 # optional/default
+max_depth = 50 # optional/default
 
-test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8, minimum_leaf_fraction, split_multi_eval)
+test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8, minimum_leaf_fraction, split_multi_eval, max_depth)
 test.save('test.baobzi')
 print(test(point))
 del test
@@ -287,9 +291,10 @@ order = 6
 tol = 1E-8
 minimum_leaf_fraction = 0.0 # optional/default
 split_multi_eval = 1 # optional/default
+max_depth = 50 # optional/default
 output_file = "simple2d.baobzi"
 
-func_approx = baobzi.init(testfunc, dim, order, center, hl, tol, minimum_leaf_fraction, split_multi_eval)
+func_approx = baobzi.init(testfunc, dim, order, center, hl, tol, minimum_leaf_fraction, split_multi_eval, max_depth)
 println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
 
 baobzi.save(func_approx, output_file)
@@ -321,7 +326,11 @@ order = 6;
 center = [0.0, 0.0];
 hl = [1.0, 1.0];
 tol = 1E-8;
-func_approx = baobzi('new', 'testfun', dim, order, center, hl, tol);
+minimum_leaf_fraction = 0.0;
+split_multi_eval = 1;
+max_depth = 50;
+
+func_approx = baobzi('new', 'testfun', dim, order, center, hl, tol, minimum_leaf_fraction, split_multi_eval, max_depth);
 display(func_approx.eval([0.25, 0.25]))
 func_approx.save('simple2d.baobzi');
 clear func_approx
@@ -353,6 +362,7 @@ program main
   input%tol = 1E-8
   input%minimum_leaf_fraction = 0.0
   input%split_multi_eval = 0
+  input%max_depth = 50
 
   center(:) = 0.0
   half_length(:) = 1.0

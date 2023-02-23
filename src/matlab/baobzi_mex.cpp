@@ -37,18 +37,17 @@ double matfun_wrapper(const double *x, const void *data_) {
 class baobzi {
   public:
     baobzi(const std::string &matfun, int dim, int order, const double *center, const double *half_length,
-           const double tol, const double minimum_leaf_fraction, const int split_multi_eval)
+           const double tol, const double minimum_leaf_fraction, const int split_multi_eval, const int max_depth)
         : data_({matfun, dim, order}) {
 
-        baobzi_input_t input = {
-            .func = matfun_wrapper,
-            .data = &data_,
-            .dim = dim,
-            .order = order,
-            .tol = tol,
-            .minimum_leaf_fraction = minimum_leaf_fraction,
-            .split_multi_eval = split_multi_eval,
-        };
+        baobzi_input_t input = {.func = matfun_wrapper,
+                                .data = &data_,
+                                .dim = dim,
+                                .order = order,
+                                .tol = tol,
+                                .minimum_leaf_fraction = minimum_leaf_fraction,
+                                .split_multi_eval = split_multi_eval,
+                                .max_depth = max_depth};
 
         // to prevent matlab from segfaulting if your function doesn't exist, try to call it once
         matfun_wrapper(center, &data_);
@@ -95,8 +94,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         // Check parameters
         if (nlhs != 1)
             mexErrMsgTxt("New: One output expected.");
-        if (nrhs != 9)
-            mexErrMsgTxt("New: Nine inputs expected.");
+        if (nrhs != 10)
+            mexErrMsgTxt("New: Ten inputs expected.");
 
         std::string baobzi_fit_fcn = to_string(prhs[1]);
 
@@ -107,9 +106,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
         double tol = mxGetPr(prhs[6])[0];
         double minimum_leaf_fraction = mxGetPr(prhs[7])[0];
         int split_multi_eval = mxGetPr(prhs[8])[0];
+        int max_depth = mxGetPr(prhs[9])[0];
 
         // Return a handle to a new C++ instance
-        plhs[0] = convertPtr2Mat<baobzi>(new baobzi(baobzi_fit_fcn, dim, order, center, half_length, tol, minimum_leaf_fraction, split_multi_eval));
+        plhs[0] = convertPtr2Mat<baobzi>(new baobzi(baobzi_fit_fcn, dim, order, center, half_length, tol,
+                                                    minimum_leaf_fraction, split_multi_eval, max_depth));
         return;
     }
 

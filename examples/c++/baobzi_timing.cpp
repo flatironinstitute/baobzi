@@ -106,10 +106,11 @@ int main(int argc, char *argv[]) {
         input.dim = 1;
         input.order = 8;
         input.data = &scale_factor;
-        input.tol = 1E-5;
+        input.tol = 1E-10;
         input.func = testfun_1d;
         input.minimum_leaf_fraction = 1.0;
         input.split_multi_eval = 0;
+        input.max_depth = 8;
 
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
@@ -118,7 +119,7 @@ int main(int argc, char *argv[]) {
         baobzi::Function<1, 6, 0, real_t> func_approx_1d(&input, &center, &hl);
         func_approx_1d.print_stats();
 
-        time_function<2>(func_approx_1d, x_transformed, n_runs);
+        time_function<1>(func_approx_1d, x_transformed, n_runs);
         print_error(func_approx_1d, input, x_transformed);
         std::cout << "\n";
     }
@@ -132,10 +133,11 @@ int main(int argc, char *argv[]) {
         input.dim = 2;
         input.order = 10;
         input.data = &scale_factor;
-        input.tol = 1E-5;
+        input.tol = 1E-10;
         input.func = testfun_2d;
         input.minimum_leaf_fraction = 0.0;
         input.split_multi_eval = 1;
+        input.max_depth = 50;
 
         for (int i = 0; i < 2 * n_points; i += 2)
             for (int j = 0; j < 2; ++j)

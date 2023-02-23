@@ -7,11 +7,18 @@
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
-#include <sstream>
 #include <iostream>
+#include <limits>
+#include <sstream>
 
-const baobzi_input_t baobzi_input_default = {
-    .func = NULL, .data = NULL, .dim = 0, .order = 0, .tol = 0.0, .minimum_leaf_fraction = 0.0, .split_multi_eval = 1};
+const baobzi_input_t baobzi_input_default = {.func = NULL,
+                                             .data = NULL,
+                                             .dim = 0,
+                                             .order = 0,
+                                             .tol = 0.0,
+                                             .minimum_leaf_fraction = 0.0,
+                                             .split_multi_eval = 1,
+                                             .max_depth = 50};
 
 inline std::string file_to_string(const std::string &path) {
     std::ostringstream buf;

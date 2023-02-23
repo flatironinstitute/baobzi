@@ -1,5 +1,6 @@
 #ifndef BAOBZI_TEMPLATE_HPP
 #define BAOBZI_TEMPLATE_HPP
+#include <stdexcept>
 #define _USE_MATH_DEFINES
 
 #include <algorithm>
@@ -28,6 +29,10 @@
 /// Namespace for baobzi
 namespace baobzi {
 using index_t = uint32_t; ///< Type specifying indexing into flattened tree
+
+class MaxDepthExceeded : public std::exception {
+    virtual const char *what() const throw() { return "tree depth exceeds max input depth"; }
+};
 
 template <int DIM, int ORDER, int ISET, typename T>
 class Function;
@@ -358,6 +363,8 @@ struct FunctionTree {
 
             if (!q.empty())
                 max_depth_++;
+            if (max_depth_ > input->max_depth)
+                throw MaxDepthExceeded();
 
             half_width *= 0.5;
         }
@@ -621,6 +628,8 @@ class Function {
             if ((1 << (DIM * (stats_.base_depth + 1))) == q.size()) {
                 n_subtrees_ *= 2;
                 stats_.base_depth++;
+                if (stats_.base_depth > input->max_depth)
+                    throw MaxDepthExceeded();
             } else
                 break;
         }
@@ -634,13 +643,16 @@ class Function {
         lower_left_ = box_.center - half_length;
 
         subtrees_.reserve(n_subtrees_.prod());
+
+        auto input_local = *input;
+        input_local.max_depth -= stats_.base_depth;
         for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin) {
             Eigen::Vector<int, DIM> bins = get_bins(i_bin);
 
             VecDimD parent_center = (bins.template cast<T>().array() + 0.5) * bin_size.array() + lower_left_.array();
 
             Box<DIM, ISET, T> root_box = {parent_center, 0.5 * bin_size};
-            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET, T>(input, root_box, coeffs_));
+             subtrees_.push_back(FunctionTree<DIM, ORDER, ISET, T>(&input_local, root_box, coeffs_));
         }
 
         auto t_end = std::chrono::steady_clock::now();

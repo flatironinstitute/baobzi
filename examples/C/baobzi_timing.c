@@ -131,6 +131,7 @@ int main(int argc, char *argv[]) {
         input.data = &scale_factor;
         input.minimum_leaf_fraction = 1.0;
         input.split_multi_eval = 0;
+        input.max_depth = 50;
 
         double hl[] = {1.0};
         double center[] = {2.0};
