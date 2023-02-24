@@ -54,14 +54,10 @@ option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
 option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
 option(BAOBZI_BUILD_FORTRAN "Build Fortran bindings" OFF)
-option(BAOBZI_CPU_DISPATCH "Use CPU dispatch for generic binary" ON)
+option(BAOBZI_CPU_DISPATCH "Use CPU dispatch for generic binary" OFF)
 
-
-if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm64")
-  set(BAOBZI_CPU_DISPATCH OFF)
-endif()
-
-if (BAOBZI_CPU_DISPATCH)
+if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+  set(BAOBZI_CPU_DISPATCH ON)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBAOBZI_CPU_DISPATCH")
 endif()
 
