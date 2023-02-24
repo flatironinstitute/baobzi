@@ -33,7 +33,7 @@ int get_iset() {
     enum ISET { GENERIC, AVX, AVX2, AVX512 };
 
     int iset = ISET::GENERIC;
-#ifdef __x86_64__
+#ifdef BAOBZI_CPU_DISPATCH
     if (__builtin_cpu_supports("avx"))
         iset = ISET::AVX;
     if (__builtin_cpu_supports("avx2"))
