@@ -56,7 +56,7 @@ int get_iset() {
         else if (iset_str == "avx512")
             iset = ISET::AVX512;
         else
-            std::cout << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
+            std::cerr << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
     }
 #endif
 
@@ -127,6 +127,9 @@ baobzi_t baobzi_free(baobzi_t func) {
 }
 
 bool is_valid_func(const baobzi_input_t *input, const double *point) {
+    if (!input->func)
+        return false;
+
     try {
         input->func(point, input->data);
     } catch (std::exception(e)) {
@@ -141,7 +144,7 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
         std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi due to invalid 'tol' parameter. Please supply "
                      "something greater than zero.\n";
         return nullptr;
-    } else if (!input->func || !is_valid_func(input, center)) {
+    } else if (!is_valid_func(input, center)) {
         std::cerr
             << "BAOBZI ERROR: Unable to initialize Baobzi due to empty or invalid 'func' parameter. Please supply "
                "a valid function to fit.\n";
