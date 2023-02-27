@@ -30,7 +30,7 @@ namespace baobzi {
 using index_t = uint32_t; ///< Type specifying indexing into flattened tree
 
 class MaxDepthExceeded : public std::exception {
-    virtual const char *what() const throw() { return "tree depth exceeds max input depth"; }
+    virtual const char *what() const throw() { return "Baobzi fit error: tree depth exceeded max allowed input depth"; }
 };
 
 template <int DIM, int ORDER, int ISET, typename T>

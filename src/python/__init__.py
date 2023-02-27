@@ -103,6 +103,8 @@ class Baobzi:
             self.ptr = baobzi_init(pointer(inputdata),
                                    center.ctypes.data_as(POINTER(c_double)),
                                    half_length.ctypes.data_as(POINTER(c_double)))
+            if self.ptr[0].obj is None:
+                raise RuntimeError("Unable to create baobzi object")
         else:
             print(
                 "Baobzi requires either a 'filename' argument or a 'fin' argument"
