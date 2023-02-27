@@ -427,10 +427,8 @@ target_link_libraries(baobzi_test PUBLIC baobzi_static)
 See the [issues](https://github.com/blackwer/baobzi/issues) or [project tracker](https://github.com/blackwer/baobzi/projects/1).
 
 ## Known Issues. IMPORTANT PLEASE READ
-* No out of bounds handling at all. If you call out of bounds, your program could crash or
-  worse. Only you can prevent segfaults (or even worse, wrong answers). Note that `baobzi`
-  dimensions are defined on the *semi-open* interval `[x0, x1)`. Calling on the upper
-  boundaries will segfault or give wrong answers.
+* `baobzi` dimensions are defined on the *semi-open* interval `[x0, x1)`. Baobzi functions
+  will return NAN outside the this interval.
 * Baobzi can't handle singularities or otherwise pathological functions like `sin(1/x)`. It
   will eat your memory and crash. I intend to handle these issues, but I want to work on an API
   that allows for more options to deal with them. That will take time.

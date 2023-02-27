@@ -1,6 +1,5 @@
 #ifndef BAOBZI_TEMPLATE_HPP
 #define BAOBZI_TEMPLATE_HPP
-#include <stdexcept>
 #define _USE_MATH_DEFINES
 
 #include <algorithm>
@@ -455,9 +454,10 @@ class Function {
     static VecOrderD cosarray_;                 ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
 
-    box_t box_;          ///< box representing the domain of our function
-    T tol_;              ///< Desired relative tolerance of our approximation
-    VecDimD lower_left_; ///< Bottom 'corner' of our domain
+    box_t box_;           ///< box representing the domain of our function
+    T tol_;               ///< Desired relative tolerance of our approximation
+    VecDimD lower_left_;  ///< Bottom 'corner' of our domain
+    VecDimD upper_right_; ///< Upper 'corner' of our domain
 
     std::vector<FunctionTree<DIM, ORDER, ISET, T>> subtrees_; ///< Grid of FunctionTree objects that do the work
     Eigen::Vector<int, DIM> n_subtrees_;    ///< Number of subtrees in each linear dimension of our space
@@ -641,6 +641,7 @@ class Function {
             inv_bin_size_[j] = 0.5 * n_subtrees_[j] / half_length[j];
         }
         lower_left_ = box_.center - half_length;
+        upper_right_ = box_.center + half_length;
 
         subtrees_.reserve(n_subtrees_.prod());
 
@@ -652,7 +653,7 @@ class Function {
             VecDimD parent_center = (bins.template cast<T>().array() + 0.5) * bin_size.array() + lower_left_.array();
 
             Box<DIM, ISET, T> root_box = {parent_center, 0.5 * bin_size};
-             subtrees_.push_back(FunctionTree<DIM, ORDER, ISET, T>(&input_local, root_box, coeffs_));
+            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET, T>(&input_local, root_box, coeffs_));
         }
 
         auto t_end = std::chrono::steady_clock::now();
@@ -731,7 +732,11 @@ class Function {
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at
     /// @returns function approximation at point x
-    inline T eval(const VecDimD &x) const { return find_node(x).eval(x, coeffs_.data()); }
+    inline T eval(const VecDimD &x) const {
+        return (x.array() < lower_left_.array()).any() || (x.array() >= upper_right_.array()).any()
+                   ? NAN
+                   : find_node(x).eval(x, coeffs_.data());
+    }
 
     /// @brief eval function approximation at point
     /// @param[in] xp [DIM] point to evaluate function at
@@ -755,14 +760,24 @@ class Function {
             std::vector<std::pair<node_t *, VecDimD>> node_map(n_trg);
             for (int i = 0; i < n_trg; ++i) {
                 VecDimD xi = VecDimD(xp + DIM * i);
-                node_map[i] = std::make_pair(node_pointers_[get_global_node_index(xi)], xi);
+                node_t *node_ptr =
+                    (xi.array() < lower_left_.array()).any() || (xi.array() >= upper_right_.array()).any()
+                        ? nullptr
+                        : node_pointers_[get_global_node_index(xi)];
+
+                node_map[i] = std::make_pair(node_ptr, xi);
             }
 
-            for (int i_trg = 0; i_trg < n_trg; i_trg++)
-                res[i_trg] = node_map[i_trg].first->eval(node_map[i_trg].second, coeffs_.data());
-        } else
-            for (int i_trg = 0; i_trg < n_trg; i_trg++)
+            for (int i_trg = 0; i_trg < n_trg; i_trg++) {
+                res[i_trg] = node_map[i_trg].first == nullptr
+                                 ? NAN
+                                 : node_map[i_trg].first->eval(node_map[i_trg].second, coeffs_.data());
+            }
+        } else {
+            for (int i_trg = 0; i_trg < n_trg; i_trg++) {
                 res[i_trg] = eval(VecDimD(xp + DIM * i_trg));
+            }
+        }
     }
 
     /// @brief eval function approximation at point
@@ -791,7 +806,8 @@ class Function {
     }
 
     /// @brief msgpack serialization magic
-    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, inv_bin_size_, coeffs_, split_multi_eval_);
+    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, upper_right_, inv_bin_size_, coeffs_,
+                       split_multi_eval_);
 };
 
 template <int DIM, int ORDER, int ISET, typename T>

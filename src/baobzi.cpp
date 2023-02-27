@@ -1,15 +1,15 @@
-#include <msgpack.hpp>
-
 #include "baobzi.h"
 
-#include <tuple>
-
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <msgpack.hpp>
 #include <sstream>
+#include <stdexcept>
+#include <tuple>
 
 const baobzi_input_t baobzi_input_default = {.func = NULL,
                                              .data = NULL,
