@@ -52,10 +52,6 @@ baobzi_init.argtypes = [
     POINTER(c_double)
 ]
 
-baobzi_eval = libbaobzi.baobzi_eval
-baobzi_eval.restype = c_double
-baobzi_eval.argtypes = [c_void_p, POINTER(c_double)]
-
 baobzi_eval_multi = libbaobzi.baobzi_eval_multi
 baobzi_eval_multi.restype = c_void_p
 baobzi_eval_multi.argtypes = [c_void_p, POINTER(c_double), POINTER(c_double), c_int]
@@ -117,12 +113,10 @@ class Baobzi:
             baobzi_free(self.ptr)
 
     def __call__(self, x):
-        if x.size == self.dim:
-            return baobzi_eval(self.ptr, (c_double * self.dim)(*x))
-        else:
-            res = np.empty(x.size // self.dim, dtype=np.float64)
-            baobzi_eval_multi(self.ptr, x.ctypes.data_as(POINTER(c_double)), res.ctypes.data_as(POINTER(c_double)), res.size)
-            return res
+        xarr = np.array(x, dtype=np.float64)
+        res = np.empty(xarr.size // self.dim, dtype=np.float64)
+        baobzi_eval_multi(self.ptr, xarr.ctypes.data_as(POINTER(c_double)), res.ctypes.data_as(POINTER(c_double)), res.size)
+        return res
 
     def save(self, filename):
         bfilename = bytes(filename, 'utf-8')
