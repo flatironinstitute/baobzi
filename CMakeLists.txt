@@ -193,6 +193,9 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/
 
 install(FILES ${PROJECT_SOURCE_DIR}/src/julia/baobzi.jl
   DESTINATION ${CMAKE_INSTALL_PREFIX}/share/baobzi/julia)
+install(FILES ${PROJECT_SOURCE_DIR}/LICENSE
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/share/licenses/baobzi)
+
 if (NOT DEFINED SKBUILD)
   install(FILES ${PROJECT_SOURCE_DIR}/src/python/__init__.py
     RENAME baobzi.py
