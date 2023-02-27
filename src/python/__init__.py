@@ -103,16 +103,17 @@ class Baobzi:
             self.ptr = baobzi_init(pointer(inputdata),
                                    center.ctypes.data_as(POINTER(c_double)),
                                    half_length.ctypes.data_as(POINTER(c_double)))
-            if self.ptr[0].obj is None:
-                raise RuntimeError("Unable to create baobzi object")
         else:
             print(
                 "Baobzi requires either a 'filename' argument or a 'fin' argument"
             )
 
+        if self.ptr[0] is None or self.ptr[0].obj is None:
+            raise RuntimeError("Unable to create baobzi object")
+
+
     def __del__(self):
-        if self.ptr:
-            baobzi_free(self.ptr)
+        baobzi_free(self.ptr)
 
     def __call__(self, x):
         xarr = np.array(x, dtype=np.float64)

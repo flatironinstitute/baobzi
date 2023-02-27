@@ -39,12 +39,7 @@
     void baobzi_free_##DIM##d_##ORDER##_##ISET(void *f) { delete (baobzi::Function<DIM, ORDER, ISET> *)f; }            \
     void *baobzi_init_##DIM##d_##ORDER##_##ISET(const baobzi_input_t *input, const double *center,                     \
                                                 const double *half_length) {                                           \
-        try {                                                                                                          \
-            return (void *)new (std::nothrow) baobzi::Function<DIM, ORDER, ISET>(input, center, half_length);          \
-        } catch (std::exception & e) {                                                                                 \
-            std::cerr << e.what() << std::endl;                                                                        \
-            return nullptr;                                                                                            \
-        };                                                                                                             \
+        return (void *)new (std::nothrow) baobzi::Function<DIM, ORDER, ISET>(input, center, half_length);              \
     }                                                                                                                  \
     void *baobzi_restore_##DIM##d_##ORDER##_##ISET(const void *obj_) {                                                 \
         const msgpack::object *obj = (msgpack::object *)obj_;                                                          \

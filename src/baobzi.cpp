@@ -80,35 +80,43 @@ baobzi_header_t read_header(const char *addr, const std::size_t buflen, std::siz
 baobzi_t baobzi_restore(const char *filename_cstr) {
     std::string filename(filename_cstr);
     baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
+    res->obj = nullptr;
 
-    std::size_t offset = 0;
-    std::string filedata_str = file_to_string(filename);
-    baobzi_header_t header = read_header(filedata_str.data(), filedata_str.size(), &offset);
+    try {
+        std::size_t offset = 0;
+        std::string filedata_str = file_to_string(filename);
+        baobzi_header_t header = read_header(filedata_str.data(), filedata_str.size(), &offset);
 
-    msgpack::object_handle oh;
-    msgpack::unpack(oh, filedata_str.data(), filedata_str.size(), offset);
-    msgpack::object obj = oh.get();
+        msgpack::object_handle oh;
+        msgpack::unpack(oh, filedata_str.data(), filedata_str.size(), offset);
+        msgpack::object obj = oh.get();
 
-    res->DIM = header.dim;
-    res->ORDER = header.order;
+        res->DIM = header.dim;
+        res->ORDER = header.order;
 
-    auto [dim, order, version] = std::make_tuple(header.dim, header.order, header.version);
+        auto [dim, order, version] = std::make_tuple(header.dim, header.order, header.version);
 
-    if (version != BAOBZI_HEADER_VERSION) {
+        if (version != BAOBZI_HEADER_VERSION) {
+            free(res);
+            return nullptr;
+        }
+
+        int iset = get_iset();
+        switch (BAOBZI_JOIN(header.dim, header.order, iset)) {
+#include "baobzi/baobzi_cases_restore.h"
+        default: {
+            std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim
+                      << ", " << order << ")\n";
+            free(res);
+            return nullptr;
+            break;
+        }
+        }
+    } catch (std::exception &e) {
+        std::cerr << "Baobzi restore error: Unable to restore from \'" << filename << "'" << std::endl;
         free(res);
         return nullptr;
     }
-
-    int iset = get_iset();
-    switch (BAOBZI_JOIN(header.dim, header.order, iset)) {
-#include "baobzi/baobzi_cases_restore.h"
-    default: {
-        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim << ", "
-                  << order << ")\n";
-        break;
-    }
-    }
-
     return res;
 }
 
@@ -121,7 +129,8 @@ void baobzi_stats(baobzi_t func) {
 baobzi_t baobzi_free(baobzi_t func) {
     if (!func)
         return nullptr;
-    func->free(func->obj);
+    if (func->obj)
+        func->free(func->obj);
     free(func);
     return nullptr;
 }
@@ -141,7 +150,7 @@ bool is_valid_func(const baobzi_input_t *input, const double *point) {
 
 baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length) {
     if (input->tol <= 0.0) {
-        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi due to invalid 'tol' parameter. Please supply "
+        std::cerr << "Baobzi error: Unable to initialize Baobzi due to invalid 'tol' parameter. Please supply "
                      "something greater than zero.\n";
         return nullptr;
     } else if (!is_valid_func(input, center)) {
@@ -151,22 +160,29 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
         return nullptr;
     }
 
-    baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
-    res->DIM = input->dim;
-    res->ORDER = input->order;
+    baobzi_t res;
+    try {
+        res = (baobzi_t)malloc(sizeof(baobzi_struct));
+        res->DIM = input->dim;
+        res->ORDER = input->order;
 
-    int iset = get_iset();
+        int iset = get_iset();
 
-    switch (BAOBZI_JOIN(res->DIM, res->ORDER, iset)) {
+        switch (BAOBZI_JOIN(res->DIM, res->ORDER, iset)) {
 #include "baobzi/baobzi_cases.h"
-    default: {
-        std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << res->DIM
-                  << ", " << res->ORDER << ")\n";
+        default: {
+            std::cerr << "Baobzi error: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << res->DIM
+                      << ", " << res->ORDER << ")\n";
+
+            free(res);
+            return nullptr;
+        }
+        }
+    } catch (std::exception &e) {
+        std::cerr << e.what() << std::endl;
         free(res);
         return nullptr;
     }
-    }
-
     return res;
 }
 }
