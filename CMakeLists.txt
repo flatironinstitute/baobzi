@@ -57,7 +57,7 @@ option(BAOBZI_BUILD_FORTRAN "Build Fortran bindings" OFF)
 option(BAOBZI_CPU_DISPATCH "Use CPU dispatch for generic binary" OFF)
 option(BAOBZI_SET_ARCH "Attempt to set architecture flags without dispatch" ON)
 
-if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(BAOBZI_CPU_DISPATCH ON)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBAOBZI_CPU_DISPATCH")
 endif()
