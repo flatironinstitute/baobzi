@@ -1,7 +1,0 @@
-name = "Baobzi"
-uuid = "fb487ce6-0906-4f0c-b439-418ac6d167e8"
-authors = ["Robert Blackwell <rblackwell@flatironinstitute.org>"]
-version = "0.9.6"
-
-[deps]
-Baobzi_jll = "3808fb15-9b43-5646-9112-da6e39400273"

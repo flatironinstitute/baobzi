@@ -1,4 +1,4 @@
-import baobzi
+import Baobzi
 
 function testfunc(xp::Ptr{Float64})::Cdouble
     x = unsafe_load(xp, 1)
@@ -13,16 +13,17 @@ dim = 2
 order = 6
 tol = 1E-8
 output_file = "simple2d.baobzi"
+split_multi_eval = 0
 
-func_approx = baobzi.init(testfunc, dim, order, center, hl, tol)
-baobzi.stats(func_approx)
-println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
+func_approx = Baobzi.init(testfunc, dim, order, center, hl, tol, 0)
+Baobzi.stats(func_approx)
+println(Baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
 
-baobzi.save(func_approx, output_file)
-baobzi.free(func_approx)
+Baobzi.save(func_approx, output_file)
+Baobzi.free(func_approx)
 
-func_approx = baobzi.restore(output_file)
-println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
+func_approx = Baobzi.restore(output_file)
+println(Baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
 
 points = 2.0 * (rand(Float64, 2000000)) .- 1.0
-baobzi.eval_multi(func_approx, points)
+Baobzi.eval_multi(func_approx, points)
