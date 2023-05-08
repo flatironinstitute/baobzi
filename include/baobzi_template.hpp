@@ -181,7 +181,7 @@ class Node {
                     .template cast<double>();
 
             for (int i = 0; i < ORDER; ++i)
-                F(i) = input->func(&xvec[i], input->data);
+                input->func(&xvec[i], &F(i), input->data);
 
             Eigen::Vector<T, ORDER> coeffs = Func::VLU_.solve(F);
 
@@ -203,7 +203,7 @@ class Node {
             for (int i = 0; i < ORDER; ++i) {
                 for (int j = 0; j < ORDER; ++j) {
                     double x[2] = {xvec[i], yvec[j]};
-                    F(i, j) = input->func(x, input->data);
+                    input->func(x, &F(i, j), input->data);
                 }
             }
 
@@ -231,7 +231,7 @@ class Node {
                 for (int j = 0; j < ORDER; ++j) {
                     for (int k = 0; k < ORDER; ++k) {
                         T x[3] = {xvec[i], yvec[j], zvec[k]};
-                        F(i, j, k) = input->func(x, input->data);
+                        input->func(x, &F(i, j, k), input->data);
                     }
                 }
             }
@@ -264,7 +264,8 @@ class Node {
                                         2.0 * VecDimD{(T)i, (T)j, (T)k}.array() * half_length.array() / ORDER;
 
                         const T test_val = eval(point, coeffs.data());
-                        const T actual_val = input->func(point.data(), input->data);
+                        T actual_val; // FIXME will break with vector-valued funcs
+                        input->func(point.data(), &actual_val, input->data);
                         const T rel_error = std::abs((actual_val - test_val) / actual_val);
 
                         if (fabs(actual_val) > 1E-16 && rel_error > input->tol) {

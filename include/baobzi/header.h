@@ -1,9 +1,9 @@
 #ifndef BAOBZI_HEADER_H
 #define BAOBZI_HEADER_H
 
-#define BAOBZI_HEADER_VERSION 4
+#define BAOBZI_HEADER_VERSION 5
 
-typedef double (*baobzi_input_func_t)(const double *, const void *);
+typedef void (*baobzi_input_func_t)(const double *, double *, const void *);
 
 typedef struct {
     baobzi_input_func_t func;
