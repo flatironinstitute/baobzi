@@ -9,6 +9,7 @@ typedef struct {
     baobzi_input_func_t func;
     void *data;
     int dim;
+    int output_dim;
     int order;
     double tol;
     double minimum_leaf_fraction;

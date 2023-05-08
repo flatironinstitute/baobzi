@@ -156,6 +156,7 @@ class Node {
     Box<DIM, ISET, T> box_;                                       ///< Geometric position/size of this node
     uint64_t coeff_offset = std::numeric_limits<uint64_t>::max(); ///< Flattened chebyshev coeffs
     uint32_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
+    uint32_t output_dim = 1;
 
     Node<DIM, ORDER, ISET, T>() = default; ///< Default constructor for msgpack happiness
 
@@ -169,28 +170,31 @@ class Node {
 
     /// @brief Fit node to a given tolerance. If fit succeeds, set leaf and coeffs, otherwise ... don't
     ///
-    /// Modifies: Node::leaf_, Node::coeffs_
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns true if fit successful, false if not good enough
     std::vector<T> fit(const baobzi_input_t *input) {
+        output_dim = input->output_dim;
+
         VecDimD half_length = box_.half_length();
         if constexpr (DIM == 1) {
-            Eigen::Vector<T, ORDER> F;
             Eigen::Vector<double, ORDER> xvec =
                 Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0])
                     .template cast<double>();
 
+            std::vector<T> coeffs_stl(ORDER * output_dim);
+            Eigen::MatrixXd actual_vals(output_dim, ORDER);
             for (int i = 0; i < ORDER; ++i)
-                input->func(&xvec[i], &F(i), input->data);
+                input->func(&xvec[i], actual_vals.col(i).data(), input->data);
 
-            Eigen::Vector<T, ORDER> coeffs = Func::VLU_.solve(F);
+            for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
+                Eigen::Vector<T, ORDER> F = actual_vals.row(i_dim);
+                Eigen::Vector<T, ORDER> coeffs = Func::VLU_.solve(F);
 
-            if (standard_error<T>(coeffs) > input->tol)
-                return std::vector<T>();
-
-            std::vector<T> coeffs_stl(coeffs.size());
-            for (int i = 0; i < coeffs.size(); ++i)
-                coeffs_stl[i] = coeffs(ORDER - i - 1);
+                if (standard_error<T>(coeffs) > input->tol)
+                    return std::vector<T>();
+                for (int i = 0; i < coeffs.size(); ++i)
+                    coeffs_stl[i + ORDER * i_dim] = coeffs(ORDER - i - 1);
+            }
 
             coeff_offset = 0;
             return coeffs_stl;
@@ -287,6 +291,12 @@ class Node {
     inline T eval(const VecDimD &x, const T *coeffs) const {
         const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
         return cheb_eval<ORDER, ISET, T>(xinterp, coeffs + coeff_offset);
+    }
+
+    void eval(const VecDimD &x, T *res, const T *coeffs) const {
+        const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
+        for (int i = 0; i < output_dim; ++i)
+            res[i] = cheb_eval<ORDER, ISET, T>(xinterp, coeffs + coeff_offset + i * ORDER);
     }
 
     /// @brief Calculate memory usage of self (including unused space from vector allocation)
@@ -450,6 +460,7 @@ class Function {
     static constexpr int Dim = DIM;         ///< Input dimension of function
     static constexpr int Order = ORDER;     ///< Order of polynomial representation
     static constexpr int ISet = ISET;       ///< Instruction set (dummy param)
+    uint32_t output_dim = 1;
 
     static std::mutex statics_mutex;            ///< mutex for locking vandermonde/chebyshev initialization
     static VecOrderD cosarray_;                 ///< Cached array of cosine values at chebyshev nodes
@@ -470,6 +481,8 @@ class Function {
     std::vector<T> coeffs_; ///< Flat vector of all chebyshev coefficients from all leaf nodes
 
     bool split_multi_eval_ = true; ///< Split node-search and evaluation when evaluating multiple points
+
+
 
     /// Structure containing info about self creation :D
     struct {
@@ -752,6 +765,17 @@ class Function {
         return subtree_node_offsets_[i_sub] + subtrees_[i_sub].get_node_index(x);
     }
 
+    inline void eval(const VecDimD &x, T *res) const {
+        if ((x.array() < lower_left_.array()).any() || (x.array() >= upper_right_.array()).any()) {
+            for (int i = 0; i < output_dim; ++i)
+                res[i] = NAN;
+        }
+
+        find_node(x).eval(x, res, coeffs_.data());
+    }
+
+    inline void eval(const T *xp, T *res) const { eval(VecDimD(xp), res); }
+
     /// @brief eval function approximation at n_trg points
     /// @param[in] xp [DIM * n_trg] array of points to evaluate function at
     /// @param[out] res [n_trg] array of results
@@ -796,6 +820,8 @@ class Function {
     /// @param[out] res [DIM * n_trg] array of results
     /// @param[in] n_trg number of points to evaluate
     inline void operator()(const T *xp, T *res, int n_trg) const { eval(xp, res, n_trg); }
+
+    inline void operator()(const T *xp, T *res) const { eval(xp, res); }
 
     /// @brief save function approximation to file
     /// @param[in] filename path to save file at
