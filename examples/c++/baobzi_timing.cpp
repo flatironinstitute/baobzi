@@ -2,8 +2,8 @@
 
 #include <fstream>
 #include <iostream>
-#include <time.h>
 #include <random>
+#include <time.h>
 
 using real_t = double;
 
@@ -17,19 +17,19 @@ double get_wtime_diff(const struct timespec *ts, const struct timespec *tf) {
     return (tf->tv_sec - ts->tv_sec) + (tf->tv_nsec - ts->tv_nsec) * 1E-9;
 }
 
-double testfun_1d(const double *x, const void *data) {
+void testfun_1d(const double *x, double *y, const void *data) {
     const double scale_factor = *(real_t *)data;
-    return scale_factor * log(x[0]);
+    *y = scale_factor * log(x[0]);
 }
-double testfun_2d(const double *x, const void *data) {
+void testfun_2d(const double *x, double *y, const void *data) {
     const double scale_factor = *(double *)data;
-    return scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
+    *y = scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
 }
-double testfun_2d_2(const double *x, const void *data) {
-    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
+void testfun_2d_2(const double *x, double *y, const void *data) {
+    *y = exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
 }
-double testfun_3d(const double *x, const void *data) {
-    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
+void testfun_3d(const double *x, double *y, const void *data) {
+    *y = exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
 }
 
 template <int DIM, typename Function>
@@ -62,7 +62,8 @@ void print_error(const Function &function, baobzi_input_t &input, const std::vec
         for (int j = 0; j < Function::Dim; ++j)
             pointd[j] = x[i + j];
 
-        real_t actual = input.func(pointd, input.data);
+        real_t actual;
+        input.func(pointd, &actual, input.data);
         real_t interp = function.eval(point);
         real_t delta = actual - interp;
 
