@@ -27,6 +27,17 @@
 
 /// Namespace for baobzi
 namespace baobzi {
+using raw_leaf_node = struct {
+    double a;
+    double L;
+    const double *coeffs;
+};
+
+struct leaf_compare {
+    bool operator()(baobzi::raw_leaf_node a, baobzi::raw_leaf_node b) { return a.a < b.a; };
+    bool operator()(baobzi::raw_leaf_node a, double b) { return a.a < b; };
+};
+
 using index_t = uint32_t; ///< Type specifying indexing into flattened tree
 
 class MaxDepthExceeded : public std::exception {
@@ -830,6 +841,25 @@ class Function {
         baobzi_header_t params{Dim, Order, BAOBZI_HEADER_VERSION};
         msgpack::pack(ofs, params);
         msgpack::pack(ofs, *this);
+    }
+
+    std::vector<raw_leaf_node> get_leaves() const {
+        std::vector<raw_leaf_node> leaves;
+
+        for (const auto &subtree : subtrees_) {
+            for (const auto &node : subtree.nodes_) {
+                if (!node.is_leaf())
+                    continue;
+
+                double L = 2.0 * node.box_.half_length()[0];
+                double a = node.box_.center[0] - 0.5 * L;
+                const double *coeffs = node.coeff_offset + subtree.coeffs_.data();
+                leaves.emplace_back(raw_leaf_node{a, L, coeffs});
+            }
+        }
+
+        std::sort(leaves.begin(), leaves.end(), leaf_compare());
+        return leaves;
     }
 
     /// @brief msgpack serialization magic
