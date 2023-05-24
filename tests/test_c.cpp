@@ -3,23 +3,24 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 
-double testfun_1d(const double *x, const void *data) {
+void testfun_1d(const double *x, double *res, const void *data) {
     const double scale_factor = *(double *)data;
-    return scale_factor * log(x[0]);
+    *res = scale_factor * log(x[0]);
 }
-double testfun_2d(const double *x, const void *data) {
+void testfun_2d(const double *x, double *res, const void *data) {
     const double scale_factor = *(double *)data;
-    return scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
+    *res = scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
 }
-double testfun_3d(const double *x, const void *data) {
+void testfun_3d(const double *x, double *res, const void *data) {
     const double scale_factor = *(double *)data;
-    return scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]) * cos(4.0 * x[2]));
+    *res = scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]) * cos(4.0 * x[2]));
 }
 
 TEST_CASE("1D evaluations", "[baobzi]") {
     baobzi_input_t input = baobzi_input_default;
     const double scale_factor = 1.5;
     input.dim = 1;
+    input.output_dim = 1;
     input.order = 8;
     input.tol = 1E-10;
     input.func = testfun_1d;
@@ -32,14 +33,16 @@ TEST_CASE("1D evaluations", "[baobzi]") {
     SECTION("evaluations at lower left") {
         double x[] = {center[0] - half_l[0]};
         double y_appx = baobzi_eval(baobzi_func, x);
-        double y_exact = testfun_1d(x, input.data);
+        double y_exact;
+        testfun_1d(x, &y_exact, input.data);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
     }
 
     SECTION("evaluations at center") {
         double y_appx = baobzi_eval(baobzi_func, center);
-        double y_exact = testfun_1d(center, input.data);
+        double y_exact;
+        testfun_1d(center, &y_exact, input.data);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
     }
@@ -61,6 +64,7 @@ TEST_CASE("2D evaluations", "[baobzi]") {
     baobzi_input_t input = baobzi_input_default;
     const double scale_factor = 1.5;
     input.dim = 2;
+    input.output_dim = 1;
     input.order = 6;
     input.tol = 1E-10;
     input.func = testfun_2d;
@@ -73,14 +77,16 @@ TEST_CASE("2D evaluations", "[baobzi]") {
     SECTION("evaluations at lower left") {
         double x[2] = {center[0] - half_l[0], center[1] - half_l[1]};
         double y_appx = baobzi_eval(baobzi_func, x);
-        double y_exact = testfun_2d(x, input.data);
+        double y_exact;
+        testfun_2d(x, &y_exact, input.data);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
     }
 
     SECTION("evaluations at center") {
         double y_appx = baobzi_eval(baobzi_func, center);
-        double y_exact = testfun_2d(center, input.data);
+        double y_exact;
+        testfun_2d(center, &y_exact, input.data);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
     }
@@ -102,6 +108,7 @@ TEST_CASE("3D evaluations", "[baobzi]") {
     baobzi_input_t input = baobzi_input_default;
     const double scale_factor = 1.5;
     input.dim = 3;
+    input.output_dim = 1;
     input.order = 12;
     input.tol = 1E-10;
     input.func = testfun_3d;
@@ -114,14 +121,16 @@ TEST_CASE("3D evaluations", "[baobzi]") {
     SECTION("evaluations at lower left") {
         double x[] = {center[0] - half_l[0], center[1] - half_l[1], center[2] - half_l[2]};
         double y_appx = baobzi_eval(baobzi_func, x);
-        double y_exact = testfun_3d(x, input.data);
+        double y_exact;
+        testfun_3d(x, &y_exact, input.data);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
     }
 
     SECTION("evaluations at center") {
         double y_appx = baobzi_eval(baobzi_func, center);
-        double y_exact = testfun_3d(center, input.data);
+        double y_exact;
+        testfun_3d(center, &y_exact, input.data);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
     }

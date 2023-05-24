@@ -16,19 +16,20 @@ double get_wtime_diff(const struct timespec *ts, const struct timespec *tf) {
     return (tf->tv_sec - ts->tv_sec) + (tf->tv_nsec - ts->tv_nsec) * 1E-9;
 }
 
-double testfun_1d(const double *x, const void *data) {
+void testfun_1d(const double *x, double *res, const void *data) {
     const double scale_factor = *(double *)data;
-    return scale_factor * log(x[0]);
+    *res = scale_factor * log(x[0]);
 }
-double testfun_2d(const double *x, const void *data) {
+void testfun_2d(const double *x, double *res, const void *data) {
     const double scale_factor = *(double *)data;
-    return scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
+    *res = scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
 }
-double testfun_2d_2(const double *x, const void *data) {
-    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
+void testfun_2d_2(const double *x, double *res, const void *data) {
+    *res = exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
 }
-double testfun_3d(const double *x, const void *data) {
-    return exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
+
+void testfun_3d(const double *x, double *res, const void *data) {
+    *res = exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
 }
 
 void time_function(const baobzi_t function, const double *x, int size, int n_runs) {
@@ -56,7 +57,8 @@ void print_error(const baobzi_t function, baobzi_input_t *input, const double *x
     for (int i = 0; i < size; i += function->DIM) {
         const double *point = &x[i];
 
-        double actual = input->func(point, input->data);
+        double actual;
+        input->func(point, &actual, input->data);
         double interp = baobzi_eval(function, point);
         double delta = actual - interp;
 
@@ -132,6 +134,7 @@ int main(int argc, char *argv[]) {
         input.minimum_leaf_fraction = 1.0;
         input.split_multi_eval = 0;
         input.max_depth = 50;
+        input.output_dim = 1;
 
         double hl[] = {1.0};
         double center[] = {2.0};
@@ -150,6 +153,7 @@ int main(int argc, char *argv[]) {
         input.data = &scale_factor;
         input.minimum_leaf_fraction = 0.0;
         input.split_multi_eval = 1;
+        input.output_dim = 1;
 
         const double hl[2] = {1.0, 1.0};                     // half the length of the domain in each dimension
         const double center[2] = {hl[0] + 0.5, hl[1] + 2.0}; // center of the domain
@@ -166,6 +170,7 @@ int main(int argc, char *argv[]) {
         input.func = testfun_3d;
         input.minimum_leaf_fraction = 0.0;
         input.split_multi_eval = 1;
+        input.output_dim = 1;
 
         double hl[3] = {1.0, 1.0, 1.0};
         double center[3] = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 0.5};

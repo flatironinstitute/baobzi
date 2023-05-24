@@ -139,8 +139,9 @@ bool is_valid_func(const baobzi_input_t *input, const double *point) {
     if (!input->func)
         return false;
 
+    double res[input->output_dim];
     try {
-        input->func(point, input->data);
+        input->func(point, res, input->data);
     } catch (std::exception(e)) {
         return false;
     }

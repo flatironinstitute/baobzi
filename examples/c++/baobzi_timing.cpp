@@ -112,6 +112,7 @@ int main(int argc, char *argv[]) {
         input.minimum_leaf_fraction = 1.0;
         input.split_multi_eval = 0;
         input.max_depth = 8;
+        input.output_dim = 1;
 
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
@@ -139,6 +140,7 @@ int main(int argc, char *argv[]) {
         input.minimum_leaf_fraction = 0.0;
         input.split_multi_eval = 1;
         input.max_depth = 50;
+        input.output_dim = 1;
 
         for (int i = 0; i < 2 * n_points; i += 2)
             for (int j = 0; j < 2; ++j)
