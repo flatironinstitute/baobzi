@@ -59,7 +59,8 @@ void print_error(const baobzi_t function, baobzi_input_t *input, const double *x
 
         double actual;
         input->func(point, &actual, input->data);
-        double interp = baobzi_eval(function, point);
+        double interp;
+        baobzi_eval(function, point, &interp);
         double delta = actual - interp;
 
         max_error = fmax(max_error, fabs(delta));
@@ -133,7 +134,6 @@ int main(int argc, char *argv[]) {
         input.data = &scale_factor;
         input.minimum_leaf_fraction = 1.0;
         input.split_multi_eval = 0;
-        input.max_depth = 50;
         input.output_dim = 1;
 
         double hl[] = {1.0};
