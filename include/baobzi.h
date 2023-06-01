@@ -19,7 +19,7 @@ typedef struct {
     void *obj;                                                            ///< Actual baobzi::Function object
     int DIM;                                                              ///< Dimension of our function
     int ORDER;                                                            ///< Order of the polynomial
-    double (*eval)(const void *, const double *);                         ///< Pointer to evaluation function
+    void (*eval)(const void *, const double *, double *);                 ///< Pointer to evaluation function
     void (*eval_multi)(const void *, const double *, double *, int ntrg); ///< Pointer to multi-evaluation function
     void (*save)(const void *, const char *);                             ///< Pointer to save function
     void (*stats)(void *);                                                ///< pointer to stats function
@@ -35,7 +35,8 @@ extern const baobzi_input_t baobzi_input_default;
 /// @param[in] func initialized C baobzi object
 /// @param[in] x point to evaluate at
 /// @returns approximation of function at x
-double baobzi_eval(const baobzi_t func, const double *x);
+
+    void baobzi_eval(const baobzi_t func, const double *x, double *y);
 
 /// @brief eval function approximation at ntrg points
 /// @param[in] func initialized C baobzi object

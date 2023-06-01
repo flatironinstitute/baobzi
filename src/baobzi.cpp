@@ -64,7 +64,7 @@ int get_iset() {
     return iset;
 }
 
-double baobzi_eval(const baobzi_t func, const double *x) { return func->eval(func->obj, x); }
+void baobzi_eval(const baobzi_t func, const double *x, double *y) { func->eval(func->obj, x, y); }
 
 void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
     func->eval_multi(func->obj, x, res, ntrg);

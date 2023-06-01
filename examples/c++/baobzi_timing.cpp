@@ -21,14 +21,14 @@ void testfun_1d(const double *x, double *y, const void *data) {
     const double scale_factor = *(real_t *)data;
     *y = scale_factor * log(x[0]);
 }
-void testfun_2d(const double *x, double *y, const void *data) {
+void testfun_2d3(const double *x, double *y, const void *data) {
     const double scale_factor = *(double *)data;
     *y = scale_factor * exp(cos(5.0 * x[0]) * sin(5.0 * x[1]));
 }
 void testfun_2d_2(const double *x, double *y, const void *data) {
     *y = exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1]));
 }
-void testfun_3d(const double *x, double *y, const void *data) {
+void testfun_3d1(const double *x, double *y, const void *data) {
     *y = exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
 }
 
@@ -136,7 +136,7 @@ int main(int argc, char *argv[]) {
         input.order = 10;
         input.data = &scale_factor;
         input.tol = 1E-10;
-        input.func = testfun_2d;
+        input.func = testfun_2d3;
         input.minimum_leaf_fraction = 0.0;
         input.split_multi_eval = 1;
         input.max_depth = 50;

@@ -26,8 +26,8 @@
     }
 
 #define BAOBZI_DEFS(DIM, ORDER, ISET)                                                                                  \
-    double baobzi_eval_##DIM##d_##ORDER##_##ISET(const void *f, const double *x) {                                     \
-        return (*(baobzi::Function<DIM, ORDER, ISET> *)f).eval(x);                                                     \
+    void baobzi_eval_##DIM##d_##ORDER##_##ISET(const void *f, const double *x, double *y) {                            \
+        (*(baobzi::Function<DIM, ORDER, ISET> *)f).eval(x, y);                                                         \
     }                                                                                                                  \
     void baobzi_eval_multi_##DIM##d_##ORDER##_##ISET(const void *f, const double *x, double *res, int ntrg) {          \
         (*(baobzi::Function<DIM, ORDER, ISET> *)f).eval(x, res, ntrg);                                                 \
@@ -50,7 +50,7 @@
     }
 
 #define BAOBZI_DECLS(DIM, ORDER, ISET)                                                                                 \
-    double baobzi_eval_##DIM##d_##ORDER##_##ISET(const void *f, const double *x);                                      \
+    void baobzi_eval_##DIM##d_##ORDER##_##ISET(const void *f, const double *x, double *y);                             \
     void baobzi_eval_multi_##DIM##d_##ORDER##_##ISET(const void *f, const double *x, double *res, int ntrg);           \
     void baobzi_save_##DIM##d_##ORDER##_##ISET(const void *f, const char *filename);                                   \
     void baobzi_stats_##DIM##d_##ORDER##_##ISET(void *f);                                                              \
