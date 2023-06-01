@@ -70,6 +70,55 @@ TEST_CASE("1D1 evaluations", "[baobzi]") {
     baobzi_free(baobzi_func);
 }
 
+TEST_CASE("1D2 evaluations", "[baobzi]") {
+    baobzi_input_t input = baobzi_input_default;
+    const double scale_factor = 1.5;
+    input.dim = 1;
+    input.output_dim = 2;
+    input.order = 8;
+    input.tol = 1E-10;
+    input.func = testfun_1d2;
+    input.data = (void *)&scale_factor;
+    const double half_l[] = {1.0, 1.0};
+    const double center[] = {3.0, 3.0};
+
+    baobzi_t baobzi_func = baobzi_init(&input, center, half_l);
+    double y_appx[2], y_exact[2];
+
+    SECTION("evaluations at lower left") {
+        double x[2] = {center[0] - half_l[0], center[1] - half_l[1]};
+        baobzi_eval(baobzi_func, x, y_appx);
+        testfun_1d2(x, y_exact, input.data);
+
+        REQUIRE(fabs((y_appx[0] - y_exact[0]) / y_exact[0]) < input.tol);
+        REQUIRE(fabs((y_appx[1] - y_exact[1]) / y_exact[1]) < input.tol);
+    }
+
+    SECTION("evaluations at center") {
+        baobzi_eval(baobzi_func, center, y_appx);
+        testfun_1d2(center, y_exact, input.data);
+
+        REQUIRE(fabs((y_appx[0] - y_exact[0]) / y_exact[0]) < input.tol);
+        REQUIRE(fabs((y_appx[1] - y_exact[1]) / y_exact[1]) < input.tol);
+    }
+
+    SECTION("save/restore") {
+        const char *filename = "test_func_approx_1d.baobzi";
+        baobzi_save(baobzi_func, filename);
+        baobzi_t baobzi_func_restored = baobzi_restore(filename);
+
+        double y_old[2], y_restored[2];
+        baobzi_eval(baobzi_func, center, y_old);
+        baobzi_eval(baobzi_func, center, y_restored);
+        REQUIRE(y_old[0] == y_restored[0]);
+        REQUIRE(y_old[1] == y_restored[1]);
+
+        baobzi_free(baobzi_func_restored);
+    }
+
+    baobzi_free(baobzi_func);
+}
+
 TEST_CASE("2D evaluations", "[baobzi]") {
     baobzi_input_t input = baobzi_input_default;
     const double scale_factor = 1.5;
