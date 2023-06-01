@@ -14,6 +14,7 @@
 const baobzi_input_t baobzi_input_default = {.func = NULL,
                                              .data = NULL,
                                              .dim = 0,
+                                             .output_dim = 1,
                                              .order = 0,
                                              .tol = 0.0,
                                              .minimum_leaf_fraction = 0.0,
