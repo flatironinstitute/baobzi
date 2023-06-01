@@ -195,7 +195,7 @@ class Node {
             std::vector<T> coeffs_stl(ORDER * output_dim);
             Eigen::MatrixXd actual_vals(output_dim, ORDER);
             for (int i = 0; i < ORDER; ++i)
-                input->func(&xvec[i], actual_vals.col(i).data(), input->data);
+                input->func(&xvec[i], actual_vals.data() + i * output_dim, input->data);
 
             for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
                 Eigen::Vector<T, ORDER> F = actual_vals.row(i_dim);
@@ -315,7 +315,7 @@ class Node {
     inline std::size_t memory_usage() const { return sizeof(*this); }
 
     /// @brief MSGPACK serialization magic
-    MSGPACK_DEFINE(box_, first_child_idx, coeff_offset);
+    MSGPACK_DEFINE(box_, first_child_idx, coeff_offset, output_dim);
 };
 
 /// @brief Represent a function in some domain as a tree of chebyshev nodes
@@ -471,7 +471,7 @@ class Function {
     static constexpr int Dim = DIM;         ///< Input dimension of function
     static constexpr int Order = ORDER;     ///< Order of polynomial representation
     static constexpr int ISet = ISET;       ///< Instruction set (dummy param)
-    uint32_t output_dim = 1;
+    uint32_t output_dim_ = 1;
 
     static std::mutex statics_mutex;            ///< mutex for locking vandermonde/chebyshev initialization
     static VecOrderD cosarray_;                 ///< Cached array of cosine values at chebyshev nodes
@@ -492,8 +492,6 @@ class Function {
     std::vector<T> coeffs_; ///< Flat vector of all chebyshev coefficients from all leaf nodes
 
     bool split_multi_eval_ = true; ///< Split node-search and evaluation when evaluating multiple points
-
-
 
     /// Structure containing info about self creation :D
     struct {
@@ -528,7 +526,8 @@ class Function {
                 n_leaves += node.is_leaf();
         }
 
-        std::cout << "Baobzi tree represented by " << n_nodes << " nodes, of which " << n_leaves << " are leaves\n";
+        std::cout << "Baobzi function mapping " << DIM << " to " << output_dim_ << std::endl;
+        std::cout << "Tree represented by " << n_nodes << " nodes, of which " << n_leaves << " are leaves\n";
         std::cout << "Nodes are distributed across " << n_subtrees << " subtrees at an initial depth of "
                   << stats_.base_depth << " with a maximum subtree depth of " << max_depth << "\n";
         std::cout << "Total function evaluations required for fit: "
@@ -585,6 +584,7 @@ class Function {
         : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), split_multi_eval_(input->split_multi_eval) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
+        output_dim_ = input->output_dim;
 
         VecDimD l(lp);
         VecDimD x(xp);
@@ -778,7 +778,7 @@ class Function {
 
     inline void eval(const VecDimD &x, T *res) const {
         if ((x.array() < lower_left_.array()).any() || (x.array() >= upper_right_.array()).any()) {
-            for (int i = 0; i < output_dim; ++i)
+            for (int i = 0; i < output_dim_; ++i)
                 res[i] = NAN;
         }
 
@@ -864,7 +864,7 @@ class Function {
 
     /// @brief msgpack serialization magic
     MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, upper_right_, inv_bin_size_, coeffs_,
-                       split_multi_eval_);
+                       split_multi_eval_, output_dim_);
 };
 
 template <int DIM, int ORDER, int ISET, typename T>

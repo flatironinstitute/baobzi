@@ -79,14 +79,14 @@ TEST_CASE("1D2 evaluations", "[baobzi]") {
     input.tol = 1E-10;
     input.func = testfun_1d2;
     input.data = (void *)&scale_factor;
-    const double half_l[] = {1.0, 1.0};
-    const double center[] = {3.0, 3.0};
+    const double half_l[] = {1.0};
+    const double center[] = {3.0};
 
     baobzi_t baobzi_func = baobzi_init(&input, center, half_l);
     double y_appx[2], y_exact[2];
 
     SECTION("evaluations at lower left") {
-        double x[2] = {center[0] - half_l[0], center[1] - half_l[1]};
+        double x[] = {center[0] - half_l[0]};
         baobzi_eval(baobzi_func, x, y_appx);
         testfun_1d2(x, y_exact, input.data);
 
