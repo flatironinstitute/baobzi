@@ -167,6 +167,7 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
         res = (baobzi_t)malloc(sizeof(baobzi_struct));
         res->DIM = input->dim;
         res->ORDER = input->order;
+        res->OUTPUT_DIM = input->output_dim;
 
         int iset = get_iset();
 

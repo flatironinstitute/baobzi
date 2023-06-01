@@ -17,7 +17,8 @@ extern "C" {
 /// dim+order+instruction set
 typedef struct {
     void *obj;                                                            ///< Actual baobzi::Function object
-    int DIM;                                                              ///< Dimension of our function
+    int DIM;                                                              ///< Input dimension of our function
+    int OUTPUT_DIM;                                                       ///< Output dimension of our function
     int ORDER;                                                            ///< Order of the polynomial
     void (*eval)(const void *, const double *, double *);                 ///< Pointer to evaluation function
     void (*eval_multi)(const void *, const double *, double *, int ntrg); ///< Pointer to multi-evaluation function
