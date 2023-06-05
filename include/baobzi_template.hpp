@@ -891,7 +891,7 @@ class Function {
         return leaves;
     }
 
-    std::pair<VecDimD, VecDimD> const get_bounds() { return std::make_pair(lower_left_, upper_right_); }
+    std::pair<VecDimD, VecDimD> get_bounds() const { return std::make_pair(lower_left_, upper_right_); }
 
     /// @brief msgpack serialization magic
     MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, upper_right_, inv_bin_size_, coeffs_,
