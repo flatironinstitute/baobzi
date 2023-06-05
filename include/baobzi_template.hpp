@@ -182,15 +182,16 @@ class Node {
     /// @brief Fit node to a given tolerance. If fit succeeds, set leaf and coeffs, otherwise ... don't
     ///
     /// @param[in] input parameters for fit (function, tol, etc)
-    /// @returns true if fit successful, false if not good enough
-    std::vector<T> fit(const baobzi_input_t *input) {
+    /// @returns coefficient vector list if fit successful, empty list if not good enough
+    std::vector<T> fit(const baobzi_input_t *input, const std::vector<T> &samples) {
         output_dim = input->output_dim;
 
-        VecDimD half_length = box_.half_length();
+        const VecDimD half_length = box_.half_length();
+        const auto lb = (box_.center - half_length);
+        const auto ub = (box_.center + half_length);
+
         if constexpr (DIM == 1) {
-            Eigen::Vector<double, ORDER> xvec =
-                Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0])
-                    .template cast<double>();
+            Eigen::Vector<double, ORDER> xvec = Func::get_cheb_nodes(lb[0], ub[0]).template cast<double>();
 
             std::vector<T> coeffs_stl(ORDER * output_dim);
             Eigen::MatrixXd actual_vals(output_dim, ORDER);
@@ -203,6 +204,25 @@ class Node {
 
                 if (standard_error<T>(coeffs) > input->tol)
                     return std::vector<T>();
+
+                for (const auto &sample : samples) {
+                    if (sample < lb[0] || sample >= ub[0])
+                        continue;
+
+                    auto x = VecDimD(sample);
+                    T actual_val;
+                    input->func(x.data(), &actual_val, input->data);
+                    if (actual_val < 1E-16)
+                        continue;
+
+                    T test_val;
+                    eval(x, &test_val, coeffs.data());
+
+                    T rel_error = std::abs((actual_val - test_val) / actual_val);
+                    if (rel_error > input->tol)
+                        return std::vector<T>();
+                }
+
                 for (int i = 0; i < coeffs.size(); ++i)
                     coeffs_stl[i + ORDER * i_dim] = coeffs(ORDER - i - 1);
             }
@@ -339,8 +359,8 @@ struct FunctionTree {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] coeffs flat/global coefficient vector
     /// @param[in] box box that this tree lives in
-    FunctionTree<DIM, ORDER, ISET, T>(const baobzi_input_t *input, const Box<DIM, ISET, T> &box,
-                                      std::vector<T> &coeffs) {
+    FunctionTree<DIM, ORDER, ISET, T>(const baobzi_input_t *input, const Box<DIM, ISET, T> &box, std::vector<T> &coeffs,
+                                      const std::vector<T> &samples) {
         std::queue<Box<DIM, ISET, T>> q;
         VecDimD half_width = box.half_length() * 0.5;
         q.push(box);
@@ -357,7 +377,7 @@ struct FunctionTree {
                 nodes_.push_back(node_t(box));
 
                 auto &node = nodes_[i + node_index];
-                std::vector new_coeffs = node.fit(input);
+                std::vector new_coeffs = node.fit(input, samples);
 
                 if (node.is_leaf()) {
                     node.coeff_offset = coeffs.size();
@@ -580,7 +600,9 @@ class Function {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
-    Function<DIM, ORDER, ISET, T>(const baobzi_input_t *input, const T *xp, const T *lp)
+    /// @param[in] samples list of points to force fit check
+    Function<DIM, ORDER, ISET, T>(const baobzi_input_t *input, const T *xp, const T *lp,
+                                  const std::vector<T> &samples = {})
         : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), split_multi_eval_(input->split_multi_eval),
           output_dim_(input->output_dim) {
         auto t_start = std::chrono::steady_clock::now();
@@ -629,7 +651,7 @@ class Function {
 
                 nodes.emplace_back(node_t(box));
                 auto &node = nodes.back();
-                node.fit(input);
+                node.fit(input, samples);
 
                 if (!node.is_leaf() || stats_.base_depth < input->min_depth) {
                     add_node_children_to_queue(q, node.box_.center, half_width);
@@ -678,7 +700,7 @@ class Function {
             VecDimD parent_center = (bins.template cast<T>().array() + 0.5) * bin_size.array() + lower_left_.array();
 
             Box<DIM, ISET, T> root_box = {parent_center, 0.5 * bin_size};
-            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET, T>(&input_local, root_box, coeffs_));
+            subtrees_.push_back(FunctionTree<DIM, ORDER, ISET, T>(&input_local, root_box, coeffs_, samples));
         }
 
         auto t_end = std::chrono::steady_clock::now();
