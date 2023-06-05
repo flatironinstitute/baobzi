@@ -883,7 +883,7 @@ class Function {
 
                 double L = 2.0 * node.box_.half_length()[0];
                 double a = node.box_.center[0] - 0.5 * L;
-                const double *coeffs = node.coeff_offset + subtree.coeffs_.data();
+                const double *coeffs = node.coeff_offset + coeffs_.data();
                 leaves.emplace_back(raw_leaf_node{a, L, coeffs});
             }
         }
