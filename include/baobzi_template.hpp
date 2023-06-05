@@ -581,10 +581,10 @@ class Function {
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
     Function<DIM, ORDER, ISET, T>(const baobzi_input_t *input, const T *xp, const T *lp)
-        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), split_multi_eval_(input->split_multi_eval) {
+        : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), split_multi_eval_(input->split_multi_eval),
+          output_dim_(input->output_dim) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
-        output_dim_ = input->output_dim;
 
         VecDimD l(lp);
         VecDimD x(xp);
@@ -631,7 +631,7 @@ class Function {
                 auto &node = nodes.back();
                 node.fit(input);
 
-                if (!node.is_leaf()) {
+                if (!node.is_leaf() || stats_.base_depth < input->min_depth) {
                     add_node_children_to_queue(q, node.box_.center, half_width);
                 } else {
                     leaf_fraction += 1.0;

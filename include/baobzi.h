@@ -37,7 +37,7 @@ extern const baobzi_input_t baobzi_input_default;
 /// @param[in] x point to evaluate at
 /// @returns approximation of function at x
 
-    void baobzi_eval(const baobzi_t func, const double *x, double *y);
+void baobzi_eval(const baobzi_t func, const double *x, double *y);
 
 /// @brief eval function approximation at ntrg points
 /// @param[in] func initialized C baobzi object
