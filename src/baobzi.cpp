@@ -19,6 +19,7 @@ const baobzi_input_t baobzi_input_default = {.func = NULL,
                                              .tol = 0.0,
                                              .minimum_leaf_fraction = 0.0,
                                              .split_multi_eval = 1,
+                                             .min_depth = 0,
                                              .max_depth = 50};
 
 inline std::string file_to_string(const std::string &path) {
