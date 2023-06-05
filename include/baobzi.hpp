@@ -23,15 +23,15 @@ class Baobzi {
 
     /// @brief Save Baobzi object to file
     /// @param[in] output_file path of file to serialize object to
-    void save(const std::string &output_file) { baobzi_save(obj_.get(), output_file.c_str()); }
+    inline void save(const std::string &output_file) { baobzi_save(obj_.get(), output_file.c_str()); }
 
     /// @brief Print various stats about Baobzi object
-    void stats(const std::string &output_file) { baobzi_stats(obj_.get()); }
+    inline void stats(const std::string &output_file) { baobzi_stats(obj_.get()); }
 
     /// @brief Evaluate Baobzi object at point
     /// @param[in] x [dim]
     /// @return approximate value of function at point x
-    double operator()(const double *x) const { return baobzi_eval(obj_.get(), x); }
+    inline void operator()(const double *x, double *y) const { baobzi_eval(obj_.get(), x, y); }
 
     /// @brief eval function approximation at n_trg points
     /// @param[in] xp [DIM * n_trg] array of points to evaluate function at
