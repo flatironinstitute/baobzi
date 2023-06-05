@@ -170,11 +170,16 @@ if (BAOBZI_BUILD_TESTS)
   add_executable(test_c tests/test_c.cpp)
   target_link_libraries(test_c PUBLIC Catch2::Catch2WithMain baobzi)
 
+  add_executable(test_template tests/test_template.cpp)
+  target_link_libraries(test_template PUBLIC Catch2::Catch2WithMain)
+  target_include_directories(test_template PRIVATE ${BAOBZI_INCLUDES})
+
   list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
   list(APPEND CMAKE_MODULE_PATH ${Catch2_SOURCE_DIR}/extras)
   include(CTest)
   include(Catch)
   catch_discover_tests(test_c)
+  catch_discover_tests(test_template)
 endif()
 
 if (${BAOBZI_BUILD_MATLAB})

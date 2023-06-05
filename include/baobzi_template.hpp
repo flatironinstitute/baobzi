@@ -500,6 +500,7 @@ class Function {
     static VecOrderD cosarray_;                 ///< Cached array of cosine values at chebyshev nodes
     static Eigen::PartialPivLU<VanderMat> VLU_; ///< Cached LU decomposition of Vandermonde matrix
 
+    baobzi_input_t input_;
     box_t box_;           ///< box representing the domain of our function
     T tol_;               ///< Desired relative tolerance of our approximation
     VecDimD lower_left_;  ///< Bottom 'corner' of our domain
@@ -608,7 +609,7 @@ class Function {
                                   std::function<void(const double *, double *, const void *)> func = nullptr,
                                   const std::vector<T> &samples = {})
         : box_(VecDimD(xp), VecDimD(lp)), tol_(input->tol), split_multi_eval_(input->split_multi_eval),
-          output_dim_(input->output_dim) {
+          output_dim_(input->output_dim), input_(*input) {
         auto t_start = std::chrono::steady_clock::now();
         init_statics();
 
@@ -892,6 +893,144 @@ class Function {
     }
 
     std::pair<VecDimD, VecDimD> get_bounds() const { return std::make_pair(lower_left_, upper_right_); }
+
+    Function<DIM, ORDER, ISET> shallow_copy() const {
+        Function<DIM, ORDER, ISET> other;
+        other.n_subtrees_ = n_subtrees_;
+        other.lower_left_ = lower_left_;
+        other.inv_bin_size_ = inv_bin_size_;
+        other.box_ = box_;
+        other.inv_bin_size_ = inv_bin_size_;
+        other.split_multi_eval_ = split_multi_eval_;
+        other.input_ = input_;
+        other.input_.func = nullptr;
+        other.input_.data = nullptr;
+
+        return other;
+    }
+
+    std::pair<baobzi_input_t, box_t> operator_helper(const Function<DIM, ORDER, ISET> &B) const {
+        const auto &A = *this;
+        double lbound =
+            std::max(A.box_.center[0] - A.box_.half_length()[0], B.box_.center[0] - B.box_.half_length()[0]);
+        double rbound =
+            std::min(A.box_.center[0] + A.box_.half_length()[0], B.box_.center[0] + B.box_.half_length()[0]);
+        box_t new_box{VecDimD(0.5 * (rbound + lbound)), VecDimD(0.5 * (rbound - lbound))};
+        baobzi_input_t new_input = input_;
+        new_input.func = nullptr;
+        new_input.data = nullptr;
+        return {new_input, new_box};
+    }
+
+    Function<DIM, ORDER, ISET> operator+(const Function<DIM, ORDER, ISET> &B) const {
+        static_assert(DIM == 1, "Baobzi: Function addition only defined for 1D functions");
+        const auto &A = *this;
+        auto [new_input, new_box] = operator_helper(B);
+        const int output_dim = input_.output_dim;
+        const auto func = [&A, &B, output_dim](const double *x, double *y, const void *data) {
+            T res2[output_dim];
+            A(x, y);
+            B(x, res2);
+            for (int i = 0; i < output_dim; ++i)
+                y[i] += res2[i];
+        };
+
+        return Function<DIM, ORDER, ISET>(&new_input, new_box.center.data(), new_box.half_length().data(), func, {});
+    }
+
+    Function<DIM, ORDER, ISET> operator*(const Function<DIM, ORDER, ISET> &B) const {
+        static_assert(DIM == 1, "Baobzi: Function multiplication only defined for 1D functions");
+        const auto &A = *this;
+        auto [new_input, new_box] = operator_helper(B);
+        const int output_dim = input_.output_dim;
+        const auto func = [&A, &B, output_dim](const double *x, double *y, const void *data) {
+            T res2[output_dim];
+            A(x, y);
+            B(x, res2);
+            for (int i = 0; i < output_dim; ++i)
+                y[i] *= res2[i];
+        };
+
+        return Function<DIM, ORDER, ISET>(&new_input, new_box.center.data(), new_box.half_length().data(), func, {});
+    }
+
+    Function<DIM, ORDER, ISET> operator/(const Function<DIM, ORDER, ISET> &B) const {
+        static_assert(DIM == 1, "Baobzi: Function division only defined for 1D functions");
+        const auto &A = *this;
+        auto [new_input, new_box] = operator_helper(B);
+        const int output_dim = input_.output_dim;
+        const auto func = [&A, &B, output_dim](const double *x, double *y, const void *data) {
+            T res2[output_dim];
+            A(x, y);
+            B(x, res2);
+            for (int i = 0; i < output_dim; ++i)
+                y[i] /= res2[i];
+        };
+
+        return Function<DIM, ORDER, ISET>(&new_input, new_box.center.data(), new_box.half_length().data(), func, {});
+    }
+
+    Function<DIM, ORDER, ISET> operator-(const Function<DIM, ORDER, ISET> &B) const {
+        static_assert(DIM == 1, "Baobzi: Function subtraction only defined for 1D functions");
+        const auto &A = *this;
+        auto [new_input, new_box] = operator_helper(B);
+        const int output_dim = input_.output_dim;
+        const auto func = [&A, &B, output_dim](const double *x, double *y, const void *data) {
+            T res2[output_dim];
+            A(x, y);
+            B(x, res2);
+            for (int i = 0; i < output_dim; ++i)
+                y[i] -= res2[i];
+        };
+
+        return Function<DIM, ORDER, ISET>(&new_input, new_box.center.data(), new_box.half_length().data(), func, {});
+    }
+
+    template <typename U>
+    Function<DIM, ORDER, ISET> operator*(const U &scale_factor) const {
+        Function<DIM, ORDER, ISET> copy = *this;
+
+        Eigen::Map<Eigen::VectorXd> coeffs(copy.coeffs_.data(), copy.coeffs_.size());
+        coeffs *= scale_factor;
+
+        return copy;
+    }
+
+    template <typename U>
+    friend Function<DIM, ORDER, ISET> operator*(const U &scale_factor, const Function<DIM, ORDER, ISET> &func) {
+        return func * scale_factor;
+    }
+
+    template <typename U>
+    Function<DIM, ORDER, ISET> operator/(const U &divisor) const {
+        Function<DIM, ORDER, ISET> copy = *this;
+
+        Eigen::Map<Eigen::VectorXd> coeffs(copy.coeffs_.data(), copy.coeffs_.size());
+        coeffs /= divisor;
+
+        return copy;
+    }
+
+    template <typename U>
+    Function<DIM, ORDER, ISET> operator+(const U &shift) const {
+        static_assert(DIM == 1, "Baobzi: Scalar addition only defined for 1D functions");
+        Function<DIM, ORDER, ISET> copy = *this;
+
+        for (std::size_t i = ORDER - 1; i < copy.coeffs_.size(); i += ORDER)
+            copy.coeffs_[i] += shift;
+
+        return copy;
+    }
+
+    template <typename U>
+    friend Function<DIM, ORDER, ISET> operator+(const U &shift, const Function<DIM, ORDER, ISET> &func) {
+        return func + shift;
+    }
+
+    template <typename U>
+    Function<1, ORDER, ISET> operator-(const U &shift) const {
+        return *this + (-shift);
+    }
 
     /// @brief msgpack serialization magic
     MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, upper_right_, inv_bin_size_, coeffs_,
