@@ -3,6 +3,17 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 
+baobzi_input_t default_input = {
+    .dim = 1,
+    .output_dim = 1,
+    .order = 8,
+    .tol = 1E-10,
+    .minimum_leaf_fraction = 0.0,
+    .split_multi_eval = false,
+    .min_depth = 0,
+    .max_depth = 50,
+};
+
 TEST_CASE("1D1 evaluations", "[baobzi_template]") {
     using BaobziFunc = baobzi::Function<1, 8, 0, double>;
 
@@ -11,17 +22,7 @@ TEST_CASE("1D1 evaluations", "[baobzi_template]") {
         *res = scale_factor * log(x[0]);
     };
 
-    baobzi_input_t input;
-    input.dim = 1;
-    input.output_dim = 1;
-    input.order = 8;
-    input.tol = 1E-10;
-    input.max_depth = 50;
-    input.min_depth = 0;
-    input.minimum_leaf_fraction = 0.0;
-    input.split_multi_eval = false;
-    input.func = nullptr;
-    input.data = nullptr;
+    baobzi_input_t input = default_input;
     const double half_l[] = {1.0};
     const double center[] = {3.0};
 
@@ -163,5 +164,25 @@ TEST_CASE("1D1 evaluations", "[baobzi_template]") {
         newfunc(center, &pre);
 
         REQUIRE(fabs((pre - post) / post) < 1E-12);
+    }
+
+    SECTION("sampling") {
+        auto xfunc = [](const double *x, double *y, const void *) {
+            constexpr double sigma2 = 1E-4;
+            *y = exp(-0.5 * *x * *x / sigma2);
+        };
+        double center[] = {0.4};
+        double half_l[] = {1.0};
+
+        BaobziFunc gaussfit = BaobziFunc(&input, center, half_l, xfunc, {});
+        BaobziFunc gaussfit_sample = BaobziFunc(&input, center, half_l, xfunc, {0.0});
+
+        double miss, hit;
+        double x = 0.0;
+        gaussfit(&x, &miss);
+        gaussfit_sample(&x, &hit);
+
+        REQUIRE(miss < 1E-15);
+        REQUIRE(std::fabs(hit - 1.0) <= 1E-15);
     }
 }
