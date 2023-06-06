@@ -207,6 +207,7 @@ class Node {
                 if (standard_error<T>(coeffs) > input->tol)
                     return std::vector<T>();
 
+                coeffs = coeffs.reverse().eval();
                 for (const auto &sample : samples) {
                     if (sample < lb[0] || sample >= ub[0])
                         continue;
@@ -214,19 +215,19 @@ class Node {
                     auto x = VecDimD(sample);
                     T actual_val;
                     func(x.data(), &actual_val, input->data);
-                    if (actual_val < 1E-16)
+                    if (actual_val < 1E-200)
                         continue;
 
-                    T test_val;
-                    eval(x, &test_val, coeffs.data());
+                    const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
+                    T test_val = cheb_eval<ORDER, ISET, T>(xinterp, coeffs.data());
 
-                    T rel_error = std::abs((actual_val - test_val) / actual_val);
+                    T rel_error = std::fabs((actual_val - test_val) / actual_val);
                     if (rel_error > input->tol)
                         return std::vector<T>();
                 }
 
                 for (int i = 0; i < coeffs.size(); ++i)
-                    coeffs_stl[i + ORDER * i_dim] = coeffs(ORDER - i - 1);
+                    coeffs_stl[i + ORDER * i_dim] = coeffs(i);
             }
 
             coeff_offset = 0;
