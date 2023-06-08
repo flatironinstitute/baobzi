@@ -44,6 +44,13 @@ TEST_CASE("1D1 evaluations", "[baobzi_template]") {
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
     }
 
+    SECTION("evaluation by return val") {
+        y_appx = baobzifunc(center);
+        testfun_1d1(center, &y_exact, nullptr);
+
+        REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
+    }
+
     SECTION("left scalar multiply") {
         BaobziFunc newfunc = 1.5 * baobzifunc;
         double postscaled, prescaled;

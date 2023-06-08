@@ -852,12 +852,12 @@ class Function {
     /// @brief eval function approximation at point
     /// @param[in] x [DIM] point to evaluate function at
     /// @returns function approximation at point x
-    inline T operator()(const VecDimD &x) const { return eval(x); }
+    inline T operator()(const VecDimD &x) const { return output_dim_ > 1 ? NAN : eval(x); }
 
     /// @brief eval function approximation at point
     /// @param[in] x point to evaluate function at
     /// @returns function approximation at point x
-    inline T operator()(const T *x) const { return eval(x); }
+    inline T operator()(const T *x) const { return output_dim_ > 1 ? NAN : eval(x); }
 
     /// @brief eval function approximation at n_trg points
     /// @param[in] xp [DIM * n_trg] array of points to evaluate function at
@@ -865,6 +865,9 @@ class Function {
     /// @param[in] n_trg number of points to evaluate
     inline void operator()(const T *xp, T *res, int n_trg) const { eval(xp, res, n_trg); }
 
+    /// @brief eval function approximation at 1 point by reference
+    /// @param[in] xp [DIM] array of points to evaluate function at
+    /// @param[out] res [DIM] array of results
     inline void operator()(const T *xp, T *res) const { eval(xp, res); }
 
     /// @brief save function approximation to file
