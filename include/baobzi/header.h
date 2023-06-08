@@ -18,21 +18,10 @@ typedef struct {
     int max_depth;
 } baobzi_input_t;
 
-#ifdef __cplusplus
-#include <msgpack.hpp>
-struct baobzi_header_t {
+typedef struct {
     int dim;
     int order;
     int version;
-    MSGPACK_DEFINE(dim, order, version);
-};
-#else
-/// @brief header for serialization
-typedef struct {
-    int dim;     ///< Dimension of function
-    int order;   ///< Order of polynomial
-    int version; ///< Version of output format (BAOBZI_HEADER_VERSION)
 } baobzi_header_t;
-#endif
 
 #endif

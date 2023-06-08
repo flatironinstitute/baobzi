@@ -3,6 +3,7 @@
 
 #include <baobzi.h>
 #include <string>
+#include <memory>
 
 namespace baobzi {
 /// Wrapper class for C library (which is a wrapper for the template library. oof)

@@ -26,6 +26,41 @@
 
 #include <baobzi/header.h>
 
+namespace msgpack {
+MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
+    namespace adaptor {
+
+    // Place class template specialization here
+    template <>
+    struct convert<baobzi_header_t> {
+        msgpack::object const &operator()(msgpack::object const &o, baobzi_header_t &v) const {
+            if (o.type != msgpack::type::ARRAY)
+                throw msgpack::type_error();
+            if (o.via.array.size != 3)
+                throw msgpack::type_error();
+            v = baobzi_header_t{.dim = o.via.array.ptr[0].as<int>(),
+                                .order = o.via.array.ptr[1].as<int>(),
+                                .version = o.via.array.ptr[2].as<int>()};
+            return o;
+        }
+    };
+
+    template <>
+    struct pack<baobzi_header_t> {
+        template <typename Stream>
+        packer<Stream> &operator()(msgpack::packer<Stream> &o, baobzi_header_t const &v) const {
+            o.pack_array(3);
+            o.pack(v.dim);
+            o.pack(v.order);
+            o.pack(v.version);
+            return o;
+        }
+    };
+
+    } // namespace adaptor
+} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
+} // namespace msgpack
+
 /// Namespace for baobzi
 namespace baobzi {
 static baobzi_input_t input_default = {.func = NULL,
