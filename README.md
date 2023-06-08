@@ -1,4 +1,7 @@
 # Baobzi
+NOTE: I develop on main because I live dangerously. Documentation might be out of sync --
+please use the release versions as the API is currently in a state of flux.
+
 An adaptive fast function approximator based on tree search. Word salad aside, `baobzi` is a
 tool to convert very CPU intensive function calculations into relatively cheap ones (at the
 cost of memory). This is similar to functions like `chebeval` in `MATLAB`, but can be
