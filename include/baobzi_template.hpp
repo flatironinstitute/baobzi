@@ -28,6 +28,17 @@
 
 /// Namespace for baobzi
 namespace baobzi {
+static baobzi_input_t input_default = {.func = NULL,
+                                       .data = NULL,
+                                       .dim = 1,
+                                       .output_dim = 1,
+                                       .order = 8,
+                                       .tol = 1E-10,
+                                       .minimum_leaf_fraction = 0.0,
+                                       .split_multi_eval = 0,
+                                       .min_depth = 0,
+                                       .max_depth = 50};
+
 using raw_leaf_node = struct {
     double a;
     double L;
