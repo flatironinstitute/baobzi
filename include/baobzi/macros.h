@@ -22,6 +22,7 @@
         res->eval_multi = &baobzi_eval_multi_##DIM##d_##ORDER##_##ISET;                                                \
         res->stats = &baobzi_stats_##DIM##d_##ORDER##_##ISET;                                                          \
         res->free = &baobzi_free_##DIM##d_##ORDER##_##ISET;                                                            \
+        res->OUTPUT_DIM = ((baobzi::Function<DIM, ORDER, ISET> *)(res->obj))->output_dim_;                             \
         break;                                                                                                         \
     }
 

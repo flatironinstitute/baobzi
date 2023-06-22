@@ -1,4 +1,5 @@
 #include "baobzi.h"
+#include "baobzi_template.hpp"
 
 #include <cmath>
 #include <cstdint>
