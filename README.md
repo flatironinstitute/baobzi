@@ -102,47 +102,52 @@ make install
 Baobzi only has a few input parameters, but they can greatly impact the performance and are
 worth playing with for your specific function.
 
-* `func`: Function you want to be approximated
-* `dim`: Number of independent variables to your function.
-* `order`: Polynomial order used to represent a chunk of your function. Higher order is slower,
-  especially in higher dimensions. An evaluation, ignoring search/cache issues, takes
-  `O(ORDER^DIM)` time. Search isn't free though, and `baobzi` typically needs fewer
-  subdivisions for higher orders, so your function might be faster _and_ use less memory if
-  you use a higher order.
-* `data`: This parameter is only relevant to C/C++/Fortran. If the function you're fitting
-  takes parameters, pack that somehow, and `data` is simply a pointer to that packed
-  info. See examples.
-* `tol`: The maximum desired relative error between your function and the approximant. It is
-  impossible to guarantee that all function evaluations will meet this tolerance, so it's
-  important to test the results on the domain you're interested in to ensure that results are to your satisfaction.
-* `minimum_leaf_fraction`: Baobzi internally is represented by a tree. However, to speed up
-  tree lookups, that tree is divided into subtrees that start at some depth. That depth, by
-  default, is one above the first level to have a "leaf." A leaf is a terminal box where the
-  function evaluation happens (other nodes just contain pointers to their children). This
-  scheme can adversely impact performance in some cases though (such as cases where only one
-  node on a level is a leaf). This parameter sets a requirement that baobzi keeps subdividing
-  entire levels when the fraction of leaves on a given level is less than this threshold.
+* input structure parameters
+  * `func`: Function you want to be approximated
+  * `dim`: Number of independent variables to your function.
+  * `order`: Polynomial order used to represent a chunk of your function. Higher order is slower,
+    especially in higher dimensions. An evaluation, ignoring search/cache issues, takes
+    `O(ORDER^DIM)` time. Search isn't free though, and `baobzi` typically needs fewer
+    subdivisions for higher orders, so your function might be faster _and_ use less memory if
+    you use a higher order.
+  * `data`: This parameter is only relevant to C/C++/Fortran. If the function you're fitting
+    takes parameters, pack that somehow, and `data` is simply a pointer to that packed
+    info. See examples.
+  * `tol`: The maximum desired relative error between your function and the approximant. It is
+    impossible to guarantee that all function evaluations will meet this tolerance, so it's
+    important to test the results on the domain you're interested in to ensure that results are to your satisfaction.
+  * `minimum_leaf_fraction`: Baobzi internally is represented by a tree. However, to speed up
+    tree lookups, that tree is divided into subtrees that start at some depth. That depth, by
+    default, is one above the first level to have a "leaf." A leaf is a terminal box where the
+    function evaluation happens (other nodes just contain pointers to their children). This
+    scheme can adversely impact performance in some cases though (such as cases where only one
+    node on a level is a leaf). This parameter sets a requirement that baobzi keeps subdividing
+    entire levels when the fraction of leaves on a given level is less than this threshold.
 
-  An easy way to think about this is if the parameter is `0.0`, then baobzi will never make a
-  leaf node a parent node, and the tree will be as small as possible (but not necessarily well
-  balanced). If the parameter is `1.0`, then baobzi will ensure that the final depth of the
-  tree is entirely filled with leaves. This tree is perfectly balanced, and therefore exactly a
-  uniform grid. Anything between will vary between these two extremes. This parameter can
-  EXTREMELY impact performance, especially on 1D trees.
-* `split_multi_eval`: When evaluating a vector of points, `baobzi` can currently use one of two
-  strategies which can dramatically impact performance, depending on the tree and computer. The
-  default is to split the evaluation of the points into two stages, one where the boxes are
-  calculated in one pass, and then the points are evaluated with them in a second. This tends
-  to help when there are a large number of nodes, as it increases the chance of a cache hit by
-  not ever loading in extra evaluation data. However it requires making a temporary data
-  structure to hold this, which costs time/memory.
+    An easy way to think about this is if the parameter is `0.0`, then baobzi will never make a
+    leaf node a parent node, and the tree will be as small as possible (but not necessarily well
+    balanced). If the parameter is `1.0`, then baobzi will ensure that the final depth of the
+    tree is entirely filled with leaves. This tree is perfectly balanced, and therefore exactly a
+    uniform grid. Anything between will vary between these two extremes. This parameter can
+    EXTREMELY impact performance, especially on 1D trees.
+  * `split_multi_eval`: When evaluating a vector of points, `baobzi` can currently use one of two
+    strategies which can dramatically impact performance, depending on the tree and computer. The
+    default is to split the evaluation of the points into two stages, one where the boxes are
+    calculated in one pass, and then the points are evaluated with them in a second. This tends
+    to help when there are a large number of nodes, as it increases the chance of a cache hit by
+    not ever loading in extra evaluation data. However it requires making a temporary data
+    structure to hold this, which costs time/memory.
 
-  The second is to just brute force evaluate the points as they appear in the target
-  order. This typically works very well in 1D, for small trees, but otherwise has poor performance.
+    The second is to just brute force evaluate the points as they appear in the target
+    order. This typically works very well in 1D, for small trees, but otherwise has poor performance.
 
-  Setting this parameter to 1 uses the typically faster 'split' model, while setting it to 0
-  will use the direct model.
-* `max_depth`: Maximum depth allowed for tree before interpolation considered failed.
+    Setting this parameter to 1 uses the typically faster 'split' model, while setting it to 0
+    will use the direct model.
+  * `max_depth`: Maximum depth allowed for tree before interpolation considered failed.
+* domain parameters (yes they're weird, I'm sorry)
+  * `center`: N-dim array representing the center of the domain you're interested in
+  * `half_length`: N-dim array representing _half_ the length of your domain
+
 
 ## Running with...
 All examples require your project know where the `baobzi` shared object is located. In the
@@ -180,11 +185,11 @@ int main(int argc, char *argv[]) {
         .max_depth = 50
     };
 
-    const double hl[2] = {1.0, 1.0};
+    const double half_length[2] = {1.0, 1.0};
     const double center[2] = {0.0, 0.0};
     const double x[2] = {0.25, 0.25};
 
-    baobzi_t func_approx = baobzi_init(&input, center, hl);
+    baobzi_t func_approx = baobzi_init(&input, center, half_length);
     printf("%g\n", baobzi_eval(func_approx, x));
     baobzi_save(func_approx, "func_approx.baobzi");
     func_approx = baobzi_free(func_approx);
@@ -222,11 +227,11 @@ int main(int argc, char *argv[]) {
         .max_depth = 50
     };
 
-    const double hl[2] = {1.0, 1.0};
+    const double half_length[2] = {1.0, 1.0};
     const double center[2] = {0.0, 0.0};
     const double x[2] = {0.25, 0.25};
     {
-        Baobzi func_approx(&input, center, hl);
+        Baobzi func_approx(&input, center, half_length);
         printf("%g\n", func_approx(x));
         func_approx.save("func_approx.baobzi");
     }
@@ -253,14 +258,14 @@ def py_test_func(x):
     return x[0] * x[1]
 
 center = np.array([0.0, 0.0])
-hl = np.array([1.0, 1.0])
+half_length = np.array([1.0, 1.0])
 point = np.array([0.25, 0.25])
 tol = 1E-8
 minimum_leaf_fraction = 0.0 # optional/default
 split_multi_eval = 1 # optional/default
 max_depth = 50 # optional/default
 
-test = Baobzi(py_test_func, 2, 6, center, hl, 1E-8, minimum_leaf_fraction, split_multi_eval, max_depth)
+test = Baobzi(py_test_func, 2, 6, center, half_length, 1E-8, minimum_leaf_fraction, split_multi_eval, max_depth)
 test.save('test.baobzi')
 print(test(point))
 del test
@@ -287,7 +292,7 @@ function testfunc(xp::Ptr{Float64})::Cdouble
 end
 
 center = [0.0, 0.0]
-hl = [0.5, 1.0]
+half_length = [0.5, 1.0]
 test_point = [0.25, 0.25]
 dim = 2
 order = 6
@@ -297,7 +302,7 @@ split_multi_eval = 1 # optional/default
 max_depth = 50 # optional/default
 output_file = "simple2d.baobzi"
 
-func_approx = baobzi.init(testfunc, dim, order, center, hl, tol, minimum_leaf_fraction, split_multi_eval, max_depth)
+func_approx = baobzi.init(testfunc, dim, order, center, half_length, tol, minimum_leaf_fraction, split_multi_eval, max_depth)
 println(baobzi.eval(func_approx, test_point) - testfunc(pointer(test_point)))
 
 baobzi.save(func_approx, output_file)
@@ -327,13 +332,13 @@ end
 dim = 2;
 order = 6;
 center = [0.0, 0.0];
-hl = [1.0, 1.0];
+half_length = [1.0, 1.0];
 tol = 1E-8;
 minimum_leaf_fraction = 0.0;
 split_multi_eval = 1;
 max_depth = 50;
 
-func_approx = baobzi('new', 'testfun', dim, order, center, hl, tol, minimum_leaf_fraction, split_multi_eval, max_depth);
+func_approx = baobzi('new', 'testfun', dim, order, center, half_length, tol, minimum_leaf_fraction, split_multi_eval, max_depth);
 display(func_approx.eval([0.25, 0.25]))
 func_approx.save('simple2d.baobzi');
 clear func_approx
