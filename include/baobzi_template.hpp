@@ -12,6 +12,7 @@
 #include <limits>
 #include <mutex>
 #include <numeric>
+#include <stdexcept>
 #include <queue>
 #include <vector>
 
@@ -1082,6 +1083,37 @@ class Function {
     template <typename U>
     Function<1, ORDER, ISET> operator-(const U &shift) const {
         return *this + (-shift);
+    }
+
+    Function<DIM, ORDER, ISET, T>(const char *filename) {
+        auto read_header = [](const char *addr, const std::size_t buflen, std::size_t *offset) -> baobzi_header_t {
+            msgpack::object_handle oh;
+            msgpack::unpack(oh, addr, buflen, *offset); // actually increments offset
+            return oh.get().as<baobzi_header_t>();
+        };
+
+        auto file_to_string = [](const std::string &path) -> std::string {
+            std::ostringstream buf;
+            std::ifstream input(path.c_str());
+            buf << input.rdbuf();
+            return buf.str();
+        };
+
+        std::size_t offset = 0;
+        std::string filedata_str = file_to_string(filename);
+        baobzi_header_t header = read_header(filedata_str.data(), filedata_str.size(), &offset);
+
+        if (header.dim != DIM)
+            throw std::runtime_error("Baobzi dimension mismatch");
+        if (header.order != ORDER)
+            throw std::runtime_error("Baobzi order mismatch");
+        if (header.version != BAOBZI_HEADER_VERSION)
+            throw std::runtime_error("Baobzi version mismatch");
+
+        msgpack::object_handle oh;
+        msgpack::unpack(oh, filedata_str.data(), filedata_str.size(), offset);
+        msgpack::object obj = oh.get();
+        *this = obj.as<Function<DIM, ORDER, ISET, T>>();
     }
 
     /// @brief msgpack serialization magic
