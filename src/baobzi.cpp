@@ -1,4 +1,5 @@
 #include "baobzi.h"
+#include "baobzi/header.h"
 #include "baobzi_template.hpp"
 
 #include <cmath>
@@ -12,16 +13,19 @@
 #include <stdexcept>
 #include <tuple>
 
-const baobzi_input_t baobzi_input_default = {.func = NULL,
-                                             .data = NULL,
-                                             .dim = 0,
-                                             .output_dim = 1,
-                                             .order = 0,
-                                             .tol = 0.0,
-                                             .minimum_leaf_fraction = 0.0,
-                                             .split_multi_eval = 1,
-                                             .min_depth = 0,
-                                             .max_depth = 50};
+const baobzi_input_t baobzi_input_default = {
+    .func = NULL,
+    .data = NULL,
+    .dim = 0,
+    .output_dim = 1,
+    .order = 0,
+    .tol = 0.0,
+    .minimum_leaf_fraction = 0.0,
+    .split_multi_eval = 1,
+    .min_depth = 0,
+    .max_depth = 50,
+    .tol_type = BAOBZI_TOL_RELATIVE,
+};
 
 inline std::string file_to_string(const std::string &path) {
     std::ostringstream buf;
