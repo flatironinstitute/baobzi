@@ -3,25 +3,18 @@
 
 #define BAOBZI_HEADER_VERSION 5
 
-typedef void (*baobzi_input_func_t)(const double *, double *, const void *);
+#ifdef __cplusplus
+#include <msgpack.hpp>
+#endif
 
 typedef struct {
-    baobzi_input_func_t func;
-    void *data;
-    int dim;
-    int output_dim;
-    int order;
-    double tol;
-    double minimum_leaf_fraction;
-    int split_multi_eval;
-    int min_depth;
-    int max_depth;
-} baobzi_input_t;
+    int dim;     ///< Dimension of function
+    int order;   ///< Order of polynomial
+    int version; ///< Version of output format (BAOBZI_HEADER_VERSION)
+#ifdef __cplusplus
+    MSGPACK_DEFINE(dim, order, version);
+#endif
 
-typedef struct {
-    int dim;
-    int order;
-    int version;
 } baobzi_header_t;
 
 #endif

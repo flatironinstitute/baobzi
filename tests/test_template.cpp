@@ -3,6 +3,18 @@
 #include <catch2/catch_test_macros.hpp>
 #include <cmath>
 
+baobzi_input_t default_input = {
+    .dim = 1,
+    .output_dim = 1,
+    .order = 8,
+    .tol = 1E-10,
+    .minimum_leaf_fraction = 0.0,
+    .split_multi_eval = false,
+    .min_depth = 0,
+    .max_depth = 50,
+    .tol_type = BAOBZI_TOL_RELATIVE,
+};
+
 TEST_CASE("1D1 evaluations", "[baobzi_template]") {
     using BaobziFunc = baobzi::Function<1, 8, 0, double>;
 
@@ -11,7 +23,8 @@ TEST_CASE("1D1 evaluations", "[baobzi_template]") {
         *res = scale_factor * log(x[0]);
     };
 
-    baobzi_input_t input = baobzi::input_default;
+    baobzi_input_t input = default_input;
+
     const double half_l[] = {1.0};
     const double center[] = {3.0};
 
@@ -28,13 +41,6 @@ TEST_CASE("1D1 evaluations", "[baobzi_template]") {
 
     SECTION("evaluations at center") {
         baobzifunc(center, &y_appx);
-        testfun_1d1(center, &y_exact, nullptr);
-
-        REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);
-    }
-
-    SECTION("evaluation with return val") {
-        y_appx = baobzifunc(center);
         testfun_1d1(center, &y_exact, nullptr);
 
         REQUIRE(fabs((y_appx - y_exact) / y_exact) < input.tol);

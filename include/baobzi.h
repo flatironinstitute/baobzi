@@ -10,6 +10,28 @@
 extern "C" {
 #endif
 
+typedef void (*baobzi_input_func_t)(const double *, double *, const void *);
+
+typedef enum {
+    BAOBZI_TOL_RELATIVE = 0,
+    BAOBZI_TOL_ABSOLUTE = 1,
+} baobzi_tol_t;
+
+/// @brief Input data type to define baobzi function
+typedef struct {
+    baobzi_input_func_t func;
+    void *data;
+    int dim;
+    int output_dim;
+    int order;
+    double tol;
+    double minimum_leaf_fraction;
+    int split_multi_eval;
+    int min_depth;
+    int max_depth;
+    baobzi_tol_t tol_type;
+} baobzi_input_t;
+
 /// @brief Baobzi C structure for a common API through C bindings. All work is done through the
 /// pointer baobzi_t though.
 ///

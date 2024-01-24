@@ -24,7 +24,7 @@
 #include <Eigen/LU>
 #include <unsupported/Eigen/CXX11/Tensor>
 
-#include <baobzi/header.h>
+#include <baobzi.h>
 
 namespace msgpack {
 MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
@@ -63,17 +63,6 @@ MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
 
 /// Namespace for baobzi
 namespace baobzi {
-static baobzi_input_t input_default = {.func = NULL,
-                                       .data = NULL,
-                                       .dim = 1,
-                                       .output_dim = 1,
-                                       .order = 8,
-                                       .tol = 1E-10,
-                                       .minimum_leaf_fraction = 0.0,
-                                       .split_multi_eval = 0,
-                                       .min_depth = 0,
-                                       .max_depth = 50};
-
 using raw_leaf_node = struct {
     double a;
     double L;
@@ -120,7 +109,8 @@ struct Box {
 /// @param[in] coeffs one or two dimensional Vector/Matrix of coefficients
 /// @returns estimation of error given those coefficients
 template <typename T>
-inline T standard_error(const Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> &coeffs) {
+inline T standard_error(const Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>> &coeffs,
+                        baobzi_tol_t tol_type) {
     T maxcoeff = 0.0;
     T scaling_factor = 1.0;
     if (coeffs.cols() == 1) {
@@ -137,7 +127,10 @@ inline T standard_error(const Eigen::Ref<Eigen::Matrix<T, Eigen::Dynamic, Eigen:
         scaling_factor = std::max(scaling_factor, std::abs(coeffs(0, n - 1)));
     }
 
-    return maxcoeff / scaling_factor;
+    if (tol_type == BAOBZI_TOL_RELATIVE)
+        return maxcoeff / scaling_factor;
+    else
+        return maxcoeff;
 }
 
 /// @brief Evaluate chebyshev polynomial given a box and a point inside that box
@@ -250,7 +243,7 @@ class Node {
                 Eigen::Vector<T, ORDER> F = actual_vals.row(i_dim);
                 Eigen::Vector<T, ORDER> coeffs = Func::VLU_.solve(F);
 
-                if (standard_error<T>(coeffs) > input->tol)
+                if (standard_error<T>(coeffs, input->tol_type) > input->tol)
                     return std::vector<T>();
 
                 for (int i = 0; i < coeffs.size(); ++i)
@@ -296,7 +289,7 @@ class Node {
             Eigen::Matrix<T, ORDER, ORDER> coeffs = Func::VLU_.solve(F);
             coeffs = Func::VLU_.solve(coeffs.transpose()).transpose();
 
-            if (standard_error<T>(coeffs) > input->tol)
+            if (standard_error<T>(coeffs, input->tol_type) > input->tol)
                 return std::vector<T>();
 
             std::vector<T> coeffs_stl(coeffs.size());

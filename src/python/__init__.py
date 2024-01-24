@@ -28,19 +28,20 @@ if not baobzi_path:
 
 libbaobzi = CDLL(baobzi_path)
 
-INPUT_FUNC = CFUNCTYPE(c_double, POINTER(c_double))
+INPUT_FUNC = CFUNCTYPE(None, POINTER(c_double), POINTER(c_double), c_void_p)
 
 
 class BAOBZI_STRUCT(Structure):
-    _fields_ = (("obj", c_void_p), ("dim", c_int), ("order", c_int),
+    _fields_ = (("obj", c_void_p), ("dim", c_int), ("output_dim", c_int), ("order", c_int),
                 ("f_", INPUT_FUNC), ("eval", c_void_p), ("eval_multi", c_void_p),
                 ("stats", c_void_p), ("save", c_void_p), ("free", c_void_p),)
 
 
 class BAOBZI_INPUT_STRUCT(Structure):
     _fields_ = [("func", INPUT_FUNC), ("data", c_void_p), ("dim", c_int),
+                ("output_dim", c_int),
                 ("order", c_int), ("tol", c_double), ("minimum_leaf_fraction", c_double),
-                ("split_multi_eval", c_int),("max_depth", c_int)]
+                ("split_multi_eval", c_int), ("min_depth", c_int), ("max_depth", c_int)]
 
 baobzi_t = POINTER(BAOBZI_STRUCT)
 
@@ -81,8 +82,10 @@ class Baobzi:
                  center=None,
                  half_length=None,
                  tol=None,
+                 output_dim=1,
                  minimum_leaf_fraction=0.0,
                  split_multi_eval=1,
+                 min_depth=0,
                  max_depth=50,
                  filename=None):
         self.ptr = None
@@ -90,6 +93,7 @@ class Baobzi:
             bfilename = bytes(filename, 'utf-8')
             self.ptr = baobzi_restore(bfilename)
             self.dim = self.ptr[0].dim
+            self.output_dim = self.ptr[0].output_dim
             self.order = self.ptr[0].order
         elif fin:
             if not (dim and order and center.size and half_length.size and tol):
@@ -98,7 +102,11 @@ class Baobzi:
                 )
             self.dim = dim
             self.order = order
-            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, order, tol, minimum_leaf_fraction, split_multi_eval, max_depth)
+            self.output_dim = output_dim
+
+            INPUT_FUNC(fin)
+            inputdata = BAOBZI_INPUT_STRUCT(INPUT_FUNC(fin), None, dim, output_dim, order, tol,
+                                            minimum_leaf_fraction, split_multi_eval, min_depth, max_depth)
 
             self.ptr = baobzi_init(pointer(inputdata),
                                    center.ctypes.data_as(POINTER(c_double)),
@@ -117,8 +125,9 @@ class Baobzi:
 
     def __call__(self, x):
         xarr = np.array(x, dtype=np.float64)
-        res = np.empty(xarr.size // self.dim, dtype=np.float64)
-        baobzi_eval_multi(self.ptr, xarr.ctypes.data_as(POINTER(c_double)), res.ctypes.data_as(POINTER(c_double)), res.size)
+        n_points = xarr.size // self.dim
+        res = np.empty(self.output_dim * n_points, dtype=np.float64)
+        baobzi_eval_multi(self.ptr, xarr.ctypes.data_as(POINTER(c_double)), res.ctypes.data_as(POINTER(c_double)), n_points)
         return res
 
     def save(self, filename):

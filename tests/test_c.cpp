@@ -110,6 +110,7 @@ TEST_CASE("1D2 evaluations", "[baobzi]") {
         double y_old[2], y_restored[2];
         baobzi_eval(baobzi_func, center, y_old);
         baobzi_eval(baobzi_func_restored, center, y_restored);
+
         REQUIRE(y_old[0] == y_restored[0]);
         REQUIRE(y_old[1] == y_restored[1]);
 
@@ -157,6 +158,7 @@ TEST_CASE("2D evaluations", "[baobzi]") {
         double y_old, y_restored;
         baobzi_eval(baobzi_func, center, &y_old);
         baobzi_eval(baobzi_func_restored, center, &y_restored);
+
         REQUIRE(y_old == y_restored);
 
         baobzi_free(baobzi_func_restored);
@@ -203,6 +205,7 @@ TEST_CASE("3D evaluations", "[baobzi]") {
         double y_old, y_restored;
         baobzi_eval(baobzi_func, center, &y_old);
         baobzi_eval(baobzi_func_restored, center, &y_restored);
+
         REQUIRE(y_old == y_restored);
 
         baobzi_free(baobzi_func_restored);
