@@ -18,7 +18,7 @@ typedef enum {
 } baobzi_tol_t;
 
 /// @brief Input data type to define baobzi function
-typedef struct {
+struct baobzi_input_t {
     baobzi_input_func_t func;
     void *data;
     int dim;
@@ -30,7 +30,14 @@ typedef struct {
     int min_depth;
     int max_depth;
     baobzi_tol_t tol_type;
-} baobzi_input_t;
+#ifdef __cplusplus
+    baobzi_input_t()
+        : func(nullptr), data(nullptr), dim(0), output_dim(1), order(8), tol(0.0), minimum_leaf_fraction(0.0),
+          split_multi_eval(1), min_depth(0), max_depth(50), tol_type(BAOBZI_TOL_RELATIVE) {}
+#endif
+};
+
+typedef struct baobzi_input_t baobzi_input_t;
 
 /// @brief Baobzi C structure for a common API through C bindings. All work is done through the
 /// pointer baobzi_t though.
