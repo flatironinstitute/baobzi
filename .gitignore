@@ -1,3 +1,5 @@
 /compile_commands.json
 /.cache
 /build*
+__pycache__
+*.egg-info
