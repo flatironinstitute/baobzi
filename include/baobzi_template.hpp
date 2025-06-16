@@ -215,26 +215,44 @@ class Node {
                     coeffs_stl[i + ORDER * i_dim] = coeffs(ORDER - i - 1);
             }
 
-            for (const auto &sample : samples) {
-                if (sample < lb[0] || sample >= ub[0])
-                    continue;
+            auto sample_fails = [this, &input, &coeffs_stl, &lb, &ub](const VecDimD &x, const auto &func) {
+                for (int i = 0; i < DIM; ++i)
+                    if (x[i] < lb[i] || x[i] >= ub[i])
+                        return false;
 
-                const VecDimD x(sample);
                 const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
 
-                T actual_val[output_dim];
+                double actual_val[output_dim];
                 func(x.data(), actual_val, input->data);
+                if (lb[0] == 0.0 && x[0] == 0.0)
+                    int a = 0;
 
                 for (int i = 0; i < output_dim; ++i) {
-                    if (actual_val[i] < 1E-200)
+                    if (actual_val[i] < 1E-12 && input->tol_type == BAOBZI_TOL_RELATIVE)
                         continue;
 
                     T test_val = cheb_eval<ORDER, ISET, T>(xinterp, coeffs_stl.data() + i * ORDER);
-                    T rel_error = std::fabs((actual_val[i] - test_val) / actual_val[i]);
-                    if (rel_error > input->tol)
-                        return std::vector<T>();
+                    if (input->tol_type == BAOBZI_TOL_RELATIVE) {
+                        T rel_error = std::fabs(1.0 - test_val / actual_val[i]);
+                        if (rel_error > input->tol)
+                            return true;
+                    } else {
+                        T abs_error = std::fabs(test_val - actual_val[i]);
+                        if (abs_error > input->tol)
+                            return true;
+                    }
                 }
-            }
+
+                return false;
+            };
+
+            for (int i = 0; i < ORDER; ++i)
+                if (sample_fails(lb + ((ub - lb) * i) / ORDER, func))
+                    return std::vector<T>();
+
+            for (const auto &sample : samples)
+                if (sample_fails(VecDimD{sample}, func))
+                    return std::vector<T>();
 
             coeff_offset = 0;
             return coeffs_stl;
