@@ -396,6 +396,11 @@ struct FunctionTree {
         index_t curr_child_idx = 1;
         max_depth_ = 0;
         while (!q.empty()) {
+#ifdef PYBIND11_MODULE
+            if (PyErr_CheckSignals() != 0)
+                throw pybind11::error_already_set();
+#endif
+
             int n_next = q.size();
             int node_index = nodes_.size();
             for (int i = 0; i < n_next; ++i) {
