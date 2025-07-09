@@ -28,11 +28,11 @@
 
 /// Namespace for baobzi
 namespace baobzi {
-using raw_leaf_node = struct {
+typedef struct raw_leaf_node {
     double a;
     double L;
     const double *coeffs;
-};
+} raw_leaf_node;
 
 struct leaf_compare {
     bool operator()(baobzi::raw_leaf_node a, baobzi::raw_leaf_node b) { return a.a < b.a; };
