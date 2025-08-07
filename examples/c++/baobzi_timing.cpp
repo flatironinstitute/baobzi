@@ -1,6 +1,5 @@
 #include <baobzi_template.hpp>
 
-#include <fstream>
 #include <iostream>
 #include <random>
 #include <time.h>
@@ -117,42 +116,46 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
 
+        auto func = [](double x) -> double {
+            return 1.5 * log(x);
+        };
+
         std::cout << "Testing on 1D function...\n";
-        baobzi::Function<1, 6, 0, real_t> func_approx_1d(&input, &center, &hl);
+        baobzi::Function<6, decltype(func)> func_approx_1d(input, center, hl, func);
         func_approx_1d.print_stats();
 
-        time_function<1>(func_approx_1d, x_transformed, n_runs);
-        print_error(func_approx_1d, input, x_transformed);
+        // time_function<1>(func_approx_1d, x_transformed, n_runs);
+        // print_error(func_approx_1d, input, x_transformed);
         std::cout << "\n";
     }
 
-    {
-        Eigen::Vector<real_t, 2> hl{1.0, 1.0};
-        Eigen::Vector<real_t, 2> center2d = hl + Eigen::Vector<real_t, 2>{0.5, 2.0};
-        std::vector<real_t> x_2d_transformed(n_points * 2);
-        real_t scale_factor = 1.5;
-        baobzi_input_t input;
-        input.dim = 2;
-        input.order = 10;
-        input.data = &scale_factor;
-        input.tol = 1E-10;
-        input.func = testfun_2d3;
-        input.minimum_leaf_fraction = 0.0;
-        input.split_multi_eval = 1;
-        input.max_depth = 50;
-        input.output_dim = 1;
+    // {
+    //     Eigen::Vector<real_t, 2> hl{1.0, 1.0};
+    //     Eigen::Vector<real_t, 2> center2d = hl + Eigen::Vector<real_t, 2>{0.5, 2.0};
+    //     std::vector<real_t> x_2d_transformed(n_points * 2);
+    //     real_t scale_factor = 1.5;
+    //     baobzi_input_t input;
+    //     input.dim = 2;
+    //     input.order = 10;
+    //     input.data = &scale_factor;
+    //     input.tol = 1E-10;
+    //     input.func = testfun_2d3;
+    //     input.minimum_leaf_fraction = 0.0;
+    //     input.split_multi_eval = 0;
+    //     input.max_depth = 50;
+    //     input.output_dim = 1;
 
-        for (int i = 0; i < 2 * n_points; i += 2)
-            for (int j = 0; j < 2; ++j)
-                x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
+    //     for (int i = 0; i < 2 * n_points; i += 2)
+    //         for (int j = 0; j < 2; ++j)
+    //             x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
 
-        std::cout << "Testing on 2D function...\n";
-        baobzi::Function<2, 10, 0, real_t> func_approx_2d(&input, center2d.data(), hl.data());
-        func_approx_2d.print_stats();
+    //     std::cout << "Testing on 2D function...\n";
+    //     baobzi::Function<2, 10, 0, real_t> func_approx_2d(&input, center2d.data(), hl.data());
+    //     func_approx_2d.print_stats();
 
-        time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
-        print_error(func_approx_2d, input, x_2d_transformed);
-    }
+    //     time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
+    //     print_error(func_approx_2d, input, x_2d_transformed);
+    // }
 
     return 0;
 }

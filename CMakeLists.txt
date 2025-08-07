@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.14)
 project(
   baobzi
   LANGUAGES C CXX
-  )
+)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(GNUInstallDirs)
 
@@ -48,6 +49,17 @@ if (NOT EXISTS ${PROJECT_SOURCE_DIR}/extern/msgpack-c/README.md)
   endif()
 endif()
 
+include(FetchContent)
+FetchContent_Declare(
+    polyfit
+    GIT_REPOSITORY https://github.com/DiamonDinoia/polyfit.git
+    GIT_TAG        be704cc
+  )
+set(Build_Tests OFF CACHE BOOL "" FORCE) # gtest... tests
+set(MONOFIT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(MONOFIT_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(polyfit)
+
 option(BAOBZI_BUILD_STATIC "Build the static library" OFF)
 option(BAOBZI_BUILD_SHARED "Build the shared library" ON)
 option(BAOBZI_BUILD_EXAMPLES "Build C/C++ examples" ON)
@@ -72,6 +84,7 @@ endif()
 
 file(GLOB LIB_SOURCES_GENERIC "src/*0.cpp")
 add_library(baobzi_generic OBJECT ${LIB_SOURCES_GENERIC})
+target_link_libraries(baobzi_generic PRIVATE polyfit::polyfit)
 target_include_directories(baobzi_generic PUBLIC ${BAOBZI_INCLUDES})
 target_compile_options(baobzi_generic PRIVATE)
 if (NOT BAOBZI_CPU_DISPATCH)
@@ -90,6 +103,7 @@ if (BAOBZI_CPU_DISPATCH)
     target_compile_options(baobzi_avx PRIVATE /ARCH:AVX)
   endif()
   set_property(TARGET baobzi_avx PROPERTY POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(baobzi_avx PRIVATE polyfit::polyfit)
 
   file(GLOB LIB_SOURCES_AVX2 "src/*2.cpp")
   add_library(baobzi_avx2 OBJECT ${LIB_SOURCES_AVX2})
@@ -100,6 +114,7 @@ if (BAOBZI_CPU_DISPATCH)
     target_compile_options(baobzi_avx2 PRIVATE /ARCH:AVX2)
   endif()
   set_property(TARGET baobzi_avx2 PROPERTY POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(baobzi_avx2 PRIVATE polyfit::polyfit)
 
   file(GLOB LIB_SOURCES_AVX512 "src/*3.cpp")
   add_library(baobzi_avx512 OBJECT ${LIB_SOURCES_AVX512} )
@@ -109,8 +124,8 @@ if (BAOBZI_CPU_DISPATCH)
   else()
     target_compile_options(baobzi_avx512 PRIVATE /ARCH:AVX512)
   endif()
-
   set_property(TARGET baobzi_avx512 PROPERTY POSITION_INDEPENDENT_CODE ON)
+  target_link_libraries(baobzi_avx512 PRIVATE polyfit::polyfit)
 endif()
 
 set(BAOBZI_BINDING_SOURCES src/baobzi.cpp)
@@ -129,9 +144,9 @@ if (${BAOBZI_BUILD_SHARED})
   add_library(baobzi SHARED ${BAOBZI_BINDING_SOURCES})
   target_include_directories(baobzi PUBLIC ${BAOBZI_INCLUDES})
   if (BAOBZI_CPU_DISPATCH)
-    target_link_libraries(baobzi PRIVATE baobzi_generic baobzi_avx baobzi_avx2 baobzi_avx512)
+    target_link_libraries(baobzi PRIVATE baobzi_generic baobzi_avx baobzi_avx2 baobzi_avx512 polyfit::polyfit)
   else()
-    target_link_libraries(baobzi PRIVATE baobzi_generic)
+    target_link_libraries(baobzi PRIVATE baobzi_generic polyfit::polyfit)
   endif()
 
   list(APPEND INSTALL_TARGETS baobzi)
@@ -140,9 +155,9 @@ endif()
 if (${BAOBZI_BUILD_STATIC})
   add_library(baobzi_static STATIC ${BAOBZI_BINDING_SOURCES})
   if (BAOBZI_CPU_DISPATCH)
-    target_link_libraries(baobzi_static PRIVATE baobzi_generic baobzi_avx baobzi_avx2 baobzi_avx512)
+    target_link_libraries(baobzi_static PRIVATE baobzi_generic baobzi_avx baobzi_avx2 baobzi_avx512 polyfit::polyfit)
   else()
-    target_link_libraries(baobzi_static PRIVATE baobzi_generic)
+    target_link_libraries(baobzi_static PRIVATE baobzi_generic polyfit::polyfit)
   endif()
 
   set_target_properties(baobzi_static PROPERTIES OUTPUT_NAME baobzi)
@@ -153,7 +168,7 @@ if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
   set(EXAMPLE_SOURCE_CPP "examples/c++/baobzi_timing.cpp")
   add_executable(baobzi_timing_cpp ${EXAMPLE_SOURCE_CPP})
   target_include_directories(baobzi_timing_cpp PUBLIC ${BAOBZI_INCLUDES})
-  target_link_libraries(baobzi_timing_cpp PUBLIC)
+  target_link_libraries(baobzi_timing_cpp PUBLIC polyfit::polyfit)
   target_compile_options(baobzi_timing_cpp PUBLIC ${NATIVE_ARCH_FLAG})
 
   set(EXAMPLE_SOURCE_C "examples/C/baobzi_timing.c")
@@ -171,7 +186,7 @@ if (BAOBZI_BUILD_TESTS)
   target_link_libraries(test_c PUBLIC Catch2::Catch2WithMain baobzi)
 
   add_executable(test_template tests/test_template.cpp)
-  target_link_libraries(test_template PUBLIC Catch2::Catch2WithMain)
+  target_link_libraries(test_template PUBLIC Catch2::Catch2WithMain polyfit::polyfit)
   target_include_directories(test_template PRIVATE ${BAOBZI_INCLUDES})
 
   list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/extern/catch2/extras)
