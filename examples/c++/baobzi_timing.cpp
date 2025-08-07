@@ -56,19 +56,19 @@ void print_error(const Function &function, baobzi_input_t &input, const std::vec
 
     size_t n_meas = 0;
     for (int i = 0; i < x.size(); i += Function::Dim) {
-        const real_t *point = &x[i];
+        const real_t point = x[i];
         double pointd[Function::Dim];
         for (int j = 0; j < Function::Dim; ++j)
             pointd[j] = x[i + j];
 
         real_t actual;
         input.func(pointd, &actual, input.data);
-        real_t interp = function.eval(point);
+        real_t interp = function(point);
         real_t delta = actual - interp;
 
         max_error = std::max(max_error, std::fabs(delta));
 
-        if (std::abs(actual) > 1E-15) {
+        if (std::abs(actual) > 1E-100) {
             real_t rel_error = std::abs(interp / actual - 1.0);
             max_rel_error = std::max(max_rel_error, rel_error);
             mean_rel_error += std::abs(rel_error);
@@ -112,20 +112,19 @@ int main(int argc, char *argv[]) {
         input.split_multi_eval = 0;
         input.max_depth = 8;
         input.output_dim = 1;
+        input.tol_type = BAOBZI_TOL_RELATIVE;
 
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
 
-        auto func = [](double x) -> double {
-            return 1.5 * log(x);
-        };
+        auto func = [scale_factor](double x) -> double { return scale_factor * log(x); };
 
         std::cout << "Testing on 1D function...\n";
         baobzi::Function<6, decltype(func)> func_approx_1d(input, center, hl, func);
         func_approx_1d.print_stats();
 
-        // time_function<1>(func_approx_1d, x_transformed, n_runs);
-        // print_error(func_approx_1d, input, x_transformed);
+        volatile auto dont_optimize = time_function<1>(func_approx_1d, x_transformed, n_runs).data();
+        print_error(func_approx_1d, input, x_transformed);
         std::cout << "\n";
     }
 

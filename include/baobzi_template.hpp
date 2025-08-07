@@ -141,9 +141,9 @@ inline double standard_error(const auto &polyfit, baobzi_tol_t tol_type) {
 
     if constexpr (input_dim == 1) {
         int n = coeffs.size();
-        for (auto i = n - 2; i < n; ++i)
+        for (auto i = 0; i < 2; ++i)
             maxcoeff = std::max(std::abs(coeffs[i]), maxcoeff);
-        scaling_factor = std::max(scaling_factor, std::abs(coeffs[0]));
+        scaling_factor = std::max(scaling_factor, std::abs(coeffs[n - 1]));
     } else {
         throw std::runtime_error("Baobzi standard_error error: only scalar functions are currently supported");
         // int n = coeffs.size() / output_dim;
@@ -168,6 +168,7 @@ template <class Func, int ORDER, int ISET = 0>
 class Node {
   public:
     using input_type = poly_eval::function_traits<Func>::arg0_type;
+    using output_type = poly_eval::function_traits<Func>::result_type;
     using value_type = value_type_or_identity<input_type>::type;
     using PolyEvalType = poly_eval::FuncEval<Func, ORDER>;
     static constexpr int DIM = get_tuple_size<input_type>();
@@ -205,37 +206,11 @@ class Node {
             const auto lb = (box_.center[0] - half_length);
             const auto ub = (box_.center[0] + half_length);
 
-            std::vector<value_type> xs;
-            std::vector<value_type> ys;
-
-            for (auto x = lb; x < ub; x += 2 * half_length / (ORDER + 1))
-                xs.push_back(x);
-            for (auto x : xs)
-                ys.push_back(func(x));
-
-            auto error = [&xs, &ys, &func](const PolyEvalType &poly, baobzi_tol_t tol_type) {
-                value_type max_error = 0.0;
-                if (tol_type == BAOBZI_TOL_RELATIVE) {
-                    // Relative error
-                    for (size_t i = 0; i < xs.size(); ++i) {
-                        value_type actual = func(xs[i]);
-                        if (std::abs(actual) > 1E-16)
-                            max_error = std::max(max_error, std::abs((poly(xs[i]) - actual) / actual));
-                    }
-                } else {
-                    // Absolute error
-                    for (size_t i = 0; i < xs.size(); ++i)
-                        max_error = std::max(max_error, std::abs(poly(xs[i]) - ys[i]));
-                }
-
-                return max_error;
-            };
-
             std::vector<PolyEvalType> poly_evals;
             for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
                 auto poly = poly_eval::make_func_eval<ORDER>(func, lb, ub);
 
-                if (error(poly, input.tol_type) > input.tol)
+                if (standard_error(poly, input.tol_type) > input.tol)
                     return std::vector<PolyEvalType>();
                 else
                     poly_evals.push_back(poly);
@@ -336,16 +311,16 @@ class Node {
     // /// @param[in] x point to evaluate at
     // /// @param[in] coeffs flat/global coefficient array
     // /// @returns function approximation at x
-    // inline value_type eval(const VecDimD &x, const T *coeffs) const {
+    // inline output_type eval(const input_type &x, const PolyEvalType *coeffs) const {
     //     const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
     //     return cheb_eval<ORDER, ISET, T>(xinterp, coeffs + coeff_offset);
     // }
 
-    // void eval(const VecDimD &x, T *res, const T *coeffs) const {
-    //     const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
-    //     for (int i = 0; i < output_dim; ++i)
-    //         res[i] = cheb_eval<ORDER, ISET, T>(xinterp, coeffs + coeff_offset + i * ORDER);
-    // }
+    // // void eval(const VecDimD &x, T *res, const T *coeffs) const {
+    // //     const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
+    // //     for (int i = 0; i < output_dim; ++i)
+    // //         res[i] = cheb_eval<ORDER, ISET, T>(xinterp, coeffs + coeff_offset + i * ORDER);
+    // // }
 
     /// @brief Calculate memory usage of self (including unused space from vector allocation)
     /// @returns size in bytes of object instance
@@ -439,17 +414,21 @@ struct FunctionTree {
     /// @brief Find leaf node containing a point via standard pointer traversal
     /// @param[in] x point that the node will contain
     /// @return leaf node containing point x
-    inline const node_t &find_node_traverse(const VecDimD &x) const { return nodes_[get_node_index(x)]; }
+    inline const node_t &find_node_traverse(const input_type &x) const { return nodes_[get_node_index(x)]; }
 
     /// @brief Get index of node at point x (relative to local nodes_ array)
     /// @param[in] x [DIM] point to lookup
     /// @returns index of node in nodes_ array containing x
-    inline std::size_t get_node_index(const VecDimD &x) const {
+    inline std::size_t get_node_index(const input_type &x) const {
         index_t curr_index = 0;
         while (!nodes_[curr_index].is_leaf()) {
             index_t child_idx = 0;
-            for (int i = 0; i < DIM; ++i)
-                child_idx = child_idx | ((x[i] > nodes_[curr_index].box_.center[i]) << i);
+
+            if constexpr (has_tuple_size_v<input_type>)
+                for (int i = 0; i < DIM; ++i)
+                    child_idx = child_idx | ((x[i] > nodes_[curr_index].box_.center[i]) << i);
+            else
+                child_idx = (x > nodes_[curr_index].box_.center[0]) ? 1 : 0;
 
             curr_index = nodes_[curr_index].first_child_idx + child_idx;
         }
@@ -731,76 +710,58 @@ class Function {
     /// @brief find linear index of bin at a point
     /// @param[in] x [1] position to find bin
     /// @returns linear index of bin that x lives in
-    inline int get_linear_bin(const std::array<value_type, 1> &x) const {
-        const value_type x_bin = x[0] - lower_left_[0];
-        return x_bin * inv_bin_size_[0];
-    }
+    inline int get_linear_bin(const input_type &x) const {
+        if constexpr (DIM == 1) {
+            const value_type x_bin = [this, &x]() {
+                if constexpr (has_tuple_size_v<input_type>)
+                    return x[0] - lower_left_[0];
+                else
+                    return x - lower_left_[0];
+            }();
+            return x_bin * inv_bin_size_[0];
+        } else {
+            std::array<int, DIM> bin;
+            for (int i = 0; i < DIM; ++i)
+                bin[i] = (x[i] - lower_left_[i]) * inv_bin_size_[i];
 
-    /// @brief find linear index of bin at a point
-    /// @param[in] x [2] position to find bin
-    /// @returns linear index of bin that x lives in
-    inline int get_linear_bin(const std::array<value_type, 2> &x) const {
-        const VecDimD x_bin = x - lower_left_;
-        const std::array<int, DIM> bin = (x_bin.array() * inv_bin_size_.array()).template cast<int>();
-        return bin[0] + n_subtrees_[0] * bin[1];
-    }
-
-    /// @brief find linear index of bin at a point
-    /// @param[in] x [3] position to find bin
-    /// @returns linear index of bin that x lives in
-    inline int get_linear_bin(const std::array<value_type, 3> &x) const {
-        const VecDimD x_bin = x - lower_left_;
-        const std::array<int, DIM> bin = (x_bin.array() * inv_bin_size_.array()).template cast<int>();
-        return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
+            if constexpr (DIM == 2)
+                return bin[0] + n_subtrees_[0] * bin[1];
+            else if constexpr (DIM == 3)
+                return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
+        }
     }
 
     /// @brief get constant reference to leaf node that contains a point
     /// @param[in] x point of interest
     /// @returns constant reference to leaf node that contains x
-    inline const node_t &find_node(const VecDimD &x) const {
+    inline const node_t &find_node(const input_type &x) const {
         return subtrees_[get_linear_bin(x)].find_node_traverse(x);
     }
 
-    /// @brief eval function approximation at point
-    /// @param[in] x point to evaluate function at
-    /// @returns function approximation at point x
-    inline value_type eval(const VecDimD &x) const {
-        return (x.array() < lower_left_.array()).any() || (x.array() >= upper_right_.array()).any()
-                   ? NAN
-                   : find_node(x).eval(x, polyfits_.data());
-    }
-
-    /// @brief eval function approximation at point
-    /// @param[in] xp [DIM] point to evaluate function at
-    /// @returns function approximation at point xp
-    inline value_type eval(const value_type *xp) const { return eval(VecDimD(xp)); }
-
-    inline value_type eval(value_type x) {
+    inline output_type eval(input_type x) const {
         for (int i = 0; i < DIM; ++i) {
             if (x < lower_left_[i] || x >= upper_right_[i])
                 return NAN;
         }
-        return find_node(x).eval(x, polyfits_.data());
+        return polyfits_[find_node(x).poly_eval_id](x);
     }
 
     /// @brief get index of node (across all subnodes)
     /// @param[in] x [DIM] point to find the node of
     /// @returns index in global node array
-    inline std::size_t get_global_node_index(const VecDimD &x) const {
-        int i_sub = get_linear_bin(x);
+    inline std::size_t get_global_node_index(const input_type &x) const {
+        const int i_sub = get_linear_bin(x);
         return subtree_node_offsets_[i_sub] + subtrees_[i_sub].get_node_index(x);
     }
 
-    inline void eval(const VecDimD &x, value_type *res) const {
+    inline void eval(const input_type &x, output_type *res) const {
         if ((x.array() < lower_left_.array()).any() || (x.array() >= upper_right_.array()).any()) {
             for (int i = 0; i < output_dim_; ++i)
                 res[i] = NAN;
         }
 
-        find_node(x).eval(x, res, polyfits_.data());
+        *res = find_node(x).eval(x);
     }
-
-    inline void eval(const value_type *xp, value_type *res) const { eval(VecDimD(xp), res); }
 
     /// @brief eval function approximation at n_trg points
     /// @param[in] xp [DIM * n_trg] array of points to evaluate function at
@@ -808,13 +769,14 @@ class Function {
     /// @param[in] n_trg number of points to evaluate
     inline void eval(const value_type *xp, value_type *res, int n_trg) const {
         if (split_multi_eval_) {
-            std::vector<std::pair<node_t *, VecDimD>> node_map(n_trg);
+            std::vector<std::pair<node_t *, input_type>> node_map(n_trg);
             for (int i = 0; i < n_trg; ++i) {
-                VecDimD xi = VecDimD(xp + DIM * i);
-                node_t *node_ptr =
-                    (xi.array() < lower_left_.array()).any() || (xi.array() >= upper_right_.array()).any()
-                        ? nullptr
-                        : node_pointers_[get_global_node_index(xi)];
+                value_type xi = *(xp + DIM * i);
+                node_t *node_ptr = [xi, this]() {
+                    if (xi < lower_left_[0] || xi >= upper_right_[0])
+                        return (node_t *)nullptr;
+                    return node_pointers_[get_global_node_index(xi)];
+                }();
 
                 node_map[i] = std::make_pair(node_ptr, xi);
             }
@@ -822,19 +784,20 @@ class Function {
             for (int i_trg = 0; i_trg < n_trg; i_trg++) {
                 res[i_trg] = node_map[i_trg].first == nullptr
                                  ? NAN
-                                 : node_map[i_trg].first->eval(node_map[i_trg].second, polyfits_.data());
+                                 : polyfits_[node_map[i_trg].first->poly_eval_id](node_map[i_trg].second);
             }
         } else {
-            for (int i_trg = 0; i_trg < n_trg; i_trg++) {
-                res[i_trg] = eval(VecDimD(xp + DIM * i_trg));
-            }
+            for (int i_trg = 0; i_trg < n_trg; i_trg++)
+                res[i_trg] = eval(*(xp + DIM * i_trg));
         }
     }
+
+    inline void operator()(const value_type *xp, value_type *res, int n_trg) const { eval(xp, res, n_trg); }
 
     /// @brief eval function approximation at point
     /// @param[in] x [DIM] point to evaluate function at
     /// @returns function approximation at point x
-    inline output_type operator()(const VecDimD &x) const { return output_dim_ > 1 ? NAN : eval(x); }
+    inline output_type operator()(const input_type &x) const { return output_dim_ > 1 ? NAN : eval(x); }
 
     // /// @brief save function approximation to file
     // /// @param[in] filename path to save file at
