@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
         input.data = &scale_factor;
         input.tol = 1E-10;
         input.func = testfun_1d;
-        input.minimum_leaf_fraction = 1.0;
+        input.minimum_leaf_fraction = 0.0;
         input.split_multi_eval = 0;
         input.max_depth = 8;
         input.output_dim = 1;
@@ -117,13 +117,18 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < n_points; i++)
             x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
 
-        auto func = [scale_factor](double x) -> double { return scale_factor * log(x); };
+        auto func = [input](double x) -> double {
+            double y;
+            input.func(&x, &y, input.data);
+            return y;
+        };
 
         std::cout << "Testing on 1D function...\n";
         baobzi::Function<6, decltype(func)> func_approx_1d(input, center, hl, func);
         func_approx_1d.print_stats();
 
-        volatile auto dont_optimize = time_function<1>(func_approx_1d, x_transformed, n_runs).data();
+        auto dummy = time_function<1>(func_approx_1d, x_transformed, n_runs);
+        volatile auto noopt = dummy.data();
         print_error(func_approx_1d, input, x_transformed);
         std::cout << "\n";
     }

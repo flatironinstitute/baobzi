@@ -219,108 +219,7 @@ class Node {
             poly_eval_id = 0;
             return poly_evals;
         }
-
-        throw std::runtime_error("Baobzi fit error: only 1D functions are currently supported");
-        // if constexpr (DIM == 2) {
-        //     Eigen::Matrix<T, ORDER, ORDER> F;
-        //     VecOrderD xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
-        //     VecOrderD yvec = Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
-
-        //     for (int i = 0; i < ORDER; ++i) {
-        //         for (int j = 0; j < ORDER; ++j) {
-        //             double x[2] = {xvec[i], yvec[j]};
-        //             func(x, &F(i, j), input->data);
-        //         }
-        //     }
-
-        //     Eigen::Matrix<T, ORDER, ORDER> coeffs = Func::VLU_.solve(F);
-        //     coeffs = Func::VLU_.solve(coeffs.transpose()).transpose();
-
-        //     if (standard_error<T>(coeffs, input->tol_type) > input->tol)
-        //         return std::vector<T>();
-
-        //     std::vector<T> coeffs_stl(coeffs.size());
-        //     for (int i = 0; i < coeffs.size(); ++i)
-        //         coeffs_stl[i] = coeffs(i);
-
-        //     coeff_offset = 0;
-        //     return coeffs_stl;
-        // }
-        // if constexpr (DIM == 3) {
-        //     Eigen::Tensor<T, 3> F(ORDER, ORDER, ORDER);
-
-        //     VecOrderD xvec = Func::get_cheb_nodes(box_.center[0] - half_length[0], box_.center[0] + half_length[0]);
-        //     VecOrderD yvec = Func::get_cheb_nodes(box_.center[1] - half_length[1], box_.center[1] + half_length[1]);
-        //     VecOrderD zvec = Func::get_cheb_nodes(box_.center[2] - half_length[2], box_.center[2] + half_length[2]);
-
-        //     for (int i = 0; i < ORDER; ++i) {
-        //         for (int j = 0; j < ORDER; ++j) {
-        //             for (int k = 0; k < ORDER; ++k) {
-        //                 T x[3] = {xvec[i], yvec[j], zvec[k]};
-        //                 func(x, &F(i, j, k), input->data);
-        //             }
-        //         }
-        //     }
-
-        //     std::vector<T> coeffs(ORDER * ORDER * ORDER);
-        //     Eigen::Tensor<T, 3> coeffs_tensor(ORDER, ORDER, ORDER);
-        //     using matrix_t = Eigen::Matrix<T, ORDER, ORDER>;
-        //     using map_t = Eigen::Map<matrix_t>;
-        //     using tensor_t = Eigen::Tensor<T, 2>;
-        //     for (int block = 0; block < ORDER; ++block) {
-        //         tensor_t F_block_tensor = F.chip(block, 2);
-        //         map_t F_block(F_block_tensor.data());
-
-        //         matrix_t coeffs_tmp = Func::VLU_.solve(F_block);
-        //         coeffs_tmp = Func::VLU_.solve(coeffs_tmp.transpose()).transpose();
-        //         coeffs_tensor.chip(block, 2) = Eigen::TensorMap<tensor_t>(coeffs_tmp.data(), ORDER, ORDER);
-        //     }
-        //     for (int block = 0; block < ORDER; ++block) {
-        //         Eigen::Tensor<T, 2> coeffs_tmp = coeffs_tensor.chip(block, 0);
-        //         map_t coeffs_ysolve(coeffs_tmp.data());
-        //         map_t(coeffs.data() + block * ORDER * ORDER) =
-        //         Func::VLU_.solve(coeffs_ysolve.transpose()).transpose();
-        //     }
-
-        //     // Hack to use local coefficient array rather than global one
-        //     coeff_offset = 0;
-        //     for (int i = 0; i < ORDER; ++i) {
-        //         for (int j = 0; j < ORDER; ++j) {
-        //             for (int k = 0; k < ORDER; ++k) {
-        //                 VecDimD point = (box_.center - half_length).array() +
-        //                                 2.0 * VecDimD{(T)i, (T)j, (T)k}.array() * half_length.array() / ORDER;
-
-        //                 const T test_val = eval(point, coeffs.data());
-        //                 T actual_val; // FIXME will break with vector-valued funcs
-        //                 func(point.data(), &actual_val, input->data);
-        //                 const T rel_error = std::abs((actual_val - test_val) / actual_val);
-
-        //                 if (fabs(actual_val) > 1E-16 && rel_error > input->tol) {
-        //                     coeff_offset = std::numeric_limits<uint64_t>::max();
-        //                     return std::vector<T>();
-        //                 }
-        //             }
-        //         }
-        //     }
-
-        //     return coeffs;
-        // }
     }
-
-    // /// @brief eval node at point x
-    // /// @param[in] x point to evaluate at
-    // /// @param[in] coeffs flat/global coefficient array
-    // /// @returns function approximation at x
-    // inline output_type eval(const input_type &x, const PolyEvalType *coeffs) const {
-    //     const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
-    //     return cheb_eval<ORDER, ISET, T>(xinterp, coeffs + coeff_offset);
-    // }
-
-    // // void eval(const VecDimD &x, T *res, const T *coeffs) const {
-    // //     const VecDimD xinterp = (x - box_.center).array() * box_.inv_half_length.array();
-    // //     for (int i = 0; i < output_dim; ++i)
-    // //         res[i] = cheb_eval<ORDER, ISET, T>(xinterp, coeffs + coeff_offset + i * ORDER);
-    // // }
 
     /// @brief Calculate memory usage of self (including unused space from vector allocation)
     /// @returns size in bytes of object instance
@@ -414,7 +313,7 @@ struct FunctionTree {
     /// @brief Find leaf node containing a point via standard pointer traversal
     /// @param[in] x point that the node will contain
     /// @return leaf node containing point x
-    inline const node_t &find_node_traverse(const input_type &x) const { return nodes_[get_node_index(x)]; }
+    inline const node_t &find_node(const input_type &x) const { return nodes_[get_node_index(x)]; }
 
     /// @brief Get index of node at point x (relative to local nodes_ array)
     /// @param[in] x [DIM] point to lookup
@@ -428,7 +327,7 @@ struct FunctionTree {
                 for (int i = 0; i < DIM; ++i)
                     child_idx = child_idx | ((x[i] > nodes_[curr_index].box_.center[i]) << i);
             else
-                child_idx = (x > nodes_[curr_index].box_.center[0]) ? 1 : 0;
+                child_idx = x > nodes_[curr_index].box_.center[0];
 
             curr_index = nodes_[curr_index].first_child_idx + child_idx;
         }
@@ -735,10 +634,10 @@ class Function {
     /// @param[in] x point of interest
     /// @returns constant reference to leaf node that contains x
     inline const node_t &find_node(const input_type &x) const {
-        return subtrees_[get_linear_bin(x)].find_node_traverse(x);
+        return subtrees_[get_linear_bin(x)].find_node(x);
     }
 
-    inline output_type eval(input_type x) const {
+    inline output_type eval(const input_type &x) const {
         for (int i = 0; i < DIM; ++i) {
             if (x < lower_left_[i] || x >= upper_right_[i])
                 return NAN;
@@ -752,15 +651,6 @@ class Function {
     inline std::size_t get_global_node_index(const input_type &x) const {
         const int i_sub = get_linear_bin(x);
         return subtree_node_offsets_[i_sub] + subtrees_[i_sub].get_node_index(x);
-    }
-
-    inline void eval(const input_type &x, output_type *res) const {
-        if ((x.array() < lower_left_.array()).any() || (x.array() >= upper_right_.array()).any()) {
-            for (int i = 0; i < output_dim_; ++i)
-                res[i] = NAN;
-        }
-
-        *res = find_node(x).eval(x);
     }
 
     /// @brief eval function approximation at n_trg points
