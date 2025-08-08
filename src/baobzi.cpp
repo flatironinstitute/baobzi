@@ -1,17 +1,11 @@
 #include "baobzi.h"
 
-#include "baobzi_template.hpp"
-
+#include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <limits>
-#include <msgpack.hpp>
 #include <sstream>
-#include <stdexcept>
-#include <tuple>
 
 const struct baobzi_input_t baobzi_input_default;
 
@@ -62,57 +56,6 @@ void baobzi_eval(const baobzi_t func, const double *x, double *y) { func->eval(f
 
 void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
     func->eval_multi(func->obj, x, res, ntrg);
-}
-
-void baobzi_save(const baobzi_t func, const char *filename) { func->save(func->obj, filename); }
-
-baobzi_header_t read_header(const char *addr, const std::size_t buflen, std::size_t *offset) {
-    msgpack::object_handle oh;
-    msgpack::unpack(oh, addr, buflen, *offset); // actually increments offset
-    return oh.get().as<baobzi_header_t>();
-}
-
-baobzi_t baobzi_restore(const char *filename_cstr) {
-    std::string filename(filename_cstr);
-    baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
-    res->obj = nullptr;
-
-    try {
-        std::size_t offset = 0;
-        std::string filedata_str = file_to_string(filename);
-        baobzi_header_t header = read_header(filedata_str.data(), filedata_str.size(), &offset);
-
-        msgpack::object_handle oh;
-        msgpack::unpack(oh, filedata_str.data(), filedata_str.size(), offset);
-        msgpack::object obj = oh.get();
-
-        res->DIM = header.dim;
-        res->ORDER = header.order;
-
-        auto [dim, order, version] = std::make_tuple(header.dim, header.order, header.version);
-
-        if (version != BAOBZI_HEADER_VERSION) {
-            free(res);
-            return nullptr;
-        }
-
-        int iset = get_iset();
-        switch (BAOBZI_JOIN(header.dim, header.order, iset)) {
-#include "baobzi/baobzi_cases_restore.h"
-        default: {
-            std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim
-                      << ", " << order << ")\n";
-            free(res);
-            return nullptr;
-            break;
-        }
-        }
-    } catch (std::exception &e) {
-        std::cerr << "Baobzi restore error: Unable to restore from \'" << filename << "'" << std::endl;
-        free(res);
-        return nullptr;
-    }
-    return res;
 }
 
 void baobzi_stats(baobzi_t func) {

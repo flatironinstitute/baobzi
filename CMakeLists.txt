@@ -17,37 +17,7 @@ endif()
 
 set(BAOBZI_INCLUDES
   ${PROJECT_SOURCE_DIR}/include
-  ${PROJECT_SOURCE_DIR}/extern/msgpack-c/include
-  ${PROJECT_SOURCE_DIR}/extern/eigen
-  ${PROJECT_SOURCE_DIR}/extern/catch2/src
-  )
-
-if (NOT EXISTS ${PROJECT_SOURCE_DIR}/extern/msgpack-c/README.md)
-  include(FetchContent)
-  FetchContent_Declare(
-    msgpack-c
-    URL https://github.com/msgpack/msgpack-c/archive/refs/tags/cpp-3.3.0.tar.gz
-    URL_HASH SHA256=754c3ace499a63e45b77ef4bcab4ee602c2c414f58403bce826b76ffc2f77d0b
-    )
-  FetchContent_Declare(
-    eigen
-    URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
-    URL_HASH SHA256=8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72
-    )
-  FetchContent_Populate(msgpack-c)
-  list(APPEND BAOBZI_INCLUDES ${msgpack-c_SOURCE_DIR}/include)
-  FetchContent_Populate(eigen)
-  list(APPEND BAOBZI_INCLUDES ${eigen_SOURCE_DIR})
-
-  if (BAOBZI_BUILD_TESTS)
-    FetchContent_Declare(
-      catch2
-      URL https://github.com/catchorg/Catch2/archive/refs/tags/v3.0.0-preview4.tar.gz
-      URL_HASH SHA256=2458d47d923b65ab611656cb7669d1810bcc4faa62e4c054a7405b1914cd4aee
-      )
-    FetchContent_MakeAvailable(Catch2)
-  endif()
-endif()
+)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -178,9 +148,12 @@ if (${BAOBZI_BUILD_SHARED} AND ${BAOBZI_BUILD_EXAMPLES})
 endif()
 
 if (BAOBZI_BUILD_TESTS)
-  if (NOT catch2_POPULATED)
-    add_subdirectory(extern/catch2)
-  endif()
+  FetchContent_Declare(
+    catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG v3.9.0
+  )
+  FetchContent_MakeAvailable(catch2)
 
   add_executable(test_c tests/test_c.cpp)
   target_link_libraries(test_c PUBLIC Catch2::Catch2WithMain baobzi)

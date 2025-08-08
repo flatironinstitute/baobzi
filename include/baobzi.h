@@ -1,7 +1,6 @@
 #ifndef BAOBZI_H
 #define BAOBZI_H
 
-#include "baobzi/header.h"
 #include "baobzi/macros.h"
 
 #include <stdint.h>
@@ -51,7 +50,6 @@ typedef struct {
     int ORDER;                                                            ///< Order of the polynomial
     void (*eval)(const void *, const double *, double *);                 ///< Pointer to evaluation function
     void (*eval_multi)(const void *, const double *, double *, int ntrg); ///< Pointer to multi-evaluation function
-    void (*save)(const void *, const char *);                             ///< Pointer to save function
     void (*stats)(void *);                                                ///< pointer to stats function
     void (*free)(void *);                                                 ///< pointer to free function
 } baobzi_struct;

@@ -19,42 +19,6 @@
 #include <polyfit/fast_eval.hpp>
 
 #include <baobzi.h>
-#include <msgpack.hpp>
-
-namespace msgpack {
-MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS) {
-    namespace adaptor {
-
-    // Place class template specialization here
-    template <>
-    struct convert<baobzi_header_t> {
-        msgpack::object const &operator()(msgpack::object const &o, baobzi_header_t &v) const {
-            if (o.type != msgpack::type::ARRAY)
-                throw msgpack::type_error();
-            if (o.via.array.size != 3)
-                throw msgpack::type_error();
-            v = baobzi_header_t{.dim = o.via.array.ptr[0].as<int>(),
-                                .order = o.via.array.ptr[1].as<int>(),
-                                .version = o.via.array.ptr[2].as<int>()};
-            return o;
-        }
-    };
-
-    template <>
-    struct pack<baobzi_header_t> {
-        template <typename Stream>
-        packer<Stream> &operator()(msgpack::packer<Stream> &o, baobzi_header_t const &v) const {
-            o.pack_array(3);
-            o.pack(v.dim);
-            o.pack(v.order);
-            o.pack(v.version);
-            return o;
-        }
-    };
-
-    } // namespace adaptor
-} // MSGPACK_API_VERSION_NAMESPACE(MSGPACK_DEFAULT_API_NS)
-} // namespace msgpack
 
 /// Namespace for baobzi
 namespace baobzi {
@@ -77,13 +41,6 @@ class MaxDepthExceeded : public std::exception {
 
 template <int ORDER, class Func>
 class Function;
-
-inline auto inverse_array(const auto &arr) {
-    std::remove_cvref_t<decltype(arr)> res;
-    for (int i = 0; i < arr.size(); ++i)
-        res[i] = 1.0 / arr[i];
-    return res;
-}
 
 inline auto prod(const auto &arr) {
     typename std::remove_cvref_t<decltype(arr)>::value_type res{1};
@@ -110,22 +67,15 @@ constexpr int get_tuple_size() {
 /// @brief Structure to represent geometric portion of Baobzi nodes
 /// @tparam DIM number of dimensions of box
 /// @tparam ISET Instruction set index (dummy variable to force alignment for different instruction sets)
-template <int DIM, int ISET, typename T = double>
+template <int DIM, typename T>
 struct Box {
     using VecDimD = std::array<T, DIM>; ///< DIM dimensional vector type
 
     VecDimD center;          ///< Center of box
-    VecDimD inv_half_length; ///< 1.0 / half the dimension of the box
+    VecDimD half_length;     ///< half the dimension of the box
 
-    Box<DIM, ISET, T>() = default; ///< default constructor for msgpack happiness
     /// @brief Constructor, just copies x, hl over
-    Box<DIM, ISET, T>(const VecDimD &x, const VecDimD &hl) : center(x), inv_half_length(inverse_array(hl)) {}
-
-    /// @brief return vector of box half lengths along each dimension
-    inline VecDimD half_length() const { return inverse_array(inv_half_length); }
-
-    /// @brief MSGPACK serialization magic
-    MSGPACK_DEFINE(center, inv_half_length);
+    Box<DIM, T>(const VecDimD &x, const VecDimD &hl) : center(x), half_length(hl) {}
 };
 
 /// @brief Return an estimate of the error for a given set of coefficients
@@ -172,20 +122,18 @@ class Node {
     using value_type = value_type_or_identity<input_type>::type;
     using PolyEvalType = poly_eval::FuncEval<Func, ORDER>;
     static constexpr int DIM = get_tuple_size<input_type>();
+    static constexpr int OUTPUT_DIM = get_tuple_size<output_type>();
 
     using VecDimD = std::array<value_type, DIM>;     ///< D dimensional vector type
     using VecOrderD = std::array<value_type, ORDER>; ///< ORDER dimensional vector type
 
-    Box<DIM, ISET, value_type> box_;                              ///< Geometric position/size of this node
+    std::array<value_type, DIM> center;                           ///< Center of the node
     uint64_t poly_eval_id = std::numeric_limits<uint64_t>::max(); ///< Position of poly_eval object in global array
     uint32_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
-    uint32_t output_dim = 1;
-
-    Node<Func, ORDER, ISET>() = default; ///< Default constructor for msgpack happiness
 
     /// @brief Construct node from box (without fitting)
     /// @param [in] box box this node represents
-    Node<Func, ORDER, ISET>(const Box<DIM, ISET, value_type> &box) : box_(box) {}
+    Node<Func, ORDER, ISET>(const Box<DIM, value_type> &box) : center(box.center) {}
 
     /// @brief check if node is leaf
     /// @return true if leaf, false otherwise
@@ -196,18 +144,17 @@ class Node {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns coefficient vector list if fit successful, empty list if not good enough
     std::vector<PolyEvalType> fit(const baobzi_input_t &input, const Func &func,
+                                  const std::array<value_type, DIM> &half_length,
                                   const std::vector<value_type> &samples) {
         if (samples.size())
             throw std::runtime_error("Baobzi fit error: sample points not yet supported");
 
-        output_dim = input.output_dim;
         if constexpr (DIM == 1) {
-            const auto half_length = box_.half_length()[0];
-            const auto lb = (box_.center[0] - half_length);
-            const auto ub = (box_.center[0] + half_length);
+            const auto lb = (center[0] - half_length[0]);
+            const auto ub = (center[0] + half_length[0]);
 
             std::vector<PolyEvalType> poly_evals;
-            for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
+            for (int i_dim = 0; i_dim < OUTPUT_DIM; ++i_dim) {
                 auto poly = poly_eval::make_func_eval<ORDER>(func, lb, ub);
 
                 if (standard_error(poly, input.tol_type) > input.tol)
@@ -224,9 +171,6 @@ class Node {
     /// @brief Calculate memory usage of self (including unused space from vector allocation)
     /// @returns size in bytes of object instance
     inline std::size_t memory_usage() const { return sizeof(*this); }
-
-    /// @brief MSGPACK serialization magic
-    MSGPACK_DEFINE(box_, first_child_idx, poly_eval_id, output_dim);
 };
 
 /// @brief Represent a function in some domain as a tree of chebyshev nodes
@@ -245,7 +189,7 @@ struct FunctionTree {
     static constexpr int Order = ORDER;     ///< Order of tree
 
     using node_t = Node<Func, ORDER, ISET>;      ///< DIM,ORDER node type
-    using box_t = Box<DIM, ISET, value_type>;    ///< DIM box type
+    using box_t = Box<DIM, value_type>;    ///< DIM box type
     using VecDimD = std::array<value_type, DIM>; ///< D dimensional vector type
 
     std::vector<node_t> nodes_; ///< Flat list of all nodes in Tree (leaf or otherwise)
@@ -255,10 +199,10 @@ struct FunctionTree {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] coeffs flat/global coefficient vector
     /// @param[in] box box that this tree lives in
-    FunctionTree<ORDER, Func>(const baobzi_input_t &input, const Box<DIM, ISET, value_type> &box,
+    FunctionTree<ORDER, Func>(const baobzi_input_t &input, const Box<DIM, value_type> &box,
                               std::vector<PolyEvalType> &polyfits, const Func &func) {
-        std::queue<Box<DIM, ISET, input_type>> q;
-        VecDimD half_width = scale(box.half_length(), 0.5);
+        std::queue<Box<DIM, input_type>> q;
+        VecDimD half_width = scale(box.half_length, 0.5);
         q.push(box);
 
         index_t curr_child_idx = 1;
@@ -273,7 +217,7 @@ struct FunctionTree {
                 nodes_.push_back(node_t(box));
 
                 auto &node = nodes_[i + node_index];
-                std::vector new_polyfits = node.fit(input, func, {});
+                std::vector new_polyfits = node.fit(input, func, box.half_length, {});
 
                 if (node.is_leaf()) {
                     node.poly_eval_id = polyfits.size();
@@ -283,7 +227,7 @@ struct FunctionTree {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += NChild;
 
-                    const VecDimD &center = node.box_.center;
+                    const VecDimD &center = node.center;
                     for (index_t child = 0; child < NChild; ++child) {
                         VecDimD center_offset;
 
@@ -294,7 +238,7 @@ struct FunctionTree {
                             center_offset[j] = center[i] + signed_hw[(child >> j) & 1];
                         }
 
-                        q.push(Box<DIM, ISET, value_type>(center_offset, half_width));
+                        q.push(Box<DIM, value_type>(center_offset, half_width));
                     }
                 }
             }
@@ -307,8 +251,6 @@ struct FunctionTree {
             half_width = scale(half_width, 0.5);
         }
     }
-
-    FunctionTree<ORDER, Func>() = default; ///< Default constructor for msgpack happiness
 
     /// @brief Find leaf node containing a point via standard pointer traversal
     /// @param[in] x point that the node will contain
@@ -325,9 +267,9 @@ struct FunctionTree {
 
             if constexpr (has_tuple_size_v<input_type>)
                 for (int i = 0; i < DIM; ++i)
-                    child_idx = child_idx | ((x[i] > nodes_[curr_index].box_.center[i]) << i);
+                    child_idx = child_idx | ((x[i] > nodes_[curr_index].center[i]) << i);
             else
-                child_idx = x > nodes_[curr_index].box_.center[0];
+                child_idx = x > nodes_[curr_index].center[0];
 
             curr_index = nodes_[curr_index].first_child_idx + child_idx;
         }
@@ -351,17 +293,6 @@ struct FunctionTree {
             memory_usage += node.memory_usage();
         return memory_usage;
     }
-
-    /// @brief eval function approximation at point
-    /// @param[in] x point to evaluate function at
-    /// @param[in] coeffs flat/global coefficient array
-    /// @returns function approximation at point x
-    inline value_type eval(const VecDimD &x, const std::vector<PolyEvalType> &polyfits) const {
-        return polyfits[get_node_index(x)](x);
-    }
-
-    /// @brief msgpack serialization magic
-    MSGPACK_DEFINE(nodes_);
 };
 
 /// @brief Represents a function in some domain as a grid of baobzi::FunctionTree objects
@@ -383,7 +314,7 @@ class Function {
     static constexpr int ISet = ISET; ///< Instruction set (dummy param)
 
     using node_t = Node<Func, ORDER, ISET>;      ///< DIM,ORDER node type
-    using box_t = Box<DIM, ISET, value_type>;    ///< DIM box type
+    using box_t = Box<DIM, value_type>;    ///< DIM box type
     using VecDimD = std::array<value_type, DIM>; ///< D dimensional vector type
 
     uint32_t output_dim_ = 1;
@@ -510,13 +441,13 @@ class Function {
 
                 nodes.emplace_back(node_t(box));
                 auto &node = nodes.back();
-                node.fit(input, func, {});
+                node.fit(input, func, box.half_length, {});
 
                 if (!node.is_leaf() || stats_.base_depth < input.min_depth) {
-                    add_node_children_to_queue(q, node.box_.center, half_width);
+                    add_node_children_to_queue(q, node.center, half_width);
                 } else {
                     leaf_fraction += 1.0;
-                    add_node_children_to_queue(maybe_q, node.box_.center, half_width);
+                    add_node_children_to_queue(maybe_q, node.center, half_width);
                 }
             }
             stats_.n_evals_root += nodes.size() * std::pow(ORDER, DIM);
@@ -541,14 +472,13 @@ class Function {
         }
 
         VecDimD bin_size;
-        VecDimD half_length = box_.half_length();
         for (int j = 0; j < DIM; ++j) {
-            bin_size[j] = 2.0 * half_length[j] / n_subtrees_[j];
-            inv_bin_size_[j] = 0.5 * n_subtrees_[j] / half_length[j];
+            bin_size[j] = 2.0 * box_.half_length[j] / n_subtrees_[j];
+            inv_bin_size_[j] = 0.5 * n_subtrees_[j] / box_.half_length[j];
         }
         for (int i = 0; i < DIM; ++i) {
-            lower_left_[i] = box_.center[i] - half_length[i];
-            upper_right_[i] = box_.center[i] + half_length[i];
+            lower_left_[i] = box_.center[i] - box_.half_length[i];
+            upper_right_[i] = box_.center[i] + box_.half_length[i];
         }
 
         subtrees_.reserve(prod(n_subtrees_));
@@ -562,7 +492,7 @@ class Function {
             for (int i = 0; i < DIM; ++i)
                 parent_center[i] = (bins[i] + value_type{0.5}) * bin_size[i] + lower_left_[i];
 
-            Box<DIM, ISET, value_type> root_box = {parent_center, scale(bin_size, 0.5)};
+            Box<DIM, value_type> root_box = {parent_center, scale(bin_size, 0.5)};
             subtrees_.emplace_back(input_local, root_box, polyfits_, func);
         }
 
@@ -589,9 +519,6 @@ class Function {
             for (node_t &node : subtree.nodes_)
                 node_pointers_[i++] = &node;
     }
-
-    /// @brief default constructor for msgpack magic
-    Function<Func, DIM, ORDER, ISET>() = default;
 
     /// @brief convert linear bin index to [dim] bin vector
     /// @param[in] i_bin linear index
@@ -633,17 +560,7 @@ class Function {
     /// @brief get constant reference to leaf node that contains a point
     /// @param[in] x point of interest
     /// @returns constant reference to leaf node that contains x
-    inline const node_t &find_node(const input_type &x) const {
-        return subtrees_[get_linear_bin(x)].find_node(x);
-    }
-
-    inline output_type eval(const input_type &x) const {
-        for (int i = 0; i < DIM; ++i) {
-            if (x < lower_left_[i] || x >= upper_right_[i])
-                return NAN;
-        }
-        return polyfits_[find_node(x).poly_eval_id](x);
-    }
+    inline const node_t &find_node(const input_type &x) const { return subtrees_[get_linear_bin(x)].find_node(x); }
 
     /// @brief get index of node (across all subnodes)
     /// @param[in] x [DIM] point to find the node of
@@ -657,14 +574,14 @@ class Function {
     /// @param[in] xp [DIM * n_trg] array of points to evaluate function at
     /// @param[out] res [n_trg] array of results
     /// @param[in] n_trg number of points to evaluate
-    inline void eval(const value_type *xp, value_type *res, int n_trg) const {
+    inline void operator()(const value_type *xp, value_type *res, int n_trg) const {
         if (split_multi_eval_) {
             std::vector<std::pair<node_t *, input_type>> node_map(n_trg);
             for (int i = 0; i < n_trg; ++i) {
                 value_type xi = *(xp + DIM * i);
-                node_t *node_ptr = [xi, this]() {
+                node_t *node_ptr = [xi, this]() -> node_t * {
                     if (xi < lower_left_[0] || xi >= upper_right_[0])
-                        return (node_t *)nullptr;
+                         return nullptr;
                     return node_pointers_[get_global_node_index(xi)];
                 }();
 
@@ -678,25 +595,20 @@ class Function {
             }
         } else {
             for (int i_trg = 0; i_trg < n_trg; i_trg++)
-                res[i_trg] = eval(*(xp + DIM * i_trg));
+                res[i_trg] = (*this)(*(xp + DIM * i_trg));
         }
     }
-
-    inline void operator()(const value_type *xp, value_type *res, int n_trg) const { eval(xp, res, n_trg); }
 
     /// @brief eval function approximation at point
     /// @param[in] x [DIM] point to evaluate function at
     /// @returns function approximation at point x
-    inline output_type operator()(const input_type &x) const { return output_dim_ > 1 ? NAN : eval(x); }
+    inline output_type operator()(const input_type &x) const {
+        for (int i = 0; i < DIM; ++i)
+            if (x < lower_left_[i] || x >= upper_right_[i])
+                return NAN;
 
-    // /// @brief save function approximation to file
-    // /// @param[in] filename path to save file at
-    // void save(const char *filename) const {
-    //     std::ofstream ofs(filename, std::ofstream::binary | std::ofstream::out);
-    //     baobzi_header_t params{Dim, Order, BAOBZI_HEADER_VERSION};
-    //     msgpack::pack(ofs, params);
-    //     msgpack::pack(ofs, *this);
-    // }
+        return polyfits_[find_node(x).poly_eval_id](x);
+    }
 
     // std::vector<raw_leaf_node> get_leaves() const {
     //     std::vector<raw_leaf_node> leaves;
@@ -706,7 +618,7 @@ class Function {
     //             if (!node.is_leaf())
     //                 continue;
 
-    //             double L = 2.0 * node.box_.half_length()[0];
+    //             double L = 2.0 * node.box_.half_length[0];
     //             double a = node.box_.center[0] - 0.5 * L;
     //             const double *coeffs = node.coeff_offset + coeffs_.data();
     //             leaves.emplace_back(raw_leaf_node{a, L, coeffs});
@@ -733,10 +645,6 @@ class Function {
 
     //     return other;
     // }
-
-    /// @brief msgpack serialization magic
-    MSGPACK_DEFINE_MAP(box_, subtrees_, n_subtrees_, tol_, lower_left_, upper_right_, inv_bin_size_, polyfits_,
-                       split_multi_eval_, output_dim_);
 };
 } // namespace baobzi
 
