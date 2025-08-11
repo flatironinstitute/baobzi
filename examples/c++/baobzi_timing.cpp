@@ -55,10 +55,10 @@ void print_error(const Function &function, baobzi_input_t &input, const std::vec
     real_t mean_rel_error = 0.0;
 
     size_t n_meas = 0;
-    for (int i = 0; i < x.size(); i += Function::Dim) {
+    for (int i = 0; i < x.size(); i += Function::input_dim) {
         const real_t point = x[i];
-        double pointd[Function::Dim];
-        for (int j = 0; j < Function::Dim; ++j)
+        double pointd[Function::input_dim];
+        for (int j = 0; j < Function::input_dim; ++j)
             pointd[j] = x[i + j];
 
         real_t actual;
