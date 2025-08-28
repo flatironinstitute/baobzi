@@ -22,8 +22,8 @@ set(BAOBZI_INCLUDES
 include(FetchContent)
 FetchContent_Declare(
     polyfit
-    GIT_REPOSITORY https://github.com/DiamonDinoia/polyfit.git
-    GIT_TAG        be704cc
+    GIT_REPOSITORY https://github.com/blackwer/polyfit.git
+    GIT_TAG        ccdb349
   )
 set(Build_Tests OFF CACHE BOOL "" FORCE) # gtest... tests
 set(MONOFIT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -39,9 +39,13 @@ option(BAOBZI_BUILD_FORTRAN "Build Fortran bindings" OFF)
 option(BAOBZI_CPU_DISPATCH "Use CPU dispatch for generic binary" OFF)
 option(BAOBZI_SET_ARCH "Attempt to set architecture flags without dispatch" ON)
 
+# Needed for ND polyfit performance
+add_compile_options(-funsafe-math-optimizations)
+add_link_options(-funsafe-math-optimizations)
+
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(BAOBZI_CPU_DISPATCH ON)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBAOBZI_CPU_DISPATCH")
+  add_compile_options(-DBAOBZI_CPU_DISPATCH)
 endif()
 
 if (BAOBZI_SET_ARCH)

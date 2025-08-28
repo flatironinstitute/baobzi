@@ -29,7 +29,7 @@ class MaxDepthExceeded : public std::exception {
 namespace detail {
 using index_t = uint32_t; ///< Type specifying indexing into flattened tree
 
-template <int Order, class Func>
+template <std::size_t Order, class Func>
 class Function;
 
 inline auto prod(const auto &arr) {
@@ -63,33 +63,34 @@ struct Box {
     const std::array<T, Dim> half_length; ///< half the dimension of the box
 
     /// @brief Constructor, just copies x, hl over
-    Box<Dim, T>(const auto &x, const auto &hl) : center{x}, half_length{hl} {}
+    Box(const auto &x, const auto &hl) : center{x}, half_length{hl} {}
 };
 
 /// @brief Return an estimate of the error for a given set of coefficients
 /// @param[in] coeffs one or two dimensional Vector/Matrix of coefficients
 /// @returns estimation of error given those coefficients
-inline double standard_error(const auto &polyfit, baobzi_tol_t tol_type) {
-    using T = std::remove_cvref_t<decltype(polyfit)>::InputType;
-    constexpr int input_dim = get_tuple_size<T>();
+inline double standard_error(int i_dim, const auto &polyfit, baobzi_tol_t tol_type) {
+    using input_type = std::remove_cvref_t<decltype(polyfit)>::InputType;
+    constexpr int input_dim = get_tuple_size<input_type>();
+    using T = value_type_or_identity<input_type>::type;
 
     T maxcoeff{0.0};
     T scaling_factor{1.0};
-    const auto &coeffs = polyfit.coeffs();
 
     if constexpr (input_dim == 1) {
+        const auto &coeffs = polyfit.coeffs();
+
         int n = coeffs.size();
         for (auto i = 0; i < 2; ++i)
             maxcoeff = std::max(std::abs(coeffs[i]), maxcoeff);
         scaling_factor = std::max(scaling_factor, std::abs(coeffs[n - 1]));
     } else {
-        throw std::runtime_error("Baobzi standard_error error: only scalar functions are currently supported");
-        // int n = coeffs.size() / output_dim;
-        // for (auto i = 0; i < n; ++i)
-        //     maxcoeff = std::max(std::abs(coeffs(i, n - i - 1)), maxcoeff);
+        const int n = polyfit.degree();
+        for (auto i = 0; i < n; ++i)
+            maxcoeff = std::max(std::abs(polyfit.coeff_at(i_dim, i, n - i - 1)), maxcoeff);
 
-        // scaling_factor = std::max(scaling_factor, std::abs(coeffs(n - 1, 0)));
-        // scaling_factor = std::max(scaling_factor, std::abs(coeffs(0, n - 1)));
+        scaling_factor = std::max(scaling_factor, std::abs(polyfit.coeff_at(i_dim, n - 1, 0)));
+        scaling_factor = std::max(scaling_factor, std::abs(polyfit.coeff_at(i_dim, 0, n - 1)));
     }
 
     if (tol_type == BAOBZI_TOL_RELATIVE)
@@ -101,13 +102,16 @@ inline double standard_error(const auto &polyfit, baobzi_tol_t tol_type) {
 /// @brief Node in baobzi::FunctionTree. If leaf, contains evaluation data, otherwise children
 /// @tparam Func function type to evaluate at this node
 /// @tparam Order order of evaluation polynomial
-template <class Func, int Order>
+template <class Func, std::size_t Order>
 class Node {
   public:
-    using input_type = poly_eval::function_traits<Func>::arg0_type;
+    using input_type_cv = typename poly_eval::function_traits<Func>::arg0_type;
+    using input_type = typename std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type>;    
     using output_type = poly_eval::function_traits<Func>::result_type;
     using value_type = value_type_or_identity<input_type>::type;
-    using poly_eval_type = poly_eval::FuncEval<Func, Order>;
+    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Order>,
+                                            poly_eval::FuncEval<Func, Order>>::type;
+
     static constexpr int input_dim = get_tuple_size<input_type>();
     static constexpr int output_dim = get_tuple_size<output_type>();
 
@@ -120,7 +124,7 @@ class Node {
 
     /// @brief Construct node from box (without fitting)
     /// @param [in] box box this node represents
-    Node<Func, Order>(const Box<input_dim, value_type> &box) : center(box.center) {}
+    Node(const Box<input_dim, value_type> &box) : center(box.center) {}
 
     /// @brief check if node is leaf
     /// @return true if leaf, false otherwise
@@ -136,23 +140,33 @@ class Node {
         if (samples.size())
             throw std::runtime_error("Baobzi fit error: sample points not yet supported");
 
+        input_type lb, ub;
         if constexpr (input_dim == 1) {
-            const auto lb = (center[0] - half_length[0]);
-            const auto ub = (center[0] + half_length[0]);
-
-            std::vector<poly_eval_type> poly_evals;
-            for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
-                auto poly = poly_eval::make_func_eval<Order>(func, lb, ub);
-
-                if (standard_error(poly, input.tol_type) > input.tol)
-                    return std::vector<poly_eval_type>();
-                else
-                    poly_evals.push_back(poly);
+            lb = center[0] - half_length[0];
+            ub = center[0] + half_length[0];
+        } else {
+            for (int i = 0; i < input_dim; ++i) {
+                lb[i] = center[i] - half_length[i];
+                ub[i] = center[i] + half_length[i];
             }
-
-            poly_eval_id = 0;
-            return poly_evals;
         }
+        std::vector<poly_eval_type> poly_evals;
+        for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
+            poly_eval_type poly = [func, lb, ub]() {
+                if constexpr (input_dim == 1)
+                    return poly_eval_type(func, lb, ub, nullptr);
+                else
+                    return poly_eval_type(func, lb, ub);
+            }();
+
+            if (standard_error(i_dim, poly, input.tol_type) > input.tol)
+                return std::vector<poly_eval_type>();
+            else
+                poly_evals.push_back(poly);
+        }
+
+        poly_eval_id = 0;
+        return poly_evals;
     }
 
     /// @brief Calculate memory usage of self (including unused space from vector allocation)
@@ -163,11 +177,14 @@ class Node {
 /// @brief Represent a function in some domain as a tree of chebyshev nodes
 /// @tparam Order order of evaluation polynomial
 /// @tparam Func input function type to fit
-template <int Order, class Func>
+template <std::size_t Order, class Func>
 struct FunctionTree {
-    using input_type = poly_eval::function_traits<Func>::arg0_type;
+    using input_type_cv = typename poly_eval::function_traits<Func>::arg0_type;
+    using input_type = typename std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type>;
     using value_type = value_type_or_identity<input_type>::type;
-    using poly_eval_type = poly_eval::FuncEval<Func, Order>;
+    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Order>,
+                                            poly_eval::FuncEval<Func, Order>>::type;
+
     static constexpr int input_dim = get_tuple_size<input_type>();
     static constexpr int n_child = 1 << input_dim; ///< Number of children each node potentially has (2^D)
 
@@ -179,9 +196,9 @@ struct FunctionTree {
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] coeffs flat/global coefficient vector
     /// @param[in] box box that this tree lives in
-    FunctionTree<Order, Func>(const baobzi_input_t &input, const Box<input_dim, value_type> &box,
-                              std::vector<poly_eval_type> &polyfits, const Func &func) {
-        std::queue<Box<input_dim, input_type>> q;
+    FunctionTree(const baobzi_input_t &input, const Box<input_dim, value_type> &box,
+                 std::vector<poly_eval_type> &polyfits, const Func &func) {
+        std::queue<box_t> q;
         dim_array_t half_width = scale(box.half_length, 0.5);
         q.push(box);
 
@@ -283,17 +300,22 @@ struct FunctionTree {
 };
 } // namespace detail
 
+
 /// @brief Represents a function in some domain as a grid of baobzi::FunctionTree objects
 /// @tparam Order order of evaluation polynomial
 /// @tparam Func function type to evaluate at this node
-template <int Order, class Func>
+template <std::size_t Order, class Func>
 class Function {
   public:
-    using input_type = poly_eval::function_traits<Func>::arg0_type;
+    using input_type_cv = typename poly_eval::function_traits<Func>::arg0_type;
+    using input_type = typename std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type>;
     using output_type = poly_eval::function_traits<Func>::result_type;
     using value_type = value_type_or_identity<input_type>::type;
-    using poly_eval_type = poly_eval::FuncEval<Func, Order>;
+    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Order>,
+                                            poly_eval::FuncEval<Func, Order>>::type;
+
     static constexpr int input_dim = detail::get_tuple_size<input_type>();
+    static constexpr int output_dim = detail::get_tuple_size<output_type>();
     static constexpr int n_child = 1 << input_dim; ///< Number of children each node potentially has (2^D)
 
     using node_t = detail::Node<Func, Order>;              ///< Func,Order node type
@@ -341,8 +363,8 @@ class Function {
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
     /// @param[in] samples list of points to force fit check
-    Function<Func, Order>(const baobzi_input_t &input, const input_type &center, const input_type &half_width_in,
-                          const Func &func)
+    Function(const baobzi_input_t &input, const input_type center, const input_type half_width_in,
+             const Func &func)
         : box_(dim_array_t{center}, dim_array_t{half_width_in}), tol_(input.tol),
           split_multi_eval_(input.split_multi_eval), output_dim_(input.output_dim), input_(input) {
         auto t_start = std::chrono::steady_clock::now();
@@ -552,9 +574,14 @@ class Function {
     /// @param[in] x [input_dim] point to evaluate function at
     /// @returns function approximation at point x
     inline output_type operator()(const input_type &x) const {
-        for (int i = 0; i < input_dim; ++i)
-            if (x < lower_left_[i] || x >= upper_right_[i])
+        if constexpr (input_dim == 1) {
+            if (x < lower_left_[0] || x >= upper_right_[0])
                 return NAN;
+        } else {
+            for (int i = 0; i < input_dim; ++i)
+                if (x[i] < lower_left_[i] || x[i] >= upper_right_[i])
+                    return output_type{NAN};
+        }
 
         return polyfits_[find_node(x).poly_eval_id](x);
     }

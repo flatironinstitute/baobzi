@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <baobzi_template.hpp>
 
 #include <iostream>
@@ -31,20 +32,36 @@ void testfun_3d1(const double *x, double *y, const void *data) {
     *y = exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
 }
 
-template <int DIM, typename Function>
-std::vector<real_t> time_function(const Function &function, const std::vector<real_t> &x, int n_runs) {
+template <typename Function>
+void time_function(const Function &function, const std::vector<real_t> &x, int n_runs) {
+    constexpr int DIM = Function::input_dim;
+    constexpr int OUT_DIM = Function::output_dim;
     const size_t n_points = x.size() / DIM;
-    std::vector<real_t> res(n_points);
-    const auto st = get_wtime();
-    for (int i_run = 0; i_run < n_runs; ++i_run)
-        function(x.data(), res.data(), n_points);
-    const auto ft = get_wtime();
+    std::vector<real_t> res_arr(n_points * OUT_DIM);
+    real_t *res = res_arr.data();
 
+    const auto st = get_wtime();
+    for (int i_run = 0; i_run < n_runs; ++i_run) {
+        if constexpr (DIM == 1)
+            function(x.data(), res, n_points);
+        else {
+            for (size_t i = 0; i < n_points; ++i) {
+                std::array<double, DIM> point;
+                for (int j = 0; j < DIM; ++j)
+                    point[j] = x[i * DIM + j];
+                auto out = function(point);
+                for (int j = 0; j < OUT_DIM; ++j)
+                    res[j] = out[j];
+            }
+        }
+    }
+
+    const auto ft = get_wtime();
     const real_t dt = get_wtime_diff(&st, &ft);
     const long n_eval = n_runs * n_points;
+    volatile auto noopt = res;
     std::cout << "Elapsed time (s): " << dt << std::endl;
     std::cout << "Mevals/s: " << n_eval / (dt * 1E6) << std::endl;
-    return res;
 }
 
 template <typename Function>
@@ -53,43 +70,139 @@ void print_error(const Function &function, baobzi_input_t &input, const std::vec
     real_t max_rel_error = 0.0;
     real_t mean_error = 0.0;
     real_t mean_rel_error = 0.0;
+    constexpr int input_dim = Function::input_dim;
+    constexpr int output_dim = Function::output_dim;
+    using in_arr_t = std::array<double, input_dim>;
+    using out_arr_t = std::array<double, output_dim>;
 
     size_t n_meas = 0;
     for (int i = 0; i < x.size(); i += Function::input_dim) {
-        const real_t point = x[i];
-        double pointd[Function::input_dim];
-        for (int j = 0; j < Function::input_dim; ++j)
-            pointd[j] = x[i + j];
+        const in_arr_t pointd = [&x, i]() {
+            in_arr_t p;
+            for (int j = 0; j < Function::input_dim; ++j)
+                p[j] = x[i + j];
+            return p;
+        }();
 
-        real_t actual;
-        input.func(pointd, &actual, input.data);
-        real_t interp = function(point);
-        real_t delta = actual - interp;
+        out_arr_t actual;
+        input.func(pointd.data(), actual.data(), input.data);
+        out_arr_t interp{[function, pointd]() {
+            if constexpr (Function::input_dim == 1)
+                return function(pointd[0]);
+            else
+                return function(pointd);
+        }()};
 
-        max_error = std::max(max_error, std::fabs(delta));
-
-        if (std::abs(actual) > 1E-100) {
-            real_t rel_error = std::abs(interp / actual - 1.0);
-            max_rel_error = std::max(max_rel_error, rel_error);
-            mean_rel_error += std::abs(rel_error);
-            n_meas++;
+        for (int j = 0; j < output_dim; ++j) {
+            const double delta = actual[j] - interp[j];
+            max_error = std::max(max_error, std::sqrt(delta));
+            mean_error += std::fabs(delta);
         }
 
-        mean_error += std::abs(delta);
+        for (int j = 0; j < output_dim; ++j) {
+            if (std::abs(actual[j]) > 1E-100) {
+                real_t rel_error = std::abs(interp[j] / actual[j] - 1.0);
+                max_rel_error = std::max(max_rel_error, rel_error);
+                mean_rel_error += std::abs(rel_error);
+                n_meas++;
+            }
+        }
     }
-    mean_error = mean_error / n_meas;
+    mean_error = mean_error / x.size();
     mean_rel_error = mean_rel_error / n_meas;
 
     std::cout << "rel error max, mean: " << max_rel_error << " " << mean_rel_error << std::endl;
     std::cout << "abs error max, mean: " << max_error << " " << mean_error << std::endl;
 }
 
+void test_1d(int n_runs, int n_points, std::vector<double> &x) {
+    real_t hl = 1.0;
+    real_t center = 2.0;
+    std::vector<real_t> x_transformed(n_points);
+    real_t scale_factor = 1.5;
+    baobzi_input_t input;
+    input.dim = 1;
+    input.order = 8;
+    input.data = &scale_factor;
+    input.tol = 1E-10;
+    input.func = testfun_1d;
+    input.minimum_leaf_fraction = 0.0;
+    input.split_multi_eval = 0;
+    input.max_depth = 8;
+    input.output_dim = 1;
+    input.tol_type = BAOBZI_TOL_RELATIVE;
+
+    for (int i = 0; i < n_points; i++)
+        x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
+
+    auto func = [input](double x) -> double {
+        double y;
+        input.func(&x, &y, input.data);
+        return y;
+    };
+
+    std::cout << "Testing on 1D function...\n";
+    baobzi::Function<6, decltype(func)> func_approx_1d(input, center, hl, func);
+    func_approx_1d.print_stats();
+
+    time_function(func_approx_1d, x_transformed, n_runs);
+    print_error(func_approx_1d, input, x_transformed);
+    std::cout << "\n";
+}
+
+void test_2d(int n_runs, int n_points, std::vector<double> &x) {
+    std::array<real_t, 2> hl{1.0, 1.0};
+    std::array<real_t, 2> center2d = {hl[0] + 0.5, hl[1] + 2.0};
+    std::vector<real_t> x_2d_transformed(n_points * 2);
+    real_t scale_factor = 1.5;
+    baobzi_input_t input;
+    input.dim = 2;
+    input.order = 10;
+    input.data = &scale_factor;
+    input.tol = 1E-10;
+    input.func = testfun_2d3;
+    input.minimum_leaf_fraction = 0.0;
+    input.split_multi_eval = 0;
+    input.max_depth = 50;
+    input.output_dim = 1;
+
+    for (int i = 0; i < 2 * n_points; i += 2)
+        for (int j = 0; j < 2; ++j)
+            x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
+
+    auto func = [input](const std::array<double, 2> &x) -> std::array<double, 1> {
+        std::array<double, 1> y{0.0};
+        input.func(x.data(), y.data(), input.data);
+        return y;
+    };
+
+    auto simple_func = [](const std::array<double, 2> &x) {
+        std::array<double, 1> y;
+        y[0] = x[0] * x[0] + x[1] * x[1] - 2 * x[0] * x[1];
+        return y;
+    };
+
+    std::cout << "Testing on 2D function...\n";
+    baobzi::Function<10, decltype(func)> func_approx_2d(input, center2d, hl, func);
+    func_approx_2d.print_stats();
+
+    time_function(func_approx_2d, x_2d_transformed, n_runs);
+    // print_error(func_approx_2d, input, x_2d_transformed);
+}
+
 int main(int argc, char *argv[]) {
     size_t n_points = 1000000;
     size_t n_runs = 50;
 
-    if (argc == 2)
+    std::vector<int> run_dims{1, 2};
+
+    if (argc >= 2)
         n_runs = atoi(argv[1]);
+    if (argc > 2) {
+        run_dims.clear();
+        for (int i = 2; i < argc; ++i)
+            run_dims.push_back(atoi(argv[i]));
+    }
 
     std::mt19937 gen(1);
     std::uniform_real_distribution<> dis(0, 1);
@@ -97,69 +210,16 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < n_points * 3; ++i)
         x[i] = dis(gen);
 
-    {
-        real_t hl = 1.0;
-        real_t center = 2.0;
-        std::vector<real_t> x_transformed(n_points);
-        real_t scale_factor = 1.5;
-        baobzi_input_t input;
-        input.dim = 1;
-        input.order = 8;
-        input.data = &scale_factor;
-        input.tol = 1E-10;
-        input.func = testfun_1d;
-        input.minimum_leaf_fraction = 0.0;
-        input.split_multi_eval = 0;
-        input.max_depth = 8;
-        input.output_dim = 1;
-        input.tol_type = BAOBZI_TOL_RELATIVE;
+    std::array<void (*)(int, int, std::vector<double> &), 2> runners{&test_1d, &test_2d};
 
-        for (int i = 0; i < n_points; i++)
-            x_transformed[i] = hl * (2.0 * x[i] - 1.0) + center;
+    for (auto dim : run_dims) {
+        if (dim < 1 || dim > 2) {
+            std::cerr << "Only 1D and 2D tests are implemented\n";
+            return 1;
+        }
 
-        auto func = [input](double x) -> double {
-            double y;
-            input.func(&x, &y, input.data);
-            return y;
-        };
-
-        std::cout << "Testing on 1D function...\n";
-        baobzi::Function<6, decltype(func)> func_approx_1d(input, center, hl, func);
-        func_approx_1d.print_stats();
-
-        auto dummy = time_function<1>(func_approx_1d, x_transformed, n_runs);
-        volatile auto noopt = dummy.data();
-        print_error(func_approx_1d, input, x_transformed);
-        std::cout << "\n";
+        runners[dim - 1](n_runs, n_points, x);
     }
-
-    // {
-    //     Eigen::Vector<real_t, 2> hl{1.0, 1.0};
-    //     Eigen::Vector<real_t, 2> center2d = hl + Eigen::Vector<real_t, 2>{0.5, 2.0};
-    //     std::vector<real_t> x_2d_transformed(n_points * 2);
-    //     real_t scale_factor = 1.5;
-    //     baobzi_input_t input;
-    //     input.dim = 2;
-    //     input.order = 10;
-    //     input.data = &scale_factor;
-    //     input.tol = 1E-10;
-    //     input.func = testfun_2d3;
-    //     input.minimum_leaf_fraction = 0.0;
-    //     input.split_multi_eval = 0;
-    //     input.max_depth = 50;
-    //     input.output_dim = 1;
-
-    //     for (int i = 0; i < 2 * n_points; i += 2)
-    //         for (int j = 0; j < 2; ++j)
-    //             x_2d_transformed[i + j] = hl[j] * (2.0 * x[i + j] - 1.0) + center2d[j];
-
-    //     std::cout << "Testing on 2D function...\n";
-    //     baobzi::Function<2, 10, 0, real_t> func_approx_2d(&input, center2d.data(), hl.data());
-    //     func_approx_2d.print_stats();
-
-    //     time_function<2>(func_approx_2d, x_2d_transformed, n_runs);
-    //     print_error(func_approx_2d, input, x_2d_transformed);
-    // }
 
     return 0;
 }
