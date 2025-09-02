@@ -124,7 +124,7 @@ class Node {
 
     /// @brief Construct node from box (without fitting)
     /// @param [in] box box this node represents
-    Node(const Box<input_dim, value_type> &box) : center(box.center) {}
+    Node(const Box<input_dim, value_type> &box) : center{box.center} {}
 
     /// @brief check if node is leaf
     /// @return true if leaf, false otherwise
@@ -134,12 +134,13 @@ class Node {
     ///
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns coefficient vector list if fit successful, empty list if not good enough
-    std::vector<poly_eval_type> fit(const baobzi_input_t &input, const Func &func,
+    bool fit(const baobzi_input_t &input, const Func &func,
                                     const std::array<value_type, input_dim> &half_length,
-                                    const std::vector<value_type> &samples) {
+                                    const std::vector<value_type> &samples, std::vector<poly_eval_type> &polyfits) {
         if (samples.size())
             throw std::runtime_error("Baobzi fit error: sample points not yet supported");
 
+        const auto n_polyfit_before = polyfits.size();
         input_type lb, ub;
         if constexpr (input_dim == 1) {
             lb = center[0] - half_length[0];
@@ -150,23 +151,22 @@ class Node {
                 ub[i] = center[i] + half_length[i];
             }
         }
-        std::vector<poly_eval_type> poly_evals;
-        for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
-            poly_eval_type poly = [func, lb, ub]() {
-                if constexpr (input_dim == 1)
-                    return poly_eval_type(func, lb, ub, nullptr);
-                else
-                    return poly_eval_type(func, lb, ub);
-            }();
 
-            if (standard_error(i_dim, poly, input.tol_type) > input.tol)
-                return std::vector<poly_eval_type>();
+        for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
+            if constexpr (input_dim == 1)
+                polyfits.emplace_back(func, lb, ub, nullptr);
             else
-                poly_evals.push_back(poly);
+                polyfits.emplace_back(func, lb, ub);
+
+            if (standard_error(i_dim, polyfits.back(), input.tol_type) > input.tol) {
+                for (std::size_t i = 0; i <= i_dim; i++)
+                    polyfits.pop_back();
+                return false;
+            }
         }
 
-        poly_eval_id = 0;
-        return poly_evals;
+        poly_eval_id = n_polyfit_before;
+        return true;
     }
 
     /// @brief Calculate memory usage of self (including unused space from vector allocation)
@@ -184,7 +184,9 @@ struct FunctionTree {
     using value_type = value_type_or_identity<input_type>::type;
     using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Order>,
                                             poly_eval::FuncEval<Func, Order>>::type;
+    using output_type = poly_eval::function_traits<Func>::result_type;
 
+    static constexpr int output_dim = get_tuple_size<output_type>();
     static constexpr int input_dim = get_tuple_size<input_type>();
     static constexpr int n_child = 1 << input_dim; ///< Number of children each node potentially has (2^D)
 
@@ -211,16 +213,18 @@ struct FunctionTree {
                 box_t box = q.front();
                 q.pop();
 
-                nodes_.push_back(node_t(box));
+                nodes_.emplace_back(box);
 
                 auto &node = nodes_[i + node_index];
-                std::vector new_polyfits = node.fit(input, func, box.half_length, {});
+                const auto poly_id = polyfits.size();                
+                bool successful_fit = node.fit(input, func, box.half_length, {}, polyfits);
 
-                if (node.is_leaf()) {
-                    node.poly_eval_id = polyfits.size();
-                    for (auto &pf : new_polyfits)
-                        polyfits.emplace_back(std::move(pf));
-                } else if (!node.is_leaf()) {
+                if (successful_fit) {
+                    assert(node.poly_eval_id == poly_id);
+                    assert(polyfits.size() == poly_id + output_dim);
+                    if constexpr (input_dim == 2)
+                        polyfits.back()(box.center);
+                } else {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += n_child;
 
@@ -232,7 +236,7 @@ struct FunctionTree {
                         // Basically: permute all possible offsets
                         for (int j = 0; j < input_dim; ++j) {
                             value_type signed_hw[2] = {-half_width[j], half_width[j]};
-                            center_offset[j] = center[i] + signed_hw[(child >> j) & 1];
+                            center_offset[j] = center[j] + signed_hw[(child >> j) & 1];
                         }
 
                         q.push(Box<input_dim, value_type>(center_offset, half_width));
@@ -412,7 +416,10 @@ class Function {
 
                 nodes.emplace_back(node_t(box));
                 auto &node = nodes.back();
-                node.fit(input, func, box.half_length, {});
+                std::vector<poly_eval_type> dummy;
+                node.fit(input, func, box.half_length, {}, dummy);
+                if (node.poly_eval_id)
+                    node.poly_eval_id = 0;                    
 
                 if (!node.is_leaf() || stats_.base_depth < input.min_depth) {
                     add_node_children_to_queue(q, node.center, half_width);

@@ -40,8 +40,8 @@ option(BAOBZI_CPU_DISPATCH "Use CPU dispatch for generic binary" OFF)
 option(BAOBZI_SET_ARCH "Attempt to set architecture flags without dispatch" ON)
 
 # Needed for ND polyfit performance
-add_compile_options(-funsafe-math-optimizations)
-add_link_options(-funsafe-math-optimizations)
+add_compile_options(-funroll-loops)
+add_link_options(-funroll-loops)
 
 if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "x86_64" AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set(BAOBZI_CPU_DISPATCH ON)
