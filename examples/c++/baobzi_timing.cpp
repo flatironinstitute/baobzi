@@ -160,7 +160,7 @@ void test<1>(int n_runs, int n_points, std::vector<double> &x) {
     };
 
     std::cout << "Testing on 1D function...\n";
-    baobzi::Function<8, decltype(func)> func_approx(input, center, hl, func);
+    auto func_approx = baobzi::make_function<8>(input, center, hl, func);
     func_approx.print_stats();
 
     time_function(func_approx, x_transformed, n_runs);
@@ -183,7 +183,7 @@ void test<2>(int n_runs, int n_points, std::vector<double> &x) {
     };
 
     std::cout << "Testing on 2D function...\n";
-    baobzi::Function<10, decltype(func)> func_approx(input, center, hl, func);
+    auto func_approx = baobzi::make_function<10>(input, center, hl, func);
     func_approx.print_stats();
 
     time_function(func_approx, x_transformed, n_runs);
@@ -206,7 +206,7 @@ void test<3>(int n_runs, int n_points, std::vector<double> &x) {
     };
 
     std::cout << "Testing on 3D function...\n";
-    baobzi::Function<6, decltype(func)> func_approx(input, center, hl, func);
+    auto func_approx = baobzi::make_function<6>(input, center, hl, func);
     func_approx.print_stats();
 
     time_function(func_approx, x_transformed, n_runs);

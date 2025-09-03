@@ -645,6 +645,15 @@ class Function {
         uint32_t t_elapsed = 0;    ///< time in milliseconds to create object
     } stats_;
 };
+
+template <std::size_t Order, class Func>
+Function<Order, Func>
+make_function(const baobzi_input_t &input,
+              const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> center,
+              const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> half_width_in,
+              const Func &func) {
+    return Function<Order, Func>(input, center, half_width_in, func);
+}
 } // namespace baobzi
 
 #endif
