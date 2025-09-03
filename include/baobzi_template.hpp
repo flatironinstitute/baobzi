@@ -532,6 +532,16 @@ class Function {
         else if constexpr (input_dim == 3)
             return std::array<int, input_dim>{i_bin % n_subtrees_[0], (i_bin / n_subtrees_[0]) % n_subtrees_[1],
                                               i_bin / (n_subtrees_[0] * n_subtrees_[1])};
+        else if constexpr (input_dim == 4)
+            return std::array<int, input_dim>{i_bin % n_subtrees_[0], (i_bin / n_subtrees_[0]) % n_subtrees_[1],
+                                              (i_bin / (n_subtrees_[0] * n_subtrees_[1])) % n_subtrees_[2],
+                                              i_bin / (n_subtrees_[0] * n_subtrees_[1] * n_subtrees_[2])};
+        else if constexpr (input_dim == 5)
+            return std::array<int, input_dim>{
+                i_bin % n_subtrees_[0], (i_bin / n_subtrees_[0]) % n_subtrees_[1],
+                (i_bin / (n_subtrees_[0] * n_subtrees_[1])) % n_subtrees_[2],
+                (i_bin / (n_subtrees_[0] * n_subtrees_[1] * n_subtrees_[2])) % n_subtrees_[3],
+                i_bin / (n_subtrees_[0] * n_subtrees_[1] * n_subtrees_[2] * n_subtrees_[3])};
     }
 
     /// @brief find linear index of bin at a point
@@ -555,6 +565,13 @@ class Function {
                 return bin[0] + n_subtrees_[0] * bin[1];
             else if constexpr (input_dim == 3)
                 return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2];
+            else if constexpr (input_dim == 4)
+                return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2] +
+                       n_subtrees_[0] * n_subtrees_[1] * n_subtrees_[2] * bin[3];
+            else if constexpr (input_dim == 5)
+                return bin[0] + n_subtrees_[0] * bin[1] + n_subtrees_[0] * n_subtrees_[1] * bin[2] +
+                       n_subtrees_[0] * n_subtrees_[1] * n_subtrees_[2] * bin[3] +
+                       n_subtrees_[0] * n_subtrees_[1] * n_subtrees_[2] * n_subtrees_[3] * bin[4];
         }
     }
 

@@ -31,6 +31,7 @@ void testfun_2d_2(const double *x, double *y, const void *data) {
 void testfun_3d1(const double *x, double *y, const void *data) {
     *y = exp(x[0] + 2 * sin(x[1])) * (x[0] * x[0] + log(2 + x[1] * x[2]));
 }
+void testfun_4d1(const double *x, double *y, const void *data) { *y = cos(x[0] + x[1] + x[2] + x[3]); }
 
 template <typename Function>
 void time_function(const Function &function, const std::vector<real_t> &x, int n_runs) {
@@ -214,11 +215,35 @@ void test<3>(int n_runs, int n_points, std::vector<double> &x) {
     std::cout << "\n";
 }
 
+template <>
+void test<4>(int n_runs, int n_points, std::vector<double> &x) {
+    std::array<real_t, 4> hl{1.0, 1.0, 1.0, 1.0};
+    std::array<real_t, 4> center = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 1.0, hl[3] + 0.5};
+
+    auto input = create_input(3, testfun_4d1);
+    input.tol = 1E-6;
+    const auto x_transformed = transform<4>(x, n_points, hl, center);
+
+    auto func = [input](const std::array<double, 4> &x) -> std::array<double, 1> {
+        std::array<double, 1> y{0.0};
+        input.func(x.data(), y.data(), input.data);
+        return y;
+    };
+
+    std::cout << "Testing on 4D function...\n";
+    auto func_approx = baobzi::make_function<6>(input, center, hl, func);
+    func_approx.print_stats();
+
+    time_function(func_approx, x_transformed, n_runs);
+    print_error(func_approx, input, x_transformed);
+    std::cout << "\n";
+}
+
 int main(int argc, char *argv[]) {
     size_t n_points = 1000000;
     size_t n_runs = 50;
 
-    std::vector<int> run_dims{1, 2, 3};
+    std::vector<int> run_dims{1, 2, 3, 4};
 
     if (argc >= 2)
         n_runs = atoi(argv[1]);
@@ -235,11 +260,11 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < n_points * max_dim; ++i)
         x[i] = dis(gen);
 
-    std::array<void (*)(int, int, std::vector<double> &), 3> runners{test<1>, test<2>, test<3>};
+    std::array<void (*)(int, int, std::vector<double> &), 4> runners{test<1>, test<2>, test<3>, test<4>};
 
     for (auto dim : run_dims) {
-        if (dim < 1 || dim > 3) {
-            std::cerr << "Only 1, 2, and 3D tests are implemented\n";
+        if (dim < 1 || dim > 4) {
+            std::cerr << "Only 1, 2, 3, and 4D tests are implemented\n";
             return 1;
         }
 
