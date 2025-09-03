@@ -69,9 +69,10 @@ struct Box {
 /// @brief Return an estimate of the error for a given set of coefficients
 /// @param[in] coeffs one or two dimensional Vector/Matrix of coefficients
 /// @returns estimation of error given those coefficients
-inline double standard_error(int i_dim, const auto &polyfit, baobzi_tol_t tol_type) {
+inline double tail_error_estimate(int i_dim, const auto &polyfit, baobzi_tol_t tol_type) {
     using input_type = std::remove_cvref_t<decltype(polyfit)>::InputType;
     constexpr int input_dim = get_tuple_size<input_type>();
+    static_assert(input_dim == 1 || input_dim == 2, "tail_error_estimate only implemented for 1D and 2D input");
     using T = value_type_or_identity<input_type>::type;
 
     T maxcoeff{0.0};
@@ -84,7 +85,7 @@ inline double standard_error(int i_dim, const auto &polyfit, baobzi_tol_t tol_ty
         for (auto i = 0; i < 2; ++i)
             maxcoeff = std::max(std::abs(coeffs[i]), maxcoeff);
         scaling_factor = std::max(scaling_factor, std::abs(coeffs[n - 1]));
-    } else {
+    } else if constexpr (input_dim == 2) {
         const int n = polyfit.degree();
         for (auto i = 0; i < n; ++i)
             maxcoeff = std::max(std::abs(polyfit.coeff_at(i_dim, i, n - i - 1)), maxcoeff);
@@ -106,7 +107,7 @@ template <class Func, std::size_t Order>
 class Node {
   public:
     using input_type_cv = typename poly_eval::function_traits<Func>::arg0_type;
-    using input_type = typename std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type>;    
+    using input_type = typename std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type>;
     using output_type = poly_eval::function_traits<Func>::result_type;
     using value_type = value_type_or_identity<input_type>::type;
     using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Order>,
@@ -134,9 +135,8 @@ class Node {
     ///
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns coefficient vector list if fit successful, empty list if not good enough
-    bool fit(const baobzi_input_t &input, const Func &func,
-                                    const std::array<value_type, input_dim> &half_length,
-                                    const std::vector<value_type> &samples, std::vector<poly_eval_type> &polyfits) {
+    bool fit(const baobzi_input_t &input, const Func &func, const std::array<value_type, input_dim> &half_length,
+             const std::vector<value_type> &samples, std::vector<poly_eval_type> &polyfits) {
         if (samples.size())
             throw std::runtime_error("Baobzi fit error: sample points not yet supported");
 
@@ -152,16 +152,41 @@ class Node {
             }
         }
 
+        auto rollback_and_fail = [&polyfits, n_polyfit_before]() {
+            while (polyfits.size() != n_polyfit_before)
+                polyfits.pop_back();
+            return false;
+        };
+
         for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
             if constexpr (input_dim == 1)
                 polyfits.emplace_back(func, lb, ub, nullptr);
             else
                 polyfits.emplace_back(func, lb, ub);
 
-            if (standard_error(i_dim, polyfits.back(), input.tol_type) > input.tol) {
-                for (std::size_t i = 0; i <= i_dim; i++)
-                    polyfits.pop_back();
-                return false;
+            if constexpr (input_dim <= 2) {
+                if (tail_error_estimate(i_dim, polyfits.back(), input.tol_type) > input.tol)
+                    return rollback_and_fail();
+            } else {
+                // For higher dimensions, we need to sample for error, as the tail estimate is not
+                // implemented. Here we sample uniformly in each dimension.
+                constexpr int n_sample_1d = Order;
+                for (int linear_index = 0; linear_index < poly_eval::detail::constexpr_power<n_sample_1d, input_dim>();
+                     ++linear_index) {
+                    std::array<double, input_dim> sample_point;
+                    int curr_index = linear_index;
+                    for (int dim = 0; dim < input_dim; ++dim) {
+                        const double dx = 2.0 * half_length[dim] / 5;
+                        sample_point[dim] = center[dim] - half_length[dim] + dx / 2.0 + dx * (curr_index % n_sample_1d);
+                        curr_index /= n_sample_1d;
+                    }
+
+                    const std::array<double, output_dim> actual = func(sample_point);
+                    const std::array<double, output_dim> approx = polyfits.back()(sample_point);
+                    for (int j = 0; j < output_dim; ++j)
+                        if (std::abs(1.0 - approx[j] / actual[j]) > input.tol)
+                            return rollback_and_fail();
+                }
             }
         }
 
@@ -216,7 +241,7 @@ struct FunctionTree {
                 nodes_.emplace_back(box);
 
                 auto &node = nodes_[i + node_index];
-                const auto poly_id = polyfits.size();                
+                const auto poly_id = polyfits.size();
                 bool successful_fit = node.fit(input, func, box.half_length, {}, polyfits);
 
                 if (successful_fit) {
@@ -304,7 +329,6 @@ struct FunctionTree {
 };
 } // namespace detail
 
-
 /// @brief Represents a function in some domain as a grid of baobzi::FunctionTree objects
 /// @tparam Order order of evaluation polynomial
 /// @tparam Func function type to evaluate at this node
@@ -367,8 +391,7 @@ class Function {
     /// @param[in] xp [dim] center of function domain
     /// @param[in] lp [dim] half length of function domain
     /// @param[in] samples list of points to force fit check
-    Function(const baobzi_input_t &input, const input_type center, const input_type half_width_in,
-             const Func &func)
+    Function(const baobzi_input_t &input, const input_type center, const input_type half_width_in, const Func &func)
         : box_(dim_array_t{center}, dim_array_t{half_width_in}), tol_(input.tol),
           split_multi_eval_(input.split_multi_eval), output_dim_(input.output_dim), input_(input) {
         auto t_start = std::chrono::steady_clock::now();
@@ -419,7 +442,7 @@ class Function {
                 std::vector<poly_eval_type> dummy;
                 node.fit(input, func, box.half_length, {}, dummy);
                 if (node.poly_eval_id)
-                    node.poly_eval_id = 0;                    
+                    node.poly_eval_id = 0;
 
                 if (!node.is_leaf() || stats_.base_depth < input.min_depth) {
                     add_node_children_to_queue(q, node.center, half_width);

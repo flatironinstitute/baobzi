@@ -1,6 +1,6 @@
-#include <algorithm>
 #include <baobzi_template.hpp>
 
+#include <algorithm>
 #include <iostream>
 #include <random>
 #include <time.h>
@@ -134,8 +134,9 @@ baobzi_input_t create_input(int dim, baobzi_input_func_t func) {
     input.data = &scale_factor;
     input.tol = 1E-10;
     input.func = func;
-    input.minimum_leaf_fraction = 0.0;
+    input.minimum_leaf_fraction = 0.7;
     input.split_multi_eval = 0;
+    input.min_depth = 0;
     input.max_depth = 50;
     input.output_dim = 1;
     input.tol_type = BAOBZI_TOL_RELATIVE;
@@ -159,7 +160,7 @@ void test<1>(int n_runs, int n_points, std::vector<double> &x) {
     };
 
     std::cout << "Testing on 1D function...\n";
-    baobzi::Function<6, decltype(func)> func_approx(input, center, hl, func);
+    baobzi::Function<8, decltype(func)> func_approx(input, center, hl, func);
     func_approx.print_stats();
 
     time_function(func_approx, x_transformed, n_runs);
@@ -167,10 +168,11 @@ void test<1>(int n_runs, int n_points, std::vector<double> &x) {
     std::cout << "\n";
 }
 
-template <> void test<2>(int n_runs, int n_points, std::vector<double> &x) {
+template <>
+void test<2>(int n_runs, int n_points, std::vector<double> &x) {
     std::array<real_t, 2> hl{1.0, 1.0};
-    // std::array<real_t, 2> center = {hl[0] + 0.5, hl[1] + 2.0};
-    std::array<real_t, 2> center = {0.0, 0.0};
+    std::array<real_t, 2> center = {hl[0] + 0.5, hl[1] + 2.0};
+
     auto input = create_input(2, testfun_2d);
     const auto x_transformed = transform<2>(x, n_points, hl, center);
 
@@ -186,13 +188,37 @@ template <> void test<2>(int n_runs, int n_points, std::vector<double> &x) {
 
     time_function(func_approx, x_transformed, n_runs);
     print_error(func_approx, input, x_transformed);
+    std::cout << "\n";
+}
+
+template <>
+void test<3>(int n_runs, int n_points, std::vector<double> &x) {
+    std::array<real_t, 3> hl{1.0, 1.0, 1.0};
+    std::array<real_t, 3> center = {hl[0] + 0.5, hl[1] + 2.0, hl[2] + 1.0};
+
+    auto input = create_input(3, testfun_3d1);
+    const auto x_transformed = transform<3>(x, n_points, hl, center);
+
+    auto func = [input](const std::array<double, 3> &x) -> std::array<double, 1> {
+        std::array<double, 1> y{0.0};
+        input.func(x.data(), y.data(), input.data);
+        return y;
+    };
+
+    std::cout << "Testing on 3D function...\n";
+    baobzi::Function<6, decltype(func)> func_approx(input, center, hl, func);
+    func_approx.print_stats();
+
+    time_function(func_approx, x_transformed, n_runs);
+    print_error(func_approx, input, x_transformed);
+    std::cout << "\n";
 }
 
 int main(int argc, char *argv[]) {
     size_t n_points = 1000000;
     size_t n_runs = 50;
 
-    std::vector<int> run_dims{1, 2};
+    std::vector<int> run_dims{1, 2, 3};
 
     if (argc >= 2)
         n_runs = atoi(argv[1]);
@@ -202,17 +228,18 @@ int main(int argc, char *argv[]) {
             run_dims.push_back(atoi(argv[i]));
     }
 
+    const int max_dim = *std::max_element(run_dims.begin(), run_dims.end());
     std::mt19937 gen(1);
     std::uniform_real_distribution<> dis(0, 1);
-    std::vector<real_t> x(n_points * 3);
-    for (size_t i = 0; i < n_points * 3; ++i)
+    std::vector<real_t> x(n_points * max_dim);
+    for (size_t i = 0; i < n_points * max_dim; ++i)
         x[i] = dis(gen);
 
-    std::array<void (*)(int, int, std::vector<double> &), 2> runners{&test<1>, &test<2>};
+    std::array<void (*)(int, int, std::vector<double> &), 3> runners{test<1>, test<2>, test<3>};
 
     for (auto dim : run_dims) {
-        if (dim < 1 || dim > 2) {
-            std::cerr << "Only 1D and 2D tests are implemented\n";
+        if (dim < 1 || dim > 3) {
+            std::cerr << "Only 1, 2, and 3D tests are implemented\n";
             return 1;
         }
 
