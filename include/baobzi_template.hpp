@@ -158,35 +158,31 @@ class Node {
             return false;
         };
 
-        for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
-            if constexpr (input_dim == 1)
-                polyfits.emplace_back(func, lb, ub, nullptr);
-            else
-                polyfits.emplace_back(func, lb, ub);
+        polyfits.emplace_back(func, lb, ub);
 
-            if constexpr (input_dim <= 2) {
+        if constexpr (input_dim <= 2) {
+            for (int i_dim = 0; i_dim < output_dim; ++i_dim)
                 if (tail_error_estimate(i_dim, polyfits.back(), input.tol_type) > input.tol)
                     return rollback_and_fail();
-            } else {
-                // For higher dimensions, we need to sample for error, as the tail estimate is not
-                // implemented. Here we sample uniformly in each dimension.
-                constexpr int n_sample_1d = Order;
-                for (int linear_index = 0; linear_index < poly_eval::detail::constexpr_power<n_sample_1d, input_dim>();
-                     ++linear_index) {
-                    std::array<double, input_dim> sample_point;
-                    int curr_index = linear_index;
-                    for (int dim = 0; dim < input_dim; ++dim) {
-                        const double dx = 2.0 * half_length[dim] / 5;
-                        sample_point[dim] = center[dim] - half_length[dim] + dx / 2.0 + dx * (curr_index % n_sample_1d);
-                        curr_index /= n_sample_1d;
-                    }
-
-                    const std::array<double, output_dim> actual = func(sample_point);
-                    const std::array<double, output_dim> approx = polyfits.back()(sample_point);
-                    for (int j = 0; j < output_dim; ++j)
-                        if (std::abs(1.0 - approx[j] / actual[j]) > input.tol)
-                            return rollback_and_fail();
+        } else {
+            // For higher dimensions, we need to sample for error, as the tail estimate is not
+            // implemented. Here we sample uniformly in each dimension.
+            constexpr int n_sample_1d = Order;
+            constexpr int n_samples = poly_eval::detail::constexpr_power<n_sample_1d, input_dim>();
+            for (int linear_index = 0; linear_index < n_samples; ++linear_index) {
+                std::array<double, input_dim> sample_point;
+                int curr_index = linear_index;
+                for (int dim = 0; dim < input_dim; ++dim) {
+                    const double dx = 2.0 * half_length[dim] / 5;
+                    sample_point[dim] = center[dim] - half_length[dim] + dx / 2.0 + dx * (curr_index % n_sample_1d);
+                    curr_index /= n_sample_1d;
                 }
+
+                const std::array<double, output_dim> actual = func(sample_point);
+                const std::array<double, output_dim> approx = polyfits.back()(sample_point);
+                for (int j = 0; j < output_dim; ++j)
+                    if (std::abs(1.0 - approx[j] / actual[j]) > input.tol)
+                        return rollback_and_fail();
             }
         }
 
@@ -246,7 +242,7 @@ struct FunctionTree {
 
                 if (successful_fit) {
                     assert(node.poly_eval_id == poly_id);
-                    assert(polyfits.size() == poly_id + output_dim);
+                    assert(polyfits.size() == poly_id + 1);
                     if constexpr (input_dim == 2)
                         polyfits.back()(box.center);
                 } else {
@@ -376,7 +372,7 @@ class Function {
                 n_leaves += node.is_leaf();
         }
 
-        std::cout << "Baobzi function mapping " << input_dim << " to " << output_dim_ << std::endl;
+        std::cout << "Baobzi function mapping " << input_dim << " to " << output_dim << std::endl;
         std::cout << "Tree represented by " << n_nodes << " nodes, of which " << n_leaves << " are leaves\n";
         std::cout << "Nodes are distributed across " << n_subtrees << " subtrees at an initial depth of "
                   << stats_.base_depth << " with a maximum subtree depth of " << max_depth << "\n";
@@ -393,7 +389,7 @@ class Function {
     /// @param[in] samples list of points to force fit check
     Function(const baobzi_input_t &input, const input_type center, const input_type half_width_in, const Func &func)
         : box_(dim_array_t{center}, dim_array_t{half_width_in}), tol_(input.tol),
-          split_multi_eval_(input.split_multi_eval), output_dim_(input.output_dim), input_(input) {
+          split_multi_eval_(input.split_multi_eval), input_(input) {
         auto t_start = std::chrono::steady_clock::now();
 
         dim_array_t lvec{half_width_in}, xvec{center};
@@ -636,8 +632,6 @@ class Function {
     std::pair<dim_array_t, dim_array_t> get_bounds() const { return std::make_pair(lower_left_, upper_right_); }
 
   private:
-    uint32_t output_dim_ = 1;
-
     baobzi_input_t input_;
     box_t box_;               ///< box representing the domain of our function
     value_type tol_;          ///< Desired relative tolerance of our approximation
@@ -664,13 +658,12 @@ class Function {
 };
 
 template <std::size_t Order, class Func>
-Function<Order, Func>
-make_function(const baobzi_input_t &input,
-              const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> center,
-              const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> half_width_in,
-              const Func &func) {
+Function<Order, Func> make_function(
+    const baobzi_input_t &input, const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> center,
+    const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> half_width_in, const Func &func) {
     return Function<Order, Func>(input, center, half_width_in, func);
 }
+
 } // namespace baobzi
 
 #endif
