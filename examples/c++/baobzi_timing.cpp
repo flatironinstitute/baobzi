@@ -5,8 +5,8 @@
 #include <random>
 #include <time.h>
 
-using poly_eval::function_traits;
 using baobzi::detail::get_tuple_size;
+using poly_eval::function_traits;
 using real_t = double;
 
 struct timespec get_wtime() {
@@ -87,8 +87,10 @@ void testfun<3, 1>(const double *x, double *y, const void *data) {
 }
 
 template <>
-void testfun<4, 1>(const double *x, double *y, const void *data) { *y = cos(x[0] + x[1] + x[2] + x[3]); }
- 
+void testfun<4, 1>(const double *x, double *y, const void *data) {
+    *y = cos(x[0] + x[1] + x[2] + x[3]);
+}
+
 template <typename Function>
 void time_function(const Function &function, const std::vector<real_t> &x, int n_runs) {
     constexpr int DIM = Function::input_dim;
@@ -196,7 +198,7 @@ baobzi_input_t create_input(int dim, baobzi_input_func_t func) {
     input.min_depth = 0;
     input.max_depth = 50;
     input.output_dim = 1;
-    input.tol_type = BAOBZI_TOL_RELATIVE_L2;
+    input.tol_type = (dim < 3) ? BAOBZI_TOL_RELATIVE_TAIL : BAOBZI_TOL_RELATIVE_MAX;
     input.n_samples_per_dim = 10;
     return input;
 }
@@ -330,7 +332,7 @@ int main(int argc, char *argv[]) {
         for (int i = 2; i < argc; ++i)
             run_dims.push_back(atoi(argv[i]));
     }
-    baobzi_input_t input;
+
     const int max_dim = *std::max_element(run_dims.begin(), run_dims.end());
     std::mt19937 gen(1);
     std::uniform_real_distribution<> dis(0, 1);

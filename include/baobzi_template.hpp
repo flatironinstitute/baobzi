@@ -28,24 +28,194 @@ class MaxDepthExceeded : public std::exception {
 };
 
 namespace detail {
+template <typename T, std::size_t N>
+class Value {
+    using storage_t = std::conditional_t<N == 1, T, std::array<T, N>>;
+    storage_t data_;
+
+  public:
+    // Scalar constructor
+    template <std::size_t M = N, typename = std::enable_if_t<M == 1>>
+    Value(const T &val) : data_(val) {}
+    Value(const std::array<T, 1> &arr) { data_ = arr[0]; }
+
+    // Array constructor
+    template <std::size_t M = N, typename = std::enable_if_t<M != 1>>
+    Value(const std::array<T, N> &arr) : data_(arr) {}
+    Value() = default;
+
+    // Assignment
+    Value &operator=(const Value &other) {
+        data_ = other.data_;
+        return *this;
+    }
+
+    // Arithmetic operators
+    Value operator+(const Value &rhs) const {
+        if constexpr (N == 1) {
+            return Value(data_ + rhs.data_);
+        } else {
+            std::array<T, N> result;
+            for (std::size_t i = 0; i < N; ++i)
+                result[i] = data_[i] + rhs.data_[i];
+            return Value(result);
+        }
+    }
+
+    Value operator+(const T &rhs) const {
+        if constexpr (N == 1) {
+            return Value(data_ + rhs);
+        } else {
+            std::array<T, N> result;
+            for (std::size_t i = 0; i < N; ++i)
+                result[i] = data_[i] + rhs;
+            return Value(result);
+        }
+    }
+
+    Value operator-(const Value &rhs) const {
+        if constexpr (N == 1) {
+            return Value(data_ - rhs.data_);
+        } else {
+            std::array<T, N> result;
+            for (std::size_t i = 0; i < N; ++i)
+                result[i] = data_[i] - rhs.data_[i];
+            return Value(result);
+        }
+    }
+
+    Value operator-(const T &rhs) const {
+        if constexpr (N == 1) {
+            return Value(data_ - rhs);
+        } else {
+            std::array<T, N> result;
+            for (std::size_t i = 0; i < N; ++i)
+                result[i] = data_[i] - rhs;
+            return Value(result);
+        }
+    }
+
+    Value operator*(const Value &rhs) const {
+        if constexpr (N == 1) {
+            return Value(data_ * rhs.data_);
+        } else {
+            std::array<T, N> result;
+            for (std::size_t i = 0; i < N; ++i)
+                result[i] = data_[i] * rhs.data_[i];
+            return Value(result);
+        }
+    }
+
+    Value operator*(const T &rhs) const {
+        if constexpr (N == 1) {
+            return Value(data_ * rhs);
+        } else {
+            std::array<T, N> result;
+            for (std::size_t i = 0; i < N; ++i)
+                result[i] = data_[i] * rhs;
+            return Value(result);
+        }
+    }
+
+    Value operator/(const Value &rhs) const {
+        if constexpr (N == 1) {
+            return Value(data_ / rhs.data_);
+        } else {
+            std::array<T, N> result;
+            for (std::size_t i = 0; i < N; ++i)
+                result[i] = data_[i] / rhs.data_[i];
+            return Value(result);
+        }
+    }
+
+    Value operator/(const T &rhs) const {
+        if constexpr (N == 1) {
+            return Value(data_ / rhs);
+        } else {
+            std::array<T, N> result;
+            for (std::size_t i = 0; i < N; ++i)
+                result[i] = data_[i] / rhs;
+            return Value(result);
+        }
+    }
+
+    T &operator[](size_t idx) {
+        if constexpr (N == 1) {
+            return data_;
+        } else {
+            return data_[idx];
+        }
+    }
+
+    const T &operator[](size_t idx) const {
+        if constexpr (N == 1) {
+            return data_;
+        } else {
+            return data_[idx];
+        }
+    }
+
+    T *begin() {
+        if constexpr (N == 1) {
+            return &data_;
+        } else {
+            return data_.data();
+        }
+    }
+
+    T *end() {
+        if constexpr (N == 1) {
+            return &data_ + 1;
+        } else {
+            return data_.data() + N;
+        }
+    }
+
+    T prod() const {
+        if constexpr (N == 1) {
+            return data_;
+        } else {
+            T result = 1;
+            for (const auto &val : data_)
+                result *= val;
+            return result;
+        }
+    }
+
+    // Automatic casting to scalar or array
+    operator T() const {
+        static_assert(N == 1, "Can only cast to scalar if N == 1");
+        return data_;
+    }
+
+    operator std::array<T, N>() const {
+        static_assert(N != 1, "Can only cast to array if N != 1");
+        return data_;
+    }
+
+    // Access underlying data
+    const T &scalar() const {
+        static_assert(N == 1, "Not a scalar");
+        return data_;
+    }
+    const std::array<T, N> &array() const {
+        static_assert(N != 1, "Not an array");
+        return data_;
+    }
+
+    const std::array<T, N> as_array() const {
+        if constexpr (N == 1) {
+            return std::array<T, N>{data_};
+        } else {
+            return data_;
+        }
+    }
+};
+
 using index_t = uint32_t; ///< Type specifying indexing into flattened tree
 
 template <std::size_t Order, class Func>
 class Function;
-
-inline auto prod(const auto &arr) {
-    typename std::remove_cvref_t<decltype(arr)>::value_type res{1};
-    for (const auto &el : arr)
-        res *= el;
-    return res;
-}
-
-inline auto scale(const auto &arr, auto factor) {
-    auto res = arr;
-    for (auto &el : res)
-        el *= factor;
-    return res;
-}
 
 template <int EXP, typename T>
 constexpr T powi(T base) {
@@ -72,8 +242,8 @@ constexpr int get_tuple_size() {
 /// @tparam T type of coordinates (e.g., double, float)
 template <int Dim, typename T>
 struct Box {
-    const std::array<T, Dim> center;      ///< Center of box
-    const std::array<T, Dim> half_length; ///< half the dimension of the box
+    const Value<T, Dim> center;      ///< Center of box
+    const Value<T, Dim> half_length; ///< half the dimension of the box
 
     /// @brief Constructor, just copies x, hl over
     Box(const auto &x, const auto &hl) : center{x}, half_length{hl} {}
@@ -85,7 +255,7 @@ struct Box {
 inline double tail_error_check(int i_dim, const auto &polyfit, baobzi_tol_t tol_type, double tol) {
     using input_type = std::remove_cvref_t<decltype(polyfit)>::InputType;
     constexpr int input_dim = get_tuple_size<input_type>();
-    if (input_dim == 1 || input_dim == 2)
+    if (input_dim > 2)
         throw std::runtime_error("tail_error only implemented for 1D and 2D input");
     using T = value_type_or_identity<input_type>::type;
 
@@ -116,38 +286,27 @@ inline double tail_error_check(int i_dim, const auto &polyfit, baobzi_tol_t tol_
 
 template <int Order, class Func, class Polyfit>
 inline bool
-sample_error_check(int n_sample_1d, baobzi_tol_t tol_type, double tol, const typename Polyfit::InputType &center,
-                   const typename Polyfit::InputType &half_length, const Func &func, const Polyfit &polyfit) {
+sample_error_check(int n_sample_1d, baobzi_tol_t tol_type, double tol, const typename Polyfit::InputType &center_in,
+                   const typename Polyfit::InputType &half_length_in, const Func &func, const Polyfit &polyfit) {
     constexpr auto input_dim = Polyfit::dim_;
     constexpr auto output_dim = Polyfit::outDim_;
     const int n_samples = powi<input_dim>(n_sample_1d);
-    std::array<double, input_dim> center_arr, half_length_arr;
-    if constexpr (input_dim == 1) {
-        center_arr[0] = center;
-        half_length_arr[0] = half_length;
-    } else {
-        center_arr = center;
-        half_length_arr = half_length;
-    }
+    const Value half_length{half_length_in};
+    const Value center{center_in};
 
     double max_abs_err{0.0}, max_rel_err{0.0}, abs_err_l2{0.0}, direct_sum{0.0};
     for (int linear_index = 0; linear_index < n_samples; ++linear_index) {
-        std::array<double, input_dim> sample_point;
+        Value<double, input_dim> sample_point;
         int curr_index = linear_index;
+
         for (int dim = 0; dim < input_dim; ++dim) {
-            const double dx = 2.0 * half_length_arr[dim] / n_sample_1d;
-            sample_point[dim] = center_arr[dim] - half_length_arr[dim] + dx / 2.0 + dx * (curr_index % n_sample_1d);
+            const double dx = 2.0 * half_length[dim] / n_sample_1d;
+            sample_point[dim] = center[dim] - half_length[dim] + dx / 2.0 + dx * (curr_index % n_sample_1d);
             curr_index /= n_sample_1d;
         }
 
-        std::array<double, output_dim> actual, approx;
-        if constexpr (input_dim == 1) {
-            actual[0] = func(sample_point);
-            approx[0] = polyfit(sample_point);
-        } else {
-            actual = func(sample_point);
-            approx = polyfit(sample_point);
-        }
+        Value<double, output_dim> actual = func(sample_point);
+        Value<double, output_dim> approx = polyfit(sample_point);
 
         for (int i = 0; i < output_dim; ++i) {
             const double abs_err = std::abs(approx[i] - actual[i]);
@@ -189,10 +348,7 @@ class Node {
     static constexpr int input_dim = get_tuple_size<input_type>();
     static constexpr int output_dim = get_tuple_size<output_type>();
 
-    using dim_array_t = std::array<value_type, input_dim>; ///< input_dim dimensional vector type
-    using order_array_t = std::array<value_type, Order>;   ///< Order dimensional vector type
-
-    std::array<value_type, input_dim> center;                     ///< Center of the node
+    Value<value_type, input_dim> center;                          ///< Center of the node
     uint64_t poly_eval_id = std::numeric_limits<uint64_t>::max(); ///< Position of poly_eval object in global array
     uint32_t first_child_idx = -1; ///< First child's index in a flattened list of all nodes
 
@@ -208,22 +364,14 @@ class Node {
     ///
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @returns coefficient vector list if fit successful, empty list if not good enough
-    bool fit(const baobzi_input_t &input, const Func &func, const std::array<value_type, input_dim> &half_length,
+    bool fit(const baobzi_input_t &input, const Func &func, const Value<value_type, input_dim> &half_length,
              const std::vector<value_type> &samples, std::vector<poly_eval_type> &polyfits) {
         if (samples.size())
             throw std::runtime_error("Baobzi fit error: sample points not yet supported");
 
         const auto n_polyfit_before = polyfits.size();
-        input_type lb, ub;
-        if constexpr (input_dim == 1) {
-            lb = center[0] - half_length[0];
-            ub = center[0] + half_length[0];
-        } else {
-            for (int i = 0; i < input_dim; ++i) {
-                lb[i] = center[i] - half_length[i];
-                ub[i] = center[i] + half_length[i];
-            }
-        }
+        const input_type lb = center - half_length;
+        const input_type ub = center + half_length;
 
         auto rollback_and_fail = [&polyfits, n_polyfit_before]() {
             while (polyfits.size() != n_polyfit_before)
@@ -270,9 +418,9 @@ struct FunctionTree {
     static constexpr int input_dim = get_tuple_size<input_type>();
     static constexpr int n_child = 1 << input_dim; ///< Number of children each node potentially has (2^D)
 
-    using node_t = Node<Func, Order>;                      ///< Func,Order node type
-    using box_t = Box<input_dim, value_type>;              ///< input_dim box type
-    using dim_array_t = std::array<value_type, input_dim>; ///< input_dim dimensional vector type
+    using node_t = Node<Func, Order>;                         ///< Func,Order node type
+    using box_t = Box<input_dim, value_type>;                 ///< input_dim box type
+    using dim_array_t = detail::Value<value_type, input_dim>; ///< input_dim dimensional vector type
 
     /// @brief Construct tree
     /// @param[in] input parameters for fit (function, tol, etc)
@@ -281,7 +429,7 @@ struct FunctionTree {
     FunctionTree(const baobzi_input_t &input, const Box<input_dim, value_type> &box,
                  std::vector<poly_eval_type> &polyfits, const Func &func) {
         std::queue<box_t> q;
-        dim_array_t half_width = scale(box.half_length, 0.5);
+        dim_array_t half_width = box.half_length * 0.5;
         q.push(box);
 
         index_t curr_child_idx = 1;
@@ -297,13 +445,11 @@ struct FunctionTree {
 
                 auto &node = nodes_[i + node_index];
                 const auto poly_id = polyfits.size();
-                bool successful_fit = node.fit(input, func, box.half_length, {}, polyfits);
+                const bool successful_fit = node.fit(input, func, box.half_length, {}, polyfits);
 
                 if (successful_fit) {
                     assert(node.poly_eval_id == poly_id);
                     assert(polyfits.size() == poly_id + 1);
-                    if constexpr (input_dim == 2)
-                        polyfits.back()(box.center);
                 } else {
                     node.first_child_idx = curr_child_idx;
                     curr_child_idx += n_child;
@@ -329,7 +475,7 @@ struct FunctionTree {
             if (max_depth_ > input.max_depth)
                 throw MaxDepthExceeded();
 
-            half_width = scale(half_width, 0.5);
+            half_width = half_width * 0.5;
         }
     }
 
@@ -401,9 +547,9 @@ class Function {
     static constexpr int output_dim = detail::get_tuple_size<output_type>();
     static constexpr int n_child = 1 << input_dim; ///< Number of children each node potentially has (2^D)
 
-    using node_t = detail::Node<Func, Order>;              ///< Func,Order node type
-    using box_t = detail::Box<input_dim, value_type>;      ///< input_dim box type
-    using dim_array_t = std::array<value_type, input_dim>; ///< input_dim dimensional vector type
+    using node_t = detail::Node<Func, Order>;                 ///< Func,Order node type
+    using box_t = detail::Box<input_dim, value_type>;         ///< input_dim box type
+    using dim_array_t = detail::Value<value_type, input_dim>; ///< input_dim dimensional vector type
 
     /// @brief Calculate memory_usage of this object in bytes
     /// @returns Memory usage of baobzi object in bytes
@@ -451,18 +597,18 @@ class Function {
           split_multi_eval_(input.split_multi_eval), input_(input) {
         auto t_start = std::chrono::steady_clock::now();
 
-        dim_array_t lvec{half_width_in}, xvec{center};
+        dim_array_t lvec{half_width_in};
         std::queue<box_t> q;
         std::queue<box_t> maybe_q;
 
-        auto hlmin = *std::min_element(lvec.begin(), lvec.end());
+        const auto hlmin = *std::min_element(lvec.begin(), lvec.end());
         for (int i = 0; i < input_dim; ++i)
             n_subtrees_[i] = lvec[i] / hlmin;
 
-        q.push(box_t(xvec, lvec));
+        q.push(box_t(center, lvec));
 
         // Half-width of next children
-        dim_array_t half_width = detail::scale(lvec, 0.5);
+        dim_array_t half_width = lvec * 0.5;
 
         // Breadth first search. Step through each level of the tree and test fit all of the nodes
         // We exit when a level isn't completely filled with parent nodes (rather than leaves)
@@ -473,7 +619,7 @@ class Function {
             auto add_node_children_to_queue = [](std::queue<box_t> &theq, const dim_array_t &center,
                                                  const dim_array_t &half_width) {
                 for (unsigned child = 0; child < n_child; ++child) {
-                    dim_array_t offset_center;
+                    detail::Value<double, input_dim> offset_center;
 
                     // Extract sign of each offset component from the bits of child
                     // Basically: permute all possible offsets
@@ -517,9 +663,9 @@ class Function {
                 }
             }
 
-            half_width = detail::scale(half_width, 0.5);
+            half_width = half_width * 0.5;
             if ((1 << (input_dim * (stats_.base_depth + 1))) == q.size()) {
-                n_subtrees_ = detail::scale(n_subtrees_, 2);
+                n_subtrees_ = n_subtrees_ * 2;
                 stats_.base_depth++;
                 if (stats_.base_depth > input.max_depth)
                     throw MaxDepthExceeded();
@@ -532,23 +678,21 @@ class Function {
             bin_size[j] = 2.0 * box_.half_length[j] / n_subtrees_[j];
             inv_bin_size_[j] = 0.5 * n_subtrees_[j] / box_.half_length[j];
         }
-        for (int i = 0; i < input_dim; ++i) {
-            lower_left_[i] = box_.center[i] - box_.half_length[i];
-            upper_right_[i] = box_.center[i] + box_.half_length[i];
-        }
+        lower_left_ = box_.center - box_.half_length;
+        upper_right_ = box_.center + box_.half_length;
 
-        subtrees_.reserve(detail::prod(n_subtrees_));
+        subtrees_.reserve(n_subtrees_.prod());
 
         auto input_local = input;
         input_local.max_depth -= stats_.base_depth;
-        for (int i_bin = 0; i_bin < detail::prod(n_subtrees_); ++i_bin) {
+        for (int i_bin = 0; i_bin < n_subtrees_.prod(); ++i_bin) {
             std::array<int, input_dim> bins = get_bins(i_bin);
 
             dim_array_t parent_center;
             for (int i = 0; i < input_dim; ++i)
                 parent_center[i] = (bins[i] + value_type{0.5}) * bin_size[i] + lower_left_[i];
 
-            detail::Box<input_dim, value_type> root_box = {parent_center, detail::scale(bin_size, 0.5)};
+            detail::Box<input_dim, value_type> root_box = {parent_center, bin_size * 0.5};
             subtrees_.emplace_back(input_local, root_box, polyfits_, func);
         }
 
@@ -560,7 +704,7 @@ class Function {
 
     /// @brief Build any intermediate state necessary for computation
     void build_cache() {
-        subtree_node_offsets_.resize(detail::prod(n_subtrees_));
+        subtree_node_offsets_.resize(n_subtrees_.prod());
         subtree_node_offsets_[0] = 0;
         for (int i = 1; i < subtree_node_offsets_.size(); ++i)
             subtree_node_offsets_[i] = subtree_node_offsets_[i - 1] + subtrees_[i - 1].size();
@@ -698,11 +842,11 @@ class Function {
     dim_array_t upper_right_; ///< Upper 'corner' of our domain
 
     std::vector<detail::FunctionTree<Order, Func>> subtrees_; ///< Grid of FunctionTree objects that do the work
-    std::array<int, input_dim> n_subtrees_; ///< Number of subtrees in each linear dimension of our space
-    std::vector<int> subtree_node_offsets_; ///< n_subtrees array of offsets for where in the global array of node
-                                            ///< pointers the global node pointer array starts
-    std::vector<node_t *> node_pointers_;   ///< Vector of pointers to every node from every subtree
-    dim_array_t inv_bin_size_;              ///< Inverse linear dimensions of the bins that our subtrees live
+    detail::Value<int, input_dim> n_subtrees_; ///< Number of subtrees in each linear dimension of our space
+    std::vector<int> subtree_node_offsets_;    ///< n_subtrees array of offsets for where in the global array of node
+                                               ///< pointers the global node pointer array starts
+    std::vector<node_t *> node_pointers_;      ///< Vector of pointers to every node from every subtree
+    dim_array_t inv_bin_size_;                 ///< Inverse linear dimensions of the bins that our subtrees live
 
     std::vector<poly_eval_type> polyfits_; ///< Flat vector of all chebyshev coefficients from all leaf nodes
 
