@@ -196,7 +196,8 @@ baobzi_input_t create_input(int dim, baobzi_input_func_t func) {
     input.min_depth = 0;
     input.max_depth = 50;
     input.output_dim = 1;
-    input.tol_type = BAOBZI_TOL_RELATIVE;
+    input.tol_type = BAOBZI_TOL_RELATIVE_L2;
+    input.n_samples_per_dim = 10;
     return input;
 }
 

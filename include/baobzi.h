@@ -12,8 +12,12 @@ extern "C" {
 typedef void (*baobzi_input_func_t)(const double *, double *, const void *);
 
 typedef enum {
-    BAOBZI_TOL_RELATIVE = 0,
-    BAOBZI_TOL_ABSOLUTE = 1,
+    BAOBZI_TOL_RELATIVE_TAIL = 0,
+    BAOBZI_TOL_ABSOLUTE_TAIL = 1,
+    BAOBZI_TOL_RELATIVE_MAX = 2,
+    BAOBZI_TOL_ABSOLUTE_MAX = 3,
+    BAOBZI_TOL_RELATIVE_L2 = 4,
+    BAOBZI_TOL_ABSOLUTE_L2 = 5,
 } baobzi_tol_t;
 
 /// @brief Input data type to define baobzi function
@@ -29,10 +33,12 @@ struct baobzi_input_t {
     int min_depth;
     int max_depth;
     baobzi_tol_t tol_type;
+    int n_samples_per_dim;
 #ifdef __cplusplus
     baobzi_input_t()
         : func(nullptr), data(nullptr), dim(0), output_dim(1), order(8), tol(0.0), minimum_leaf_fraction(0.0),
-          split_multi_eval(1), min_depth(0), max_depth(50), tol_type(BAOBZI_TOL_RELATIVE) {}
+          split_multi_eval(1), min_depth(0), max_depth(50), tol_type(BAOBZI_TOL_RELATIVE_MAX),
+          n_samples_per_dim(order) {}
 #endif
 };
 

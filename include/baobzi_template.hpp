@@ -11,6 +11,7 @@
 #include <iostream>
 #include <limits>
 #include <queue>
+#include <stdexcept>
 #include <tuple>
 #include <type_traits>
 #include <vector>
@@ -46,6 +47,18 @@ inline auto scale(const auto &arr, auto factor) {
     return res;
 }
 
+template <int EXP, typename T>
+constexpr T powi(T base) {
+    if constexpr (EXP == 0) {
+        return T{1};
+    } else if constexpr (EXP % 2 == 0) {
+        const auto half = powi<EXP / 2>(base);
+        return half * half;
+    } else {
+        return base * powi<EXP - 1>(base);
+    }
+}
+
 template <typename T>
 constexpr int get_tuple_size() {
     if constexpr (has_tuple_size_v<T>)
@@ -69,10 +82,11 @@ struct Box {
 /// @brief Return an estimate of the error for a given set of coefficients
 /// @param[in] coeffs one or two dimensional Vector/Matrix of coefficients
 /// @returns estimation of error given those coefficients
-inline double tail_error_estimate(int i_dim, const auto &polyfit, baobzi_tol_t tol_type) {
+inline double tail_error_check(int i_dim, const auto &polyfit, baobzi_tol_t tol_type, double tol) {
     using input_type = std::remove_cvref_t<decltype(polyfit)>::InputType;
     constexpr int input_dim = get_tuple_size<input_type>();
-    static_assert(input_dim == 1 || input_dim == 2, "tail_error_estimate only implemented for 1D and 2D input");
+    if (input_dim == 1 || input_dim == 2)
+        throw std::runtime_error("tail_error only implemented for 1D and 2D input");
     using T = value_type_or_identity<input_type>::type;
 
     T maxcoeff{0.0};
@@ -94,10 +108,69 @@ inline double tail_error_estimate(int i_dim, const auto &polyfit, baobzi_tol_t t
         scaling_factor = std::max(scaling_factor, std::abs(polyfit.coeff_at(i_dim, 0, n - 1)));
     }
 
-    if (tol_type == BAOBZI_TOL_RELATIVE)
-        return maxcoeff / scaling_factor;
+    if (tol_type == BAOBZI_TOL_RELATIVE_L2 || tol_type == BAOBZI_TOL_RELATIVE_MAX)
+        return maxcoeff / scaling_factor > tol;
     else
-        return maxcoeff;
+        return maxcoeff > tol;
+}
+
+template <int Order, class Func, class Polyfit>
+inline bool
+sample_error_check(int n_sample_1d, baobzi_tol_t tol_type, double tol, const typename Polyfit::InputType &center,
+                   const typename Polyfit::InputType &half_length, const Func &func, const Polyfit &polyfit) {
+    constexpr auto input_dim = Polyfit::dim_;
+    constexpr auto output_dim = Polyfit::outDim_;
+    const int n_samples = powi<input_dim>(n_sample_1d);
+    std::array<double, input_dim> center_arr, half_length_arr;
+    if constexpr (input_dim == 1) {
+        center_arr[0] = center;
+        half_length_arr[0] = half_length;
+    } else {
+        center_arr = center;
+        half_length_arr = half_length;
+    }
+
+    double max_abs_err{0.0}, max_rel_err{0.0}, abs_err_l2{0.0}, direct_sum{0.0};
+    for (int linear_index = 0; linear_index < n_samples; ++linear_index) {
+        std::array<double, input_dim> sample_point;
+        int curr_index = linear_index;
+        for (int dim = 0; dim < input_dim; ++dim) {
+            const double dx = 2.0 * half_length_arr[dim] / n_sample_1d;
+            sample_point[dim] = center_arr[dim] - half_length_arr[dim] + dx / 2.0 + dx * (curr_index % n_sample_1d);
+            curr_index /= n_sample_1d;
+        }
+
+        std::array<double, output_dim> actual, approx;
+        if constexpr (input_dim == 1) {
+            actual[0] = func(sample_point);
+            approx[0] = polyfit(sample_point);
+        } else {
+            actual = func(sample_point);
+            approx = polyfit(sample_point);
+        }
+
+        for (int i = 0; i < output_dim; ++i) {
+            const double abs_err = std::abs(approx[i] - actual[i]);
+            max_abs_err = std::max((double)max_abs_err, abs_err);
+            if (actual[i] != 0.0)
+                max_rel_err = std::max(max_rel_err, std::abs(abs_err / actual[i]));
+            abs_err_l2 += powi<2>(abs_err);
+            direct_sum += powi<2>(actual[i]);
+        }
+    }
+
+    switch (tol_type) {
+    case BAOBZI_TOL_RELATIVE_L2:
+        return std::sqrt(abs_err_l2 / direct_sum) > tol;
+    case BAOBZI_TOL_ABSOLUTE_L2:
+        return std::sqrt(abs_err_l2) / (n_samples * output_dim) > tol;
+    case BAOBZI_TOL_RELATIVE_MAX:
+        return max_rel_err > tol;
+    case BAOBZI_TOL_ABSOLUTE_MAX:
+        return max_abs_err > tol;
+    default:
+        throw std::runtime_error("Baobzi fit error: unknown tolerance type for sampling");
+    }
 }
 
 /// @brief Node in baobzi::FunctionTree. If leaf, contains evaluation data, otherwise children
@@ -158,32 +231,18 @@ class Node {
             return false;
         };
 
-        polyfits.emplace_back(func, lb, ub);
+        auto polyfit = polyfits.emplace_back(func, lb, ub);
 
-        if constexpr (input_dim <= 2) {
+        if (input.tol_type == BAOBZI_TOL_RELATIVE_TAIL || input.tol_type == BAOBZI_TOL_ABSOLUTE_TAIL) {
             for (int i_dim = 0; i_dim < output_dim; ++i_dim)
-                if (tail_error_estimate(i_dim, polyfits.back(), input.tol_type) > input.tol)
+                if (tail_error_check(i_dim, polyfit, input.tol_type, input.tol))
                     return rollback_and_fail();
         } else {
-            // For higher dimensions, we need to sample for error, as the tail estimate is not
-            // implemented. Here we sample uniformly in each dimension.
-            constexpr int n_sample_1d = Order;
-            constexpr int n_samples = poly_eval::detail::constexpr_power<n_sample_1d, input_dim>();
-            for (int linear_index = 0; linear_index < n_samples; ++linear_index) {
-                std::array<double, input_dim> sample_point;
-                int curr_index = linear_index;
-                for (int dim = 0; dim < input_dim; ++dim) {
-                    const double dx = 2.0 * half_length[dim] / 5;
-                    sample_point[dim] = center[dim] - half_length[dim] + dx / 2.0 + dx * (curr_index % n_sample_1d);
-                    curr_index /= n_sample_1d;
-                }
-
-                const std::array<double, output_dim> actual = func(sample_point);
-                const std::array<double, output_dim> approx = polyfits.back()(sample_point);
-                for (int j = 0; j < output_dim; ++j)
-                    if (std::abs(1.0 - approx[j] / actual[j]) > input.tol)
-                        return rollback_and_fail();
-            }
+            if constexpr (input_dim == 1) {
+                throw std::runtime_error("Baobzi fit error: 1D sampling not yet implemented");
+            } else if (sample_error_check<Order>(input.n_samples_per_dim, input.tol_type, input.tol, center,
+                                                 half_length, func, polyfit))
+                return rollback_and_fail();
         }
 
         poly_eval_id = n_polyfit_before;
