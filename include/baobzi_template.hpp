@@ -212,6 +212,12 @@ class Value {
     }
 };
 
+template <typename T>
+Value(const T &) -> Value<T, 1>;
+
+template <typename T, std::size_t N>
+Value(const std::array<T, N> &) -> Value<T, N>;
+
 using index_t = uint32_t; ///< Type specifying indexing into flattened tree
 
 template <std::size_t Order, class Func>
@@ -288,11 +294,11 @@ template <int Order, class Func, class Polyfit>
 inline bool
 sample_error_check(int n_sample_1d, baobzi_tol_t tol_type, double tol, const typename Polyfit::InputType &center_in,
                    const typename Polyfit::InputType &half_length_in, const Func &func, const Polyfit &polyfit) {
-    constexpr auto input_dim = Polyfit::dim_;
-    constexpr auto output_dim = Polyfit::outDim_;
+    constexpr auto input_dim = get_tuple_size<typename Polyfit::InputType>();
+    constexpr auto output_dim = get_tuple_size<typename Polyfit::OutputType>();
     const int n_samples = powi<input_dim>(n_sample_1d);
-    const Value half_length{half_length_in};
-    const Value center{center_in};
+    const Value half_length = half_length_in;
+    const Value center = center_in;
 
     double max_abs_err{0.0}, max_rel_err{0.0}, abs_err_l2{0.0}, direct_sum{0.0};
     for (int linear_index = 0; linear_index < n_samples; ++linear_index) {
@@ -386,10 +392,8 @@ class Node {
                 if (tail_error_check(i_dim, polyfit, input.tol_type, input.tol))
                     return rollback_and_fail();
         } else {
-            if constexpr (input_dim == 1) {
-                throw std::runtime_error("Baobzi fit error: 1D sampling not yet implemented");
-            } else if (sample_error_check<Order>(input.n_samples_per_dim, input.tol_type, input.tol, center,
-                                                 half_length, func, polyfit))
+            if (sample_error_check<Order>(input.n_samples_per_dim, input.tol_type, input.tol, center, half_length, func,
+                                          polyfit))
                 return rollback_and_fail();
         }
 
