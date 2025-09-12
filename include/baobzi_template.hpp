@@ -1,8 +1,6 @@
 #ifndef BAOBZI_TEMPLATE_HPP
 #define BAOBZI_TEMPLATE_HPP
 
-#define _USE_MATH_DEFINES
-
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -20,7 +18,6 @@
 
 #include <baobzi.h>
 
-/// Namespace for baobzi
 namespace baobzi {
 
 class MaxDepthExceeded : public std::exception {
@@ -28,6 +25,11 @@ class MaxDepthExceeded : public std::exception {
 };
 
 namespace detail {
+/// @brief Wrapper class treat arrays and scalars as a common type with basic arithmetic
+/// operators
+///
+/// @tparam T type to extract value_type from
+/// @tparam N number of elements. If 1, T is scalar, otherwise tuple-like
 template <typename T, std::size_t N>
 class Value {
     using storage_t = std::conditional_t<N == 1, T, std::array<T, N>>;
@@ -45,13 +47,13 @@ class Value {
     Value() = default;
 
     // Assignment
-    Value &operator=(const Value &other) {
+    inline Value &operator=(const Value &other) {
         data_ = other.data_;
         return *this;
     }
 
     // Arithmetic operators
-    Value operator+(const Value &rhs) const {
+    inline Value operator+(const Value &rhs) const {
         if constexpr (N == 1) {
             return Value(data_ + rhs.data_);
         } else {
@@ -62,7 +64,7 @@ class Value {
         }
     }
 
-    Value operator+(const T &rhs) const {
+    inline Value operator+(const T &rhs) const {
         if constexpr (N == 1) {
             return Value(data_ + rhs);
         } else {
@@ -73,7 +75,7 @@ class Value {
         }
     }
 
-    Value operator-(const Value &rhs) const {
+    inline Value operator-(const Value &rhs) const {
         if constexpr (N == 1) {
             return Value(data_ - rhs.data_);
         } else {
@@ -84,7 +86,7 @@ class Value {
         }
     }
 
-    Value operator-(const T &rhs) const {
+    inline Value operator-(const T &rhs) const {
         if constexpr (N == 1) {
             return Value(data_ - rhs);
         } else {
@@ -95,7 +97,7 @@ class Value {
         }
     }
 
-    Value operator*(const Value &rhs) const {
+    inline Value operator*(const Value &rhs) const {
         if constexpr (N == 1) {
             return Value(data_ * rhs.data_);
         } else {
@@ -106,7 +108,7 @@ class Value {
         }
     }
 
-    Value operator*(const T &rhs) const {
+    inline Value operator*(const T &rhs) const {
         if constexpr (N == 1) {
             return Value(data_ * rhs);
         } else {
@@ -117,7 +119,7 @@ class Value {
         }
     }
 
-    Value operator/(const Value &rhs) const {
+    inline Value operator/(const Value &rhs) const {
         if constexpr (N == 1) {
             return Value(data_ / rhs.data_);
         } else {
@@ -128,7 +130,7 @@ class Value {
         }
     }
 
-    Value operator/(const T &rhs) const {
+    inline Value operator/(const T &rhs) const {
         if constexpr (N == 1) {
             return Value(data_ / rhs);
         } else {
@@ -139,7 +141,7 @@ class Value {
         }
     }
 
-    T &operator[](size_t idx) {
+    inline T &operator[](size_t idx) {
         if constexpr (N == 1) {
             return data_;
         } else {
@@ -147,7 +149,7 @@ class Value {
         }
     }
 
-    const T &operator[](size_t idx) const {
+    inline const T &operator[](size_t idx) const {
         if constexpr (N == 1) {
             return data_;
         } else {
@@ -155,7 +157,7 @@ class Value {
         }
     }
 
-    T *begin() {
+    inline T *begin() {
         if constexpr (N == 1) {
             return &data_;
         } else {
@@ -163,7 +165,7 @@ class Value {
         }
     }
 
-    T *end() {
+    inline T *end() {
         if constexpr (N == 1) {
             return &data_ + 1;
         } else {
@@ -171,7 +173,7 @@ class Value {
         }
     }
 
-    T prod() const {
+    inline T prod() const {
         if constexpr (N == 1) {
             return data_;
         } else {
@@ -183,27 +185,27 @@ class Value {
     }
 
     // Automatic casting to scalar or array
-    operator T() const {
+    inline operator T() const {
         static_assert(N == 1, "Can only cast to scalar if N == 1");
         return data_;
     }
 
-    operator std::array<T, N>() const {
+    inline operator std::array<T, N>() const {
         static_assert(N != 1, "Can only cast to array if N != 1");
         return data_;
     }
 
     // Access underlying data
-    const T &scalar() const {
+    inline const T &scalar() const {
         static_assert(N == 1, "Not a scalar");
         return data_;
     }
-    const std::array<T, N> &array() const {
+    inline const std::array<T, N> &array() const {
         static_assert(N != 1, "Not an array");
         return data_;
     }
 
-    const std::array<T, N> as_array() const {
+    inline const std::array<T, N> as_array() const {
         if constexpr (N == 1) {
             return std::array<T, N>{data_};
         } else {
@@ -220,7 +222,7 @@ Value(const std::array<T, N> &) -> Value<T, N>;
 
 using index_t = uint32_t; ///< Type specifying indexing into flattened tree
 
-template <std::size_t Order, class Func>
+template <std::size_t Degree, class Func>
 class Function;
 
 template <int EXP, typename T>
@@ -235,6 +237,9 @@ constexpr T powi(T base) {
     }
 }
 
+/// @brief Trait to extract number of elements from input/output types
+/// @tparam T type to extract size from
+/// @returns number of elements in tuple-like type, or 1 for scalars
 template <typename T>
 constexpr int get_tuple_size() {
     if constexpr (has_tuple_size_v<T>)
@@ -246,7 +251,7 @@ constexpr int get_tuple_size() {
 /// @brief Structure to represent geometric portion of Baobzi nodes
 /// @tparam Dim number of dimensions of box
 /// @tparam T type of coordinates (e.g., double, float)
-template <int Dim, typename T>
+template <typename T, int Dim>
 struct Box {
     const Value<T, Dim> center;      ///< Center of box
     const Value<T, Dim> half_length; ///< half the dimension of the box
@@ -255,9 +260,14 @@ struct Box {
     Box(const auto &x, const auto &hl) : center{x}, half_length{hl} {}
 };
 
-/// @brief Return an estimate of the error for a given set of coefficients
-/// @param[in] coeffs one or two dimensional Vector/Matrix of coefficients
-/// @returns estimation of error given those coefficients
+/// @brief Check if the 'tail estimate' of the error for a given set of coefficients is greater
+/// than tol.
+///
+/// @tparam Polyfit polynomial fit of function as this node
+/// @param[in] tol_type type of tolerance to use for error check. See baobzi_tol_t
+/// @param[in] tol tolerance value to use for error check
+/// @param[in] polyfit polynomial fit to evaluate at sample points
+/// @returns true if estimated error greater than tol, false otherwise
 template <class Polyfit>
 inline bool tail_error_check(baobzi_tol_t tol_type, double tol, const Polyfit &polyfit) {
     constexpr int input_dim = get_tuple_size<typename Polyfit::InputType>();
@@ -294,7 +304,20 @@ inline bool tail_error_check(baobzi_tol_t tol_type, double tol, const Polyfit &p
         return maxcoeff > tol;
 }
 
-template <int Order, class Func, class Polyfit>
+/// @brief Sample a polynomial fit on a uniform grid of points and compare to actual
+/// function. Poor fit indicated by true, i.e. returns if measured error greater than tol.
+///
+/// @tparam Func (actual) input function type to evaluate at this node
+/// @tparam Polyfit polynomial fit of function as this node
+/// @param[in] n_sample_1d number of samples per dimension (total samples = n_sample_1d^input_dim)
+/// @param[in] tol_type type of tolerance to use for error check. See baobzi_tol_t
+/// @param[in] tol tolerance value to use for error check
+/// @param[in] center_in [input_dim] center of box to sample in
+/// @param[in] half_length_in [input_dim] half length of box to sample in
+/// @param[in] func (actual) function to evaluate at sample points
+/// @param[in] polyfit polynomial fit to evaluate at sample points
+/// @returns true if sampled error greater than tol, false otherwise
+template <class Func, class Polyfit>
 inline bool
 sample_error_check(int n_sample_1d, baobzi_tol_t tol_type, double tol, const typename Polyfit::InputType &center_in,
                    const typename Polyfit::InputType &half_length_in, const Func &func, const Polyfit &polyfit) {
@@ -342,18 +365,17 @@ sample_error_check(int n_sample_1d, baobzi_tol_t tol_type, double tol, const typ
     }
 }
 
-/// @brief Node in baobzi::FunctionTree. If leaf, contains evaluation data, otherwise children
+/// @brief Node in baobzi::PolyTree. If leaf, contains evaluation data, otherwise children
 /// @tparam Func function type to evaluate at this node
-/// @tparam Order order of evaluation polynomial
-template <class Func, std::size_t Order>
+/// @tparam Degree of evaluation polynomial
+template <class Func, std::size_t Degree>
 class Node {
   public:
-    using input_type_cv = typename poly_eval::function_traits<Func>::arg0_type;
     using input_type = typename std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type>;
     using output_type = poly_eval::function_traits<Func>::result_type;
     using value_type = value_type_or_identity<input_type>::type;
-    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Order>,
-                                            poly_eval::FuncEval<Func, Order>>::type;
+    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Degree>,
+                                            poly_eval::FuncEval<Func, Degree>>::type;
 
     static constexpr int input_dim = get_tuple_size<input_type>();
     static constexpr int output_dim = get_tuple_size<output_type>();
@@ -364,7 +386,7 @@ class Node {
 
     /// @brief Construct node from box (without fitting)
     /// @param [in] box box this node represents
-    Node(const Box<input_dim, value_type> &box) : center{box.center} {}
+    Node(const Box<value_type, input_dim> &box) : center{box.center} {}
 
     /// @brief check if node is leaf
     /// @return true if leaf, false otherwise
@@ -395,8 +417,8 @@ class Node {
             if (tail_error_check(input.tol_type, input.tol, polyfit))
                 return rollback_and_fail();
         } else {
-            if (sample_error_check<Order>(input.n_samples_per_dim, input.tol_type, input.tol, center, half_length, func,
-                                          polyfit))
+            if (sample_error_check(input.n_samples_per_dim, input.tol_type, input.tol, center, half_length, func,
+                                   polyfit))
                 return rollback_and_fail();
         }
 
@@ -410,31 +432,30 @@ class Node {
 };
 
 /// @brief Represent a function in some domain as a tree of chebyshev nodes
-/// @tparam Order order of evaluation polynomial
+/// @tparam Degree of evaluation polynomial
 /// @tparam Func input function type to fit
-template <std::size_t Order, class Func>
-struct FunctionTree {
-    using input_type_cv = typename poly_eval::function_traits<Func>::arg0_type;
+template <std::size_t Degree, class Func>
+struct PolyTree {
     using input_type = typename std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type>;
     using value_type = value_type_or_identity<input_type>::type;
-    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Order>,
-                                            poly_eval::FuncEval<Func, Order>>::type;
+    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Degree>,
+                                            poly_eval::FuncEval<Func, Degree>>::type;
     using output_type = poly_eval::function_traits<Func>::result_type;
 
     static constexpr int output_dim = get_tuple_size<output_type>();
     static constexpr int input_dim = get_tuple_size<input_type>();
     static constexpr int n_child = 1 << input_dim; ///< Number of children each node potentially has (2^D)
 
-    using node_t = Node<Func, Order>;                         ///< Func,Order node type
-    using box_t = Box<input_dim, value_type>;                 ///< input_dim box type
+    using node_t = Node<Func, Degree>;                        ///< Func,Degree node type
+    using box_t = Box<value_type, input_dim>;                 ///< input_dim box type
     using dim_array_t = detail::Value<value_type, input_dim>; ///< input_dim dimensional vector type
 
     /// @brief Construct tree
     /// @param[in] input parameters for fit (function, tol, etc)
     /// @param[in] coeffs flat/global coefficient vector
     /// @param[in] box box that this tree lives in
-    FunctionTree(const baobzi_input_t &input, const Box<input_dim, value_type> &box,
-                 std::vector<poly_eval_type> &polyfits, const Func &func) {
+    PolyTree(const baobzi_input_t &input, const Box<value_type, input_dim> &box, std::vector<poly_eval_type> &polyfits,
+             const Func &func) {
         std::queue<box_t> q;
         dim_array_t half_width = box.half_length * 0.5;
         q.push(box);
@@ -472,7 +493,7 @@ struct FunctionTree {
                             center_offset[j] = center[j] + signed_hw[(child >> j) & 1];
                         }
 
-                        q.push(Box<input_dim, value_type>(center_offset, half_width));
+                        q.push(box_t(center_offset, half_width));
                     }
                 }
             }
@@ -537,25 +558,25 @@ struct FunctionTree {
 };
 } // namespace detail
 
-/// @brief Represents a function in some domain as a grid of baobzi::FunctionTree objects
-/// @tparam Order order of evaluation polynomial
+/// @brief Represents a function in some domain as a grid of baobzi::PolyTree objects
+///
+/// @tparam Degree of evaluation polynomial
 /// @tparam Func function type to evaluate at this node
-template <std::size_t Order, class Func>
+template <std::size_t Degree, class Func>
 class Function {
   public:
-    using input_type_cv = typename poly_eval::function_traits<Func>::arg0_type;
     using input_type = typename std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type>;
     using output_type = poly_eval::function_traits<Func>::result_type;
     using value_type = value_type_or_identity<input_type>::type;
-    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Order>,
-                                            poly_eval::FuncEval<Func, Order>>::type;
+    using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Degree>,
+                                            poly_eval::FuncEval<Func, Degree>>::type;
 
-    static constexpr int input_dim = detail::get_tuple_size<input_type>();
-    static constexpr int output_dim = detail::get_tuple_size<output_type>();
+    static constexpr int input_dim = detail::get_tuple_size<input_type>();   ///< Function input dimensions
+    static constexpr int output_dim = detail::get_tuple_size<output_type>(); ///< Function output dimension
     static constexpr int n_child = 1 << input_dim; ///< Number of children each node potentially has (2^D)
 
-    using node_t = detail::Node<Func, Order>;                 ///< Func,Order node type
-    using box_t = detail::Box<input_dim, value_type>;         ///< input_dim box type
+    using node_t = detail::Node<Func, Degree>;                ///< Func,Degree node type
+    using box_t = detail::Box<value_type, input_dim>;         ///< input_dim box type
     using dim_array_t = detail::Value<value_type, input_dim>; ///< input_dim dimensional vector type
 
     /// @brief Calculate memory_usage of this object in bytes
@@ -589,16 +610,16 @@ class Function {
         std::cout << "Nodes are distributed across " << n_subtrees << " subtrees at an initial depth of "
                   << stats_.base_depth << " with a maximum subtree depth of " << max_depth << "\n";
         std::cout << "Total function evaluations required for fit: "
-                  << n_nodes * (int)std::pow(Order, input_dim) + stats_.n_evals_root << std::endl;
+                  << n_nodes * (int)std::pow(Degree, input_dim) + stats_.n_evals_root << std::endl;
         std::cout << "Total time to create tree: " << stats_.t_elapsed << " milliseconds\n";
         std::cout << "Approximate memory usage of tree: " << (value_type)mem / (1024 * 1024) << " MiB" << std::endl;
     }
 
     /// @brief Construct our Function object (fits recursively, can be slow)
     /// @param[in] input parameters for fit (function, tol, etc)
-    /// @param[in] xp [dim] center of function domain
-    /// @param[in] lp [dim] half length of function domain
-    /// @param[in] samples list of points to force fit check
+    /// @param[in] center [input_dim] center of function domain
+    /// @param[in] half_width_in [input_dim] half length of function domain
+    /// @param[in] func function to fit
     Function(const baobzi_input_t &input, const input_type center, const input_type half_width_in, const Func &func)
         : box_(dim_array_t{center}, dim_array_t{half_width_in}), tol_(input.tol),
           split_multi_eval_(input.split_multi_eval), input_(input) {
@@ -659,7 +680,7 @@ class Function {
                     add_node_children_to_queue(maybe_q, node.center, half_width);
                 }
             }
-            stats_.n_evals_root += nodes.size() * std::pow(Order, input_dim);
+            stats_.n_evals_root += nodes.size() * std::pow(Degree, input_dim);
 
             leaf_fraction /= nodes.size();
             if (leaf_fraction < input.minimum_leaf_fraction) {
@@ -699,7 +720,7 @@ class Function {
             for (int i = 0; i < input_dim; ++i)
                 parent_center[i] = (bins[i] + value_type{0.5}) * bin_size[i] + lower_left_[i];
 
-            detail::Box<input_dim, value_type> root_box = {parent_center, bin_size * 0.5};
+            box_t root_box = {parent_center, bin_size * 0.5};
             subtrees_.emplace_back(input_local, root_box, polyfits_, func);
         }
 
@@ -796,7 +817,7 @@ class Function {
 
     /// @brief eval function approximation at n_trg points
     /// @param[in] xp [input_dim * n_trg] array of points to evaluate function at
-    /// @param[out] res [n_trg] array of results
+    /// @param[out] res [output_dim * n_trg] array of results
     /// @param[in] n_trg number of points to evaluate
     inline void operator()(const value_type *xp, value_type *res, int n_trg) const {
         if (split_multi_eval_) {
@@ -842,18 +863,18 @@ class Function {
     std::pair<dim_array_t, dim_array_t> get_bounds() const { return std::make_pair(lower_left_, upper_right_); }
 
   private:
-    baobzi_input_t input_;
+    baobzi_input_t input_;    ///< copy of input parameters
     box_t box_;               ///< box representing the domain of our function
     value_type tol_;          ///< Desired relative tolerance of our approximation
     dim_array_t lower_left_;  ///< Bottom 'corner' of our domain
     dim_array_t upper_right_; ///< Upper 'corner' of our domain
 
-    std::vector<detail::FunctionTree<Order, Func>> subtrees_; ///< Grid of FunctionTree objects that do the work
-    detail::Value<int, input_dim> n_subtrees_; ///< Number of subtrees in each linear dimension of our space
-    std::vector<int> subtree_node_offsets_;    ///< n_subtrees array of offsets for where in the global array of node
-                                               ///< pointers the global node pointer array starts
-    std::vector<node_t *> node_pointers_;      ///< Vector of pointers to every node from every subtree
-    dim_array_t inv_bin_size_;                 ///< Inverse linear dimensions of the bins that our subtrees live
+    std::vector<detail::PolyTree<Degree, Func>> subtrees_; ///< Grid of PolyTree objects that do the work
+    detail::Value<int, input_dim> n_subtrees_;             ///< Number of subtrees in each linear dimension of our space
+    std::vector<int> subtree_node_offsets_; ///< n_subtrees array of offsets for where in the global array of node
+                                            ///< pointers the global node pointer array starts
+    std::vector<node_t *> node_pointers_;   ///< Vector of pointers to every node from every subtree
+    dim_array_t inv_bin_size_;              ///< Inverse linear dimensions of the bins that our subtrees live
 
     std::vector<poly_eval_type> polyfits_; ///< Flat vector of all chebyshev coefficients from all leaf nodes
 
@@ -867,11 +888,22 @@ class Function {
     } stats_;
 };
 
-template <std::size_t Order, class Func>
-Function<Order, Func> make_function(
-    const baobzi_input_t &input, const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> center,
-    const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> half_width_in, const Func &func) {
-    return Function<Order, Func>(input, center, half_width_in, func);
+/// @brief Factory function to create baobzi::Function object with type deduction
+///
+/// @tparam Degree Degree of evaluation polynomial
+/// @tparam Func Function to fit
+/// @param[in] input parameters for fit (function, tol, etc)
+/// @param[in] center [M] center of function domain
+/// @param[in] half_width_in [M] half length of function domain
+/// @param[in] func function to fit. Should map an input from R^M to R^N for some M,N
+/// @returns baobzi::Function object representing func in the given domain
+template <std::size_t Degree, class Func>
+inline Function<Degree, Func>
+make_function(const baobzi_input_t &input,
+              const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> &center,
+              const std::remove_cvref_t<typename poly_eval::function_traits<Func>::arg0_type> &half_width_in,
+              const Func &func) {
+    return Function<Degree, Func>(input, center, half_width_in, func);
 }
 
 } // namespace baobzi
