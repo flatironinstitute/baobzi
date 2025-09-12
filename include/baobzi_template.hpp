@@ -258,30 +258,34 @@ struct Box {
 /// @brief Return an estimate of the error for a given set of coefficients
 /// @param[in] coeffs one or two dimensional Vector/Matrix of coefficients
 /// @returns estimation of error given those coefficients
-inline double tail_error_check(int i_dim, const auto &polyfit, baobzi_tol_t tol_type, double tol) {
-    using input_type = std::remove_cvref_t<decltype(polyfit)>::InputType;
-    constexpr int input_dim = get_tuple_size<input_type>();
+template <class Polyfit>
+inline bool tail_error_check(baobzi_tol_t tol_type, double tol, const Polyfit &polyfit) {
+    constexpr int input_dim = get_tuple_size<typename Polyfit::InputType>();
+    constexpr int output_dim = get_tuple_size<typename Polyfit::OutputType>();
+    using T = value_type_or_identity<typename Polyfit::InputType>::type;
     if (input_dim > 2)
-        throw std::runtime_error("tail_error only implemented for 1D and 2D input");
-    using T = value_type_or_identity<input_type>::type;
+        throw std::runtime_error("Baobzi fit error: tail_error only implemented for 1D and 2D input");
 
     T maxcoeff{0.0};
     T scaling_factor{1.0};
 
     if constexpr (input_dim == 1) {
         const auto &coeffs = polyfit.coeffs();
+        constexpr int N = Polyfit::kDegreeCompileTime;
+        static_assert(output_dim == 1, "tail_error only implemented for single output in 1D");
 
-        int n = coeffs.size();
         for (auto i = 0; i < 2; ++i)
             maxcoeff = std::max(std::abs(coeffs[i]), maxcoeff);
-        scaling_factor = std::max(scaling_factor, std::abs(coeffs[n - 1]));
+        scaling_factor = std::max(scaling_factor, std::abs(coeffs[N - 1]));
     } else if constexpr (input_dim == 2) {
         const int n = polyfit.degree();
-        for (auto i = 0; i < n; ++i)
-            maxcoeff = std::max(std::abs(polyfit.coeff_at(i_dim, i, n - i - 1)), maxcoeff);
+        for (int i_dim = 0; i_dim < output_dim; ++i_dim) {
+            for (auto i = 0; i < n; ++i)
+                maxcoeff = std::max(std::abs(polyfit.coeff_at(i_dim, i, n - i - 1)), maxcoeff);
 
-        scaling_factor = std::max(scaling_factor, std::abs(polyfit.coeff_at(i_dim, n - 1, 0)));
-        scaling_factor = std::max(scaling_factor, std::abs(polyfit.coeff_at(i_dim, 0, n - 1)));
+            scaling_factor = std::max(scaling_factor, std::abs(polyfit.coeff_at(i_dim, n - 1, 0)));
+            scaling_factor = std::max(scaling_factor, std::abs(polyfit.coeff_at(i_dim, 0, n - 1)));
+        }
     }
 
     if (tol_type == BAOBZI_TOL_RELATIVE_L2 || tol_type == BAOBZI_TOL_RELATIVE_MAX)
@@ -388,9 +392,8 @@ class Node {
         auto polyfit = polyfits.emplace_back(func, lb, ub);
 
         if (input.tol_type == BAOBZI_TOL_RELATIVE_TAIL || input.tol_type == BAOBZI_TOL_ABSOLUTE_TAIL) {
-            for (int i_dim = 0; i_dim < output_dim; ++i_dim)
-                if (tail_error_check(i_dim, polyfit, input.tol_type, input.tol))
-                    return rollback_and_fail();
+            if (tail_error_check(input.tol_type, input.tol, polyfit))
+                return rollback_and_fail();
         } else {
             if (sample_error_check<Order>(input.n_samples_per_dim, input.tol_type, input.tol, center, half_length, func,
                                           polyfit))
