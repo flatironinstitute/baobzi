@@ -1,4 +1,4 @@
-#include <baobzi_template.hpp>
+#include <baobzi.hpp>
 
 #include <algorithm>
 #include <iostream>
