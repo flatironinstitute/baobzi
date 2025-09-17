@@ -12,7 +12,7 @@ TEST_CASE("1D1 evaluations", "[baobzi_template]") {
     };
 
     baobzi_input_t input;
-    input.dim = 1;
+    input.input_dim = 1;
     input.tol = 1E-10;
     input.order = 8;
     input.split_multi_eval = false;

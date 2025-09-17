@@ -3,6 +3,12 @@
 
 #include "baobzi/macros.h"
 
+#define BAOBZI_DEFAULT(x)
+#ifdef __cplusplus
+#undef BAOBZI_DEFAULT
+#define BAOBZI_DEFAULT(x) = x
+#endif
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -22,24 +28,18 @@ typedef enum {
 
 /// @brief Input data type to define baobzi function
 struct baobzi_input_t {
-    baobzi_input_func_t func;
-    void *data;
-    int dim;
-    int output_dim;
-    int order;
-    double tol;
-    double minimum_leaf_fraction;
-    int split_multi_eval;
-    int min_depth;
-    int max_depth;
-    baobzi_tol_t tol_type;
-    int n_samples_per_dim;
-#ifdef __cplusplus
-    baobzi_input_t()
-        : func(nullptr), data(nullptr), dim(0), output_dim(1), order(8), tol(0.0), minimum_leaf_fraction(0.0),
-          split_multi_eval(1), min_depth(0), max_depth(50), tol_type(BAOBZI_TOL_RELATIVE_MAX),
-          n_samples_per_dim(order) {}
-#endif
+    baobzi_input_func_t func BAOBZI_DEFAULT(nullptr);
+    void *data BAOBZI_DEFAULT(nullptr);
+    int input_dim BAOBZI_DEFAULT(0);
+    int output_dim BAOBZI_DEFAULT(1);
+    int degree BAOBZI_DEFAULT(8);
+    double tol BAOBZI_DEFAULT(0.0);
+    double minimum_leaf_fraction BAOBZI_DEFAULT(0.0);
+    int split_multi_eval BAOBZI_DEFAULT(1);
+    int min_depth BAOBZI_DEFAULT(0);
+    int max_depth BAOBZI_DEFAULT(50);
+    baobzi_tol_t tol_type BAOBZI_DEFAULT(BAOBZI_TOL_RELATIVE_MAX);
+    int n_samples_per_dim BAOBZI_DEFAULT(8);
 };
 
 typedef struct baobzi_input_t baobzi_input_t;
@@ -50,14 +50,15 @@ typedef struct baobzi_input_t baobzi_input_t;
 /// Contains pointers to the wrappers of the relevant template C++ functions for a
 /// dim+order+instruction set
 typedef struct {
-    void *obj;                                                            ///< Actual baobzi::Function object
-    int DIM;                                                              ///< Input dimension of our function
-    int OUTPUT_DIM;                                                       ///< Output dimension of our function
-    int ORDER;                                                            ///< Order of the polynomial
-    void (*eval)(const void *, const double *, double *);                 ///< Pointer to evaluation function
-    void (*eval_multi)(const void *, const double *, double *, int ntrg); ///< Pointer to multi-evaluation function
-    void (*stats)(void *);                                                ///< pointer to stats function
-    void (*free)(void *);                                                 ///< pointer to free function
+    void *obj BAOBZI_DEFAULT(nullptr);                                            ///< Actual baobzi::Function object
+    int INPUT_DIM BAOBZI_DEFAULT(0);                                              ///< Input dimension of our function
+    int OUTPUT_DIM BAOBZI_DEFAULT(0);                                             ///< Output dimension of our function
+    int DEGREE BAOBZI_DEFAULT(0);                                                 ///< Highest degree of the polynomial
+    void (*eval)(const void *, const double *, double *) BAOBZI_DEFAULT(nullptr); ///< Pointer to evaluation function
+    void (*eval_multi)(const void *, const double *, double *, int ntrg)
+        BAOBZI_DEFAULT(nullptr);                   ///< Pointer to multi-evaluation function
+    void (*stats)(void *) BAOBZI_DEFAULT(nullptr); ///< pointer to stats function
+    void (*free)(void *) BAOBZI_DEFAULT(nullptr);  ///< pointer to free function
 } baobzi_struct;
 
 /// Our type for the C API
@@ -101,5 +102,7 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
 #ifdef __cplusplus
 }
 #endif
+
+#undef BAOBZI_DEFAULT
 
 #endif

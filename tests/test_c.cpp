@@ -27,7 +27,7 @@ void testfun_3d1(const double *x, double *res, const void *data) {
 TEST_CASE("1D1 evaluations", "[baobzi]") {
     baobzi_input_t input = baobzi_input_default;
     const double scale_factor = 1.5;
-    input.dim = 1;
+    input.input_dim = 1;
     input.output_dim = 1;
     input.order = 8;
     input.tol = 1E-10;
@@ -73,7 +73,7 @@ TEST_CASE("1D1 evaluations", "[baobzi]") {
 TEST_CASE("1D2 evaluations", "[baobzi]") {
     baobzi_input_t input = baobzi_input_default;
     const double scale_factor = 1.5;
-    input.dim = 1;
+    input.input_dim = 1;
     input.output_dim = 2;
     input.order = 8;
     input.tol = 1E-10;
@@ -123,7 +123,7 @@ TEST_CASE("1D2 evaluations", "[baobzi]") {
 TEST_CASE("2D evaluations", "[baobzi]") {
     baobzi_input_t input = baobzi_input_default;
     const double scale_factor = 1.5;
-    input.dim = 2;
+    input.input_dim = 2;
     input.output_dim = 1;
     input.order = 6;
     input.tol = 1E-10;
@@ -170,7 +170,7 @@ TEST_CASE("2D evaluations", "[baobzi]") {
 TEST_CASE("3D evaluations", "[baobzi]") {
     baobzi_input_t input = baobzi_input_default;
     const double scale_factor = 1.5;
-    input.dim = 3;
+    input.input_dim = 3;
     input.output_dim = 1;
     input.order = 12;
     input.tol = 1E-10;

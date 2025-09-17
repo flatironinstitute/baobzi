@@ -41,7 +41,7 @@ void testfun_3d(const double *x, double *res, const void *data) {
 }
 
 void time_function(const baobzi_t function, const double *x, int size, int n_runs) {
-    const int ntrg = size / function->DIM;
+    const int ntrg = size / function->INPUTDIM;
     double *res = (double *)malloc(sizeof(double) * ntrg * function->OUTPUT_DIM);
 
     const struct timespec st = get_wtime();
@@ -62,7 +62,7 @@ void print_error(const baobzi_t function, baobzi_input_t *input, const double *x
     double mean_rel_error = 0.0;
 
     size_t n_meas = 0;
-    for (int i = 0; i < size; i += function->DIM) {
+    for (int i = 0; i < size; i += function->INPUTDIM) {
         const double *point = &x[i];
 
         double actual[input->output_dim];
@@ -94,9 +94,9 @@ void print_error(const baobzi_t function, baobzi_input_t *input, const double *x
 void test_func(baobzi_input_t *input, const double *xin, const double *hl, const double *center, int n_points,
                int n_runs) {
     // Scale test points to our domain
-    double *x_transformed = (double *)malloc(n_points * input->dim * sizeof(double));
-    for (int i = 0; i < input->dim * n_points; i += input->dim)
-        for (int j = 0; j < input->dim; ++j)
+    double *x_transformed = (double *)malloc(n_points * input->input_dim * sizeof(double));
+    for (int i = 0; i < input->input_dim * n_points; i += input->input_dim)
+        for (int j = 0; j < input->input_dim; ++j)
             x_transformed[i + j] = hl[j] * (2.0 * xin[i + j] - 1.0) + center[j];
 
     // Create baobzi function approximator. Has pointers to relevant structures inside
@@ -105,10 +105,10 @@ void test_func(baobzi_input_t *input, const double *xin, const double *hl, const
     baobzi_stats(func_approx);
 
     char filename[256];
-    sprintf(filename, "func_approx_%dd", input->dim);
+    sprintf(filename, "func_approx_%dd", input->input_dim);
 
-    time_function(func_approx, x_transformed, n_points * input->dim, n_runs);
-    print_error(func_approx, input, x_transformed, n_points * input->dim);
+    time_function(func_approx, x_transformed, n_points * input->input_dim, n_runs);
+    print_error(func_approx, input, x_transformed, n_points * input->input_dim);
     baobzi_save(func_approx, filename);
 
     free(x_transformed);
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
         printf("Testing on 1D function...\n");
         baobzi_input_t input = baobzi_input_default;
         double scale_factor = 1.5;
-        input.dim = 1;
+        input.input_dim = 1;
         input.order = order;
         input.tol = 1E-10;
         input.func = testfun_1d;
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
         printf("Testing on 1D2 function...\n");
         baobzi_input_t input = baobzi_input_default;
         double scale_factor = 1.5;
-        input.dim = 1;
+        input.input_dim = 1;
         input.output_dim = 2;
         input.order = order;
         input.tol = 1E-10;
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
         printf("Testing on 2D function...\n");
         baobzi_input_t input = baobzi_input_default;
         double scale_factor = 1.5;
-        input.dim = 2;
+        input.input_dim = 2;
         input.order = order;
         input.func = testfun_2d;
         input.tol = 1E-10; // Maximum relative error target
@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
     {
         printf("Testing on 3D function...\n");
         baobzi_input_t input = baobzi_input_default;
-        input.dim = 3;
+        input.input_dim = 3;
         input.order = 8;
         input.tol = 1E-12;
         input.func = testfun_3d;

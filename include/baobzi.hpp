@@ -184,6 +184,8 @@ class Value {
         }
     }
 
+    inline storage_t get() const { return data_; }
+
     // Automatic casting to scalar or array
     inline operator T() const {
         static_assert(N == 1, "Can only cast to scalar if N == 1");

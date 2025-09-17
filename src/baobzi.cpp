@@ -102,17 +102,17 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
     baobzi_t res;
     try {
         res = (baobzi_t)malloc(sizeof(baobzi_struct));
-        res->DIM = input->dim;
-        res->ORDER = input->order;
+        res->INPUTDIM = input->input_dim;
+        res->DEGREE = input->order;
         res->OUTPUT_DIM = input->output_dim;
 
         int iset = get_iset();
 
-        switch (BAOBZI_JOIN(res->DIM, res->ORDER, iset)) {
+        switch (BAOBZI_JOIN(res->INPUTDIM, res->DEGREE, iset)) {
 #include "baobzi/baobzi_cases.h"
         default: {
-            std::cerr << "Baobzi error: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << res->DIM
-                      << ", " << res->ORDER << ")\n";
+            std::cerr << "Baobzi error: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << res->INPUTDIM
+                      << ", " << res->DEGREE << ")\n";
 
             free(res);
             return nullptr;

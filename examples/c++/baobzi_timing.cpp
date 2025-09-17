@@ -188,7 +188,7 @@ std::vector<double> transform(const std::vector<double> &x, int n_points, const 
 baobzi_input_t create_input(int dim, baobzi_input_func_t func) {
     static real_t scale_factor = 1.5;
     baobzi_input_t input;
-    input.dim = dim;
+    input.input_dim = dim;
     input.order = 8;
     input.data = &scale_factor;
     input.tol = 1E-10;
