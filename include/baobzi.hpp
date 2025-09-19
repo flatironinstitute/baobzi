@@ -46,6 +46,14 @@ class Value {
     Value(const std::array<T, N> &arr) : data_(arr) {}
     Value() = default;
 
+    Value(const T *arr) {
+        if constexpr (N == 1) {
+            data_ = arr[0];
+        } else {
+            std::copy(arr, arr + N, data_.begin());
+        }
+    }
+
     // Assignment
     inline Value &operator=(const Value &other) {
         data_ = other.data_;
@@ -166,6 +174,22 @@ class Value {
     }
 
     inline T *end() {
+        if constexpr (N == 1) {
+            return &data_ + 1;
+        } else {
+            return data_.data() + N;
+        }
+    }
+
+    const inline T *begin() const {
+        if constexpr (N == 1) {
+            return &data_;
+        } else {
+            return data_.data();
+        }
+    }
+
+    const inline T *end() const {
         if constexpr (N == 1) {
             return &data_ + 1;
         } else {
@@ -572,6 +596,7 @@ class Function {
     using value_type = value_type_or_identity<input_type>::type;
     using poly_eval_type = std::conditional<has_tuple_size_v<input_type>, poly_eval::FuncEvalND<Func, Degree>,
                                             poly_eval::FuncEval<Func, Degree>>::type;
+    static constexpr auto degree = Degree;
 
     static constexpr int input_dim = detail::get_tuple_size<input_type>();   ///< Function input dimensions
     static constexpr int output_dim = detail::get_tuple_size<output_type>(); ///< Function output dimension
@@ -823,13 +848,15 @@ class Function {
     /// @param[out] res [output_dim * n_trg] array of results
     /// @param[in] n_trg number of points to evaluate
     inline void operator()(const value_type *xp, value_type *res, int n_trg) const {
-        if (split_multi_eval_) {
+        if (n_trg > 1 && split_multi_eval_) {
             std::vector<std::pair<node_t *, input_type>> node_map(n_trg);
             for (int i = 0; i < n_trg; ++i) {
-                value_type xi = *(xp + input_dim * i);
+                const detail::Value<value_type, input_dim> xi(xp + input_dim * i);
                 node_t *node_ptr = [xi, this]() -> node_t * {
-                    if (xi < lower_left_[0] || xi >= upper_right_[0])
-                        return nullptr;
+                    for (int dim = 0; dim < input_dim; ++dim)
+                        if (xi[dim] < lower_left_[dim] || xi[dim] >= upper_right_[dim])
+                            return nullptr;
+
                     return node_pointers_[get_global_node_index(xi)];
                 }();
 
@@ -837,13 +864,18 @@ class Function {
             }
 
             for (int i_trg = 0; i_trg < n_trg; i_trg++) {
-                res[i_trg] = node_map[i_trg].first == nullptr
-                                 ? NAN
-                                 : polyfits_[node_map[i_trg].first->poly_eval_id](node_map[i_trg].second);
+                const detail::Value<value_type, output_dim> tmp =
+                    node_map[i_trg].first == nullptr
+                        ? output_type{NAN}
+                        : polyfits_[node_map[i_trg].first->poly_eval_id](node_map[i_trg].second);
+                std::copy(tmp.begin(), tmp.end(), res + i_trg * output_dim);
             }
         } else {
-            for (int i_trg = 0; i_trg < n_trg; i_trg++)
-                res[i_trg] = (*this)(*(xp + input_dim * i_trg));
+            for (int i_trg = 0; i_trg < n_trg; i_trg++) {
+                const detail::Value<value_type, input_dim> xi(xp + input_dim * i_trg);
+                const detail::Value<value_type, output_dim> tmp = (*this)(xi);
+                std::copy(tmp.begin(), tmp.end(), res + i_trg * output_dim);
+            }
         }
     }
 

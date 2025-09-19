@@ -1,4 +1,4 @@
-#include "baobzi.h"
+#include <baobzi/baobzi_binding.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -9,6 +9,39 @@
 
 const struct baobzi_input_t baobzi_input_default;
 
+static const auto baobzi_isa = []() {
+    using namespace baobzi;
+    int iset = baobzi_isa_t::GENERIC;
+#ifdef BAOBZI_CPU_DISPATCH
+    if (__builtin_cpu_supports("avx"))
+        iset = baobzi_isa_t::AVX;
+    if (__builtin_cpu_supports("avx2"))
+        iset = baobzi_isa_t::AVX2;
+    if (__builtin_cpu_supports("avx512f"))
+        iset = baobzi_isa_t::AVX512;
+
+    const char *iset_str_const = getenv("BAOBZI_ARCH");
+    if (iset_str_const) {
+        std::string iset_str(iset_str_const);
+        std::transform(iset_str.begin(), iset_str.end(), iset_str.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+
+        if (iset_str == "generic")
+            iset = baobzi_isa_t::GENERIC;
+        else if (iset_str == "sse4.2")
+            iset = baobzi_isa_t::AVX;
+        else if (iset_str == "avx2")
+            iset = baobzi_isa_t::AVX2;
+        else if (iset_str == "avx512")
+            iset = baobzi_isa_t::AVX512;
+        else
+            std::cerr << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
+    }
+#endif
+
+    return iset;
+}();
+
 inline std::string file_to_string(const std::string &path) {
     std::ostringstream buf;
     std::ifstream input(path.c_str());
@@ -18,59 +51,75 @@ inline std::string file_to_string(const std::string &path) {
 
 extern "C" {
 
-int get_iset() {
-    enum ISET { GENERIC, AVX, AVX2, AVX512 };
-
-    int iset = ISET::GENERIC;
+void baobzi_eval(const baobzi_t func, const double *x, double *y) {
 #ifdef BAOBZI_CPU_DISPATCH
-    if (__builtin_cpu_supports("avx"))
-        iset = ISET::AVX;
-    if (__builtin_cpu_supports("avx2"))
-        iset = ISET::AVX2;
-    if (__builtin_cpu_supports("avx512f"))
-        iset = ISET::AVX512;
-
-    const char *iset_str_const = getenv("BAOBZI_ARCH");
-    if (iset_str_const) {
-        std::string iset_str(iset_str_const);
-        std::transform(iset_str.begin(), iset_str.end(), iset_str.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-
-        if (iset_str == "generic")
-            iset = ISET::GENERIC;
-        else if (iset_str == "avx")
-            iset = ISET::AVX;
-        else if (iset_str == "avx2")
-            iset = ISET::AVX2;
-        else if (iset_str == "avx512")
-            iset = ISET::AVX512;
-        else
-            std::cerr << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
+    switch (baobzi_isa) {
+    case baobzi::baobzi_isa_t::GENERIC:
+        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>(func, x, y, 1);
+    case baobzi::baobzi_isa_t::AVX:
+        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX>(func, x, y, 1);
+    case baobzi::baobzi_isa_t::AVX2:
+        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX2>(func, x, y, 1);
+    case baobzi::baobzi_isa_t::AVX512:
+        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX512>(func, x, y, 1);
     }
+#else
+    return baobzi::baobzi_eval<baobzi::baobzi_isa_t::GENERIC>(func, x, y);
 #endif
-
-    return iset;
 }
 
-void baobzi_eval(const baobzi_t func, const double *x, double *y) { func->eval(func->obj, x, y); }
-
 void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
-    func->eval_multi(func->obj, x, res, ntrg);
+#ifdef BAOBZI_CPU_DISPATCH
+    switch (baobzi_isa) {
+    case baobzi::baobzi_isa_t::GENERIC:
+        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>(func, x, res, ntrg);
+    case baobzi::baobzi_isa_t::AVX:
+        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX>(func, x, res, ntrg);
+    case baobzi::baobzi_isa_t::AVX2:
+        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX2>(func, x, res, ntrg);
+    case baobzi::baobzi_isa_t::AVX512:
+        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX512>(func, x, res, ntrg);
+    }
+#else
+    return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>(func, x, res, ntrg);
+#endif
 }
 
 void baobzi_stats(baobzi_t func) {
-    if (!func)
-        return;
-    func->stats(func->obj);
+#ifdef BAOBZI_CPU_DISPATCH
+    switch (baobzi_isa) {
+    case baobzi::baobzi_isa_t::GENERIC:
+        return baobzi::baobzi_stats<baobzi::baobzi_isa_t::GENERIC>(func);
+    case baobzi::baobzi_isa_t::AVX:
+        return baobzi::baobzi_stats<baobzi::baobzi_isa_t::AVX>(func);
+    case baobzi::baobzi_isa_t::AVX2:
+        return baobzi::baobzi_stats<baobzi::baobzi_isa_t::AVX2>(func);
+    case baobzi::baobzi_isa_t::AVX512:
+        return baobzi::baobzi_stats<baobzi::baobzi_isa_t::AVX512>(func);
+    }
+#else
+    return baobzi::baobzi_stats<baobzi::baobzi_isa_t::GENERIC>(func);
+#endif
 }
 
 baobzi_t baobzi_free(baobzi_t func) {
     if (!func)
         return nullptr;
-    if (func->obj)
-        func->free(func->obj);
-    free(func);
+#ifdef BAOBZI_CPU_DISPATCH
+    switch (baobzi_isa) {
+    case baobzi::baobzi_isa_t::GENERIC:
+        return baobzi::baobzi_free<baobzi::baobzi_isa_t::GENERIC>(func);
+    case baobzi::baobzi_isa_t::AVX:
+        return baobzi::baobzi_free<baobzi::baobzi_isa_t::AVX>(func);
+    case baobzi::baobzi_isa_t::AVX2:
+        return baobzi::baobzi_free<baobzi::baobzi_isa_t::AVX2>(func);
+    case baobzi::baobzi_isa_t::AVX512:
+        return baobzi::baobzi_free<baobzi::baobzi_isa_t::AVX512>(func);
+    }
     return nullptr;
+#else
+    return baobzi::baobzi_free<baobzi::baobzi_isa_t::GENERIC>(func);
+#endif
 }
 
 bool is_valid_func(const baobzi_input_t *input, const double *point) {
@@ -99,30 +148,22 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
         return nullptr;
     }
 
-    baobzi_t res;
-    try {
-        res = (baobzi_t)malloc(sizeof(baobzi_struct));
-        res->INPUTDIM = input->input_dim;
-        res->DEGREE = input->order;
-        res->OUTPUT_DIM = input->output_dim;
-
-        int iset = get_iset();
-
-        switch (BAOBZI_JOIN(res->INPUTDIM, res->DEGREE, iset)) {
-#include "baobzi/baobzi_cases.h"
-        default: {
-            std::cerr << "Baobzi error: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << res->INPUTDIM
-                      << ", " << res->DEGREE << ")\n";
-
-            free(res);
-            return nullptr;
-        }
-        }
-    } catch (std::exception &e) {
-        std::cerr << e.what() << std::endl;
-        free(res);
-        return nullptr;
+#ifdef BAOBZI_CPU_DISPATCH
+    switch (baobzi_isa) {
+    case baobzi::baobzi_isa_t::GENERIC:
+        return baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>(input, center, half_length);
+    case baobzi::baobzi_isa_t::AVX:
+        return baobzi::baobzi_init<baobzi::baobzi_isa_t::AVX>(input, center, half_length);
+    case baobzi::baobzi_isa_t::AVX2:
+        return baobzi::baobzi_init<baobzi::baobzi_isa_t::AVX2>(input, center, half_length);
+    case baobzi::baobzi_isa_t::AVX512:
+        return baobzi::baobzi_init<baobzi::baobzi_isa_t::AVX512>(input, center, half_length);
+    default:
+        std::cerr << "Baobzi error: Unknown CPU instruction set. Using generic\n";
+        return baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>(input, center, half_length);
     }
-    return res;
+#else
+    return baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>(input, center, half_length);
+#endif
 }
 }

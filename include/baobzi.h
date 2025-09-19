@@ -1,8 +1,6 @@
 #ifndef BAOBZI_H
 #define BAOBZI_H
 
-#include "baobzi/macros.h"
-
 #define BAOBZI_DEFAULT(x)
 #ifdef __cplusplus
 #undef BAOBZI_DEFAULT
@@ -43,26 +41,8 @@ struct baobzi_input_t {
 };
 
 typedef struct baobzi_input_t baobzi_input_t;
-
-/// @brief Baobzi C structure for a common API through C bindings. All work is done through the
-/// pointer baobzi_t though.
-///
-/// Contains pointers to the wrappers of the relevant template C++ functions for a
-/// dim+order+instruction set
-typedef struct {
-    void *obj BAOBZI_DEFAULT(nullptr);                                            ///< Actual baobzi::Function object
-    int INPUT_DIM BAOBZI_DEFAULT(0);                                              ///< Input dimension of our function
-    int OUTPUT_DIM BAOBZI_DEFAULT(0);                                             ///< Output dimension of our function
-    int DEGREE BAOBZI_DEFAULT(0);                                                 ///< Highest degree of the polynomial
-    void (*eval)(const void *, const double *, double *) BAOBZI_DEFAULT(nullptr); ///< Pointer to evaluation function
-    void (*eval_multi)(const void *, const double *, double *, int ntrg)
-        BAOBZI_DEFAULT(nullptr);                   ///< Pointer to multi-evaluation function
-    void (*stats)(void *) BAOBZI_DEFAULT(nullptr); ///< pointer to stats function
-    void (*free)(void *) BAOBZI_DEFAULT(nullptr);  ///< pointer to free function
-} baobzi_struct;
-
-/// Our type for the C API
-typedef baobzi_struct *baobzi_t;
+typedef struct baobzi_function baobzi_function;
+typedef baobzi_function *baobzi_t;
 
 extern const baobzi_input_t baobzi_input_default;
 
@@ -96,8 +76,6 @@ baobzi_t baobzi_free(baobzi_t func);
 /// @param[in] half_length [DIM] half the size of the domain in each dimension
 /// @returns initialized baobzi C object
 baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length);
-
-#include "baobzi/baobzi_decls.h"
 
 #ifdef __cplusplus
 }

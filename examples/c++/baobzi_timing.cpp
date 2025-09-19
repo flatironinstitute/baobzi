@@ -100,20 +100,8 @@ void time_function(const Function &function, const std::vector<real_t> &x, int n
     real_t *res = res_arr.data();
 
     const auto st = get_wtime();
-    for (int i_run = 0; i_run < n_runs; ++i_run) {
-        if constexpr (DIM == 1)
-            function(x.data(), res, n_points);
-        else {
-            for (size_t i = 0; i < n_points; ++i) {
-                std::array<double, DIM> point;
-                for (int j = 0; j < DIM; ++j)
-                    point[j] = x[i * DIM + j];
-                auto out = function(point);
-                for (int j = 0; j < OUT_DIM; ++j)
-                    res[i * OUT_DIM + j] = out[j];
-            }
-        }
-    }
+    for (int i_run = 0; i_run < n_runs; ++i_run)
+        function(x.data(), res, n_points);
 
     const auto ft = get_wtime();
     const real_t dt = get_wtime_diff(&st, &ft);
@@ -135,22 +123,13 @@ void print_error(const Function &function, baobzi_input_t &input, const std::vec
     using out_arr_t = std::array<double, output_dim>;
 
     size_t n_meas = 0;
+    const int n_points = x.size() / input_dim;
+    std::vector<double> interp_all(output_dim * n_points);
+    function(x.data(), interp_all.data(), n_points);
     for (int i = 0; i < x.size(); i += input_dim) {
-        const in_arr_t pointd = [&x, i]() {
-            in_arr_t p;
-            for (int j = 0; j < input_dim; ++j)
-                p[j] = x[i + j];
-            return p;
-        }();
-
+        const auto interp = interp_all.data() + (i / input_dim) * output_dim;
         out_arr_t actual;
-        input.func(pointd.data(), actual.data(), input.data);
-        out_arr_t interp{[&function, &pointd]() {
-            if constexpr (input_dim == 1)
-                return function(pointd[0]);
-            else
-                return function(pointd);
-        }()};
+        input.func(&x[i], actual.data(), input.data);
 
         for (int j = 0; j < output_dim; ++j) {
             const double delta = actual[j] - interp[j];
@@ -189,7 +168,7 @@ baobzi_input_t create_input(int dim, baobzi_input_func_t func) {
     static real_t scale_factor = 1.5;
     baobzi_input_t input;
     input.input_dim = dim;
-    input.order = 8;
+    input.degree = 8;
     input.data = &scale_factor;
     input.tol = 1E-10;
     input.func = func;
