@@ -129,13 +129,6 @@ wrap_c_func(baobzi_input_func_t c_func, const void *user_data) {
     };
 }
 
-template <baobzi_isa_t ISA>
-baobzi_t baobzi_free(baobzi_t f) {
-    if (f)
-        delete f;
-    return nullptr;
-}
-
 template <typename Variant>
 struct variant_types;
 
@@ -207,4 +200,10 @@ void baobzi_stats(const baobzi_t f) {
         f->fn);
 }
 
+template <baobzi_isa_t ISA>
+baobzi_t baobzi_free(baobzi_t f) {
+    if (f)
+        delete f;
+    return nullptr;
+}
 } // namespace baobzi

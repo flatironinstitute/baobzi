@@ -6,12 +6,20 @@
 
 constexpr baobzi::baobzi_isa_t ISA = baobzi::baobzi_isa_t(BAOBZI_ISA);
 
-template baobzi_t baobzi::baobzi_init<ISA>(const baobzi_input_t *input, const double *center,
-                                           const double *half_width_in);
+extern "C" {
+baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_width_in) {
+    return baobzi::baobzi_init<ISA>(input, center, half_width_in);
+}
 
-template void baobzi::baobzi_eval_multi<ISA>(const baobzi_t f, const double *input_point, double *output_point,
-                                             int ntrg);
+void baobzi_eval(const baobzi_t f, const double *x, double *res) {
+    return baobzi::baobzi_eval_multi<ISA>(f, x, res, 1);
+}
 
-template void baobzi::baobzi_stats<ISA>(const baobzi_t f);
+void baobzi_eval_multi(const baobzi_t f, const double *x, double *res, int ntrg) {
+    return baobzi::baobzi_eval_multi<ISA>(f, x, res, ntrg);
+}
 
-template baobzi_t baobzi::baobzi_free<ISA>(const baobzi_t f);
+void baobzi_stats(const baobzi_t f) { return baobzi::baobzi_stats<ISA>(f); }
+
+baobzi_t baobzi_free(baobzi_t f) { return baobzi::baobzi_free<ISA>(f); }
+}

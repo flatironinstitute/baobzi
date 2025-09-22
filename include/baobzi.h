@@ -46,6 +46,13 @@ typedef baobzi_function *baobzi_t;
 
 extern const baobzi_input_t baobzi_input_default;
 
+/// @brief Construct C baobzi object from input function
+/// @param[in] input pointer to baobzi_input_t object
+/// @param[in] center [DIM] center of the domain
+/// @param[in] half_length [DIM] half the size of the domain in each dimension
+/// @returns initialized baobzi C object
+baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length);
+
 /// @brief eval approximator at point x
 /// @param[in] func initialized C baobzi object
 /// @param[in] x point [DIM] to evaluate at
@@ -64,18 +71,11 @@ void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int nt
 /// @brief Print stats about baobzi object creation
 /// @param[in] func initialized C baobzi object
 /// @returns void
-void baobzi_stats(baobzi_t func);
+void baobzi_stats(const baobzi_t func);
 
 /// @brief free all memory associated with C baobzi object
 /// @returns nullptr
 baobzi_t baobzi_free(baobzi_t func);
-
-/// @brief Construct C baobzi object from input function
-/// @param[in] input pointer to baobzi_input_t object
-/// @param[in] center [DIM] center of the domain
-/// @param[in] half_length [DIM] half the size of the domain in each dimension
-/// @returns initialized baobzi C object
-baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length);
 
 #ifdef __cplusplus
 }

@@ -1,17 +1,22 @@
+#ifdef BAOBZI_CPU_DISPATCH
 #include <baobzi/baobzi_binding.hpp>
+#else
+#include <baobzi/baobzi_binding_impl.hpp>
+#endif
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
-#include <sstream>
+
+#include <dlfcn.h>
 
 const struct baobzi_input_t baobzi_input_default;
 
-static const auto baobzi_isa = []() {
+#ifdef BAOBZI_CPU_DISPATCH
+baobzi::baobzi_isa_t get_baobzi_isa() {
     using namespace baobzi;
-    int iset = baobzi_isa_t::GENERIC;
+    auto iset = baobzi_isa_t::GENERIC;
 #ifdef BAOBZI_CPU_DISPATCH
     if (__builtin_cpu_supports("avx"))
         iset = baobzi_isa_t::AVX;
@@ -40,103 +45,57 @@ static const auto baobzi_isa = []() {
 #endif
 
     return iset;
-}();
-
-inline std::string file_to_string(const std::string &path) {
-    std::ostringstream buf;
-    std::ifstream input(path.c_str());
-    buf << input.rdbuf();
-    return buf.str();
 }
+
+std::string isa_to_string(baobzi::baobzi_isa_t isa) {
+    switch (isa) {
+    case baobzi::baobzi_isa_t::GENERIC:
+        return "generic";
+    case baobzi::baobzi_isa_t::AVX:
+        return "avx";
+    case baobzi::baobzi_isa_t::AVX2:
+        return "avx2";
+    case baobzi::baobzi_isa_t::AVX512:
+        return "avx512";
+    default:
+        throw std::runtime_error("Unknown baobzi ISA");
+    }
+}
+
+static const auto [baobzi_init_impl, baobzi_eval_impl, baobzi_eval_multi_impl, baobzi_stats_impl,
+                   baobzi_free_impl] = []() {
+    const auto libstr = "libbaobzi_" + isa_to_string(get_baobzi_isa()) + ".so";
+    void *handle = dlopen(libstr.c_str(), RTLD_NOW);
+    if (!handle)
+        std::cerr << "Error: unable to open " << libstr << "with dlopen: " << dlerror() << "\n";
+
+    auto init_ptr = (decltype(baobzi_init) *)dlsym(handle, "baobzi_init");
+    auto eval_ptr = (decltype(baobzi_eval) *)dlsym(handle, "baobzi_eval");
+    auto eval_multi_ptr = (decltype(baobzi_eval_multi) *)dlsym(handle, "baobzi_eval_multi");
+    auto stats_ptr = (decltype(baobzi_stats) *)dlsym(handle, "baobzi_stats");
+    auto free_ptr = (decltype(baobzi_free) *)dlsym(handle, "baobzi_free");
+
+    return std::tuple{init_ptr, eval_ptr, eval_multi_ptr, stats_ptr, free_ptr};
+}();
+#endif
 
 extern "C" {
 
-void baobzi_eval(const baobzi_t func, const double *x, double *y) {
-#ifdef BAOBZI_CPU_DISPATCH
-    switch (baobzi_isa) {
-    case baobzi::baobzi_isa_t::GENERIC:
-        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>(func, x, y, 1);
-    case baobzi::baobzi_isa_t::AVX:
-        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX>(func, x, y, 1);
-    case baobzi::baobzi_isa_t::AVX2:
-        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX2>(func, x, y, 1);
-    case baobzi::baobzi_isa_t::AVX512:
-        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX512>(func, x, y, 1);
-    }
-#else
-    return baobzi::baobzi_eval<baobzi::baobzi_isa_t::GENERIC>(func, x, y);
-#endif
-}
-
-void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
-#ifdef BAOBZI_CPU_DISPATCH
-    switch (baobzi_isa) {
-    case baobzi::baobzi_isa_t::GENERIC:
-        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>(func, x, res, ntrg);
-    case baobzi::baobzi_isa_t::AVX:
-        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX>(func, x, res, ntrg);
-    case baobzi::baobzi_isa_t::AVX2:
-        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX2>(func, x, res, ntrg);
-    case baobzi::baobzi_isa_t::AVX512:
-        return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::AVX512>(func, x, res, ntrg);
-    }
-#else
-    return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>(func, x, res, ntrg);
-#endif
-}
-
-void baobzi_stats(baobzi_t func) {
-#ifdef BAOBZI_CPU_DISPATCH
-    switch (baobzi_isa) {
-    case baobzi::baobzi_isa_t::GENERIC:
-        return baobzi::baobzi_stats<baobzi::baobzi_isa_t::GENERIC>(func);
-    case baobzi::baobzi_isa_t::AVX:
-        return baobzi::baobzi_stats<baobzi::baobzi_isa_t::AVX>(func);
-    case baobzi::baobzi_isa_t::AVX2:
-        return baobzi::baobzi_stats<baobzi::baobzi_isa_t::AVX2>(func);
-    case baobzi::baobzi_isa_t::AVX512:
-        return baobzi::baobzi_stats<baobzi::baobzi_isa_t::AVX512>(func);
-    }
-#else
-    return baobzi::baobzi_stats<baobzi::baobzi_isa_t::GENERIC>(func);
-#endif
-}
-
-baobzi_t baobzi_free(baobzi_t func) {
-    if (!func)
-        return nullptr;
-#ifdef BAOBZI_CPU_DISPATCH
-    switch (baobzi_isa) {
-    case baobzi::baobzi_isa_t::GENERIC:
-        return baobzi::baobzi_free<baobzi::baobzi_isa_t::GENERIC>(func);
-    case baobzi::baobzi_isa_t::AVX:
-        return baobzi::baobzi_free<baobzi::baobzi_isa_t::AVX>(func);
-    case baobzi::baobzi_isa_t::AVX2:
-        return baobzi::baobzi_free<baobzi::baobzi_isa_t::AVX2>(func);
-    case baobzi::baobzi_isa_t::AVX512:
-        return baobzi::baobzi_free<baobzi::baobzi_isa_t::AVX512>(func);
-    }
-    return nullptr;
-#else
-    return baobzi::baobzi_free<baobzi::baobzi_isa_t::GENERIC>(func);
-#endif
-}
-
-bool is_valid_func(const baobzi_input_t *input, const double *point) {
-    if (!input->func)
-        return false;
-
-    double res[input->output_dim];
-    try {
-        input->func(point, res, input->data);
-    } catch (std::exception(e)) {
-        return false;
-    }
-
-    return true;
-}
-
 baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length) {
+    const auto is_valid_func = [](const baobzi_input_t *input, const double *point) {
+        if (!input->func)
+            return false;
+
+        std::vector<double> res(input->output_dim);
+        try {
+            input->func(point, res.data(), input->data);
+        } catch (std::exception(e)) {
+            return false;
+        }
+
+        return true;
+    };
+
     if (input->tol <= 0.0) {
         std::cerr << "Baobzi error: Unable to initialize Baobzi due to invalid 'tol' parameter. Please supply "
                      "something greater than zero.\n";
@@ -149,21 +108,43 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
     }
 
 #ifdef BAOBZI_CPU_DISPATCH
-    switch (baobzi_isa) {
-    case baobzi::baobzi_isa_t::GENERIC:
-        return baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>(input, center, half_length);
-    case baobzi::baobzi_isa_t::AVX:
-        return baobzi::baobzi_init<baobzi::baobzi_isa_t::AVX>(input, center, half_length);
-    case baobzi::baobzi_isa_t::AVX2:
-        return baobzi::baobzi_init<baobzi::baobzi_isa_t::AVX2>(input, center, half_length);
-    case baobzi::baobzi_isa_t::AVX512:
-        return baobzi::baobzi_init<baobzi::baobzi_isa_t::AVX512>(input, center, half_length);
-    default:
-        std::cerr << "Baobzi error: Unknown CPU instruction set. Using generic\n";
-        return baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>(input, center, half_length);
-    }
+    return baobzi_init_impl(input, center, half_length);
 #else
     return baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>(input, center, half_length);
+#endif
+}
+
+void baobzi_eval(const baobzi_t func, const double *x, double *y) {
+#ifdef BAOBZI_CPU_DISPATCH
+    return baobzi_eval_impl(func, x, y);
+#else
+    return baobzi::baobzi_eval<baobzi::baobzi_isa_t::GENERIC>(func, x, y);
+#endif
+}
+
+void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
+#ifdef BAOBZI_CPU_DISPATCH
+    return baobzi_eval_multi_impl(func, x, res, ntrg);
+#else
+    return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>(func, x, res, ntrg);
+#endif
+}
+
+void baobzi_stats(baobzi_t func) {
+#ifdef BAOBZI_CPU_DISPATCH
+    return baobzi_stats_impl(func);
+#else
+    return baobzi::baobzi_stats<baobzi::baobzi_isa_t::GENERIC>(func);
+#endif
+}
+
+baobzi_t baobzi_free(baobzi_t func) {
+    if (!func)
+        return nullptr;
+#ifdef BAOBZI_CPU_DISPATCH
+    return baobzi_free_impl(func);
+#else
+    return baobzi::baobzi_free<baobzi::baobzi_isa_t::GENERIC>(func);
 #endif
 }
 }
