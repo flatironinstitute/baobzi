@@ -11,10 +11,6 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
     return baobzi::baobzi_init<ISA>(input, center, half_width_in);
 }
 
-void baobzi_eval(const baobzi_t f, const double *x, double *res) {
-    return baobzi::baobzi_eval_multi<ISA>(f, x, res, 1);
-}
-
 void baobzi_eval_multi(const baobzi_t f, const double *x, double *res, int ntrg) {
     return baobzi::baobzi_eval_multi<ISA>(f, x, res, ntrg);
 }

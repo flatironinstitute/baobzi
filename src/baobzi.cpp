@@ -13,11 +13,12 @@
 
 const struct baobzi_input_t baobzi_input_default;
 
+namespace baobzi {
+
 #ifdef BAOBZI_CPU_DISPATCH
 baobzi::baobzi_isa_t get_baobzi_isa() {
-    using namespace baobzi;
     auto iset = baobzi_isa_t::GENERIC;
-#ifdef BAOBZI_CPU_DISPATCH
+
     if (__builtin_cpu_supports("avx"))
         iset = baobzi_isa_t::AVX;
     if (__builtin_cpu_supports("avx2"))
@@ -42,7 +43,6 @@ baobzi::baobzi_isa_t get_baobzi_isa() {
         else
             std::cerr << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
     }
-#endif
 
     return iset;
 }
@@ -62,25 +62,29 @@ std::string isa_to_string(baobzi::baobzi_isa_t isa) {
     }
 }
 
-static const auto [baobzi_init_impl, baobzi_eval_impl, baobzi_eval_multi_impl, baobzi_stats_impl,
-                   baobzi_free_impl] = []() {
+static const auto [init_func, eval_multi_func, stats_func, free_func] = []() {
     const auto libstr = "libbaobzi_" + isa_to_string(get_baobzi_isa()) + ".so";
     void *handle = dlopen(libstr.c_str(), RTLD_NOW);
     if (!handle)
-        std::cerr << "Error: unable to open " << libstr << "with dlopen: " << dlerror() << "\n";
+        std::cerr << "Error: unable to open " << libstr << " with dlopen: " << dlerror() << "\n";
 
-    auto init_ptr = (decltype(baobzi_init) *)dlsym(handle, "baobzi_init");
-    auto eval_ptr = (decltype(baobzi_eval) *)dlsym(handle, "baobzi_eval");
-    auto eval_multi_ptr = (decltype(baobzi_eval_multi) *)dlsym(handle, "baobzi_eval_multi");
-    auto stats_ptr = (decltype(baobzi_stats) *)dlsym(handle, "baobzi_stats");
-    auto free_ptr = (decltype(baobzi_free) *)dlsym(handle, "baobzi_free");
+    auto init_func = (decltype(::baobzi_init) *)dlsym(handle, "baobzi_init");
+    auto eval_multi_func = (decltype(::baobzi_eval_multi) *)dlsym(handle, "baobzi_eval_multi");
+    auto stats_func = (decltype(::baobzi_stats) *)dlsym(handle, "baobzi_stats");
+    auto free_func = (decltype(::baobzi_free) *)dlsym(handle, "baobzi_free");
 
-    return std::tuple{init_ptr, eval_ptr, eval_multi_ptr, stats_ptr, free_ptr};
+    return std::tuple{init_func, eval_multi_func, stats_func, free_func};
 }();
+
+#else
+static const auto init_func = baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>;
+static const auto eval_multi_func = baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>;
+static const auto stats_func = baobzi::baobzi_stats<baobzi::baobzi_isa_t::GENERIC>;
+static const auto free_func = baobzi::baobzi_free<baobzi::baobzi_isa_t::GENERIC>;
 #endif
+} // namespace baobzi
 
 extern "C" {
-
 baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length) {
     const auto is_valid_func = [](const baobzi_input_t *input, const double *point) {
         if (!input->func)
@@ -107,44 +111,16 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
         return nullptr;
     }
 
-#ifdef BAOBZI_CPU_DISPATCH
-    return baobzi_init_impl(input, center, half_length);
-#else
-    return baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>(input, center, half_length);
-#endif
+    return baobzi::init_func(input, center, half_length);
 }
 
-void baobzi_eval(const baobzi_t func, const double *x, double *y) {
-#ifdef BAOBZI_CPU_DISPATCH
-    return baobzi_eval_impl(func, x, y);
-#else
-    return baobzi::baobzi_eval<baobzi::baobzi_isa_t::GENERIC>(func, x, y);
-#endif
-}
+void baobzi_eval(const baobzi_t func, const double *x, double *y) { return baobzi::eval_multi_func(func, x, y, 1); }
 
 void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
-#ifdef BAOBZI_CPU_DISPATCH
-    return baobzi_eval_multi_impl(func, x, res, ntrg);
-#else
-    return baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>(func, x, res, ntrg);
-#endif
+    return baobzi::eval_multi_func(func, x, res, ntrg);
 }
 
-void baobzi_stats(baobzi_t func) {
-#ifdef BAOBZI_CPU_DISPATCH
-    return baobzi_stats_impl(func);
-#else
-    return baobzi::baobzi_stats<baobzi::baobzi_isa_t::GENERIC>(func);
-#endif
-}
+void baobzi_stats(baobzi_t func) { return baobzi::stats_func(func); }
 
-baobzi_t baobzi_free(baobzi_t func) {
-    if (!func)
-        return nullptr;
-#ifdef BAOBZI_CPU_DISPATCH
-    return baobzi_free_impl(func);
-#else
-    return baobzi::baobzi_free<baobzi::baobzi_isa_t::GENERIC>(func);
-#endif
-}
+baobzi_t baobzi_free(baobzi_t func) { return baobzi::free_func(func); }
 }
