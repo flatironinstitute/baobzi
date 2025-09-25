@@ -440,11 +440,11 @@ class Node {
         auto polyfit = polyfits.emplace_back(func, lb, ub);
 
         if (input.tol_type == BAOBZI_TOL_RELATIVE_TAIL || input.tol_type == BAOBZI_TOL_ABSOLUTE_TAIL) {
-            if (tail_error_check(input.tol_type, input.tol, polyfit))
+            if (tail_error_check(static_cast<baobzi_tol_t>(input.tol_type), input.tol, polyfit))
                 return rollback_and_fail();
         } else {
-            if (sample_error_check(input.n_samples_per_dim, input.tol_type, input.tol, center, half_length, func,
-                                   polyfit))
+            if (sample_error_check(input.n_samples_per_dim, static_cast<baobzi_tol_t>(input.tol_type), input.tol,
+                                   center, half_length, func, polyfit))
                 return rollback_and_fail();
         }
 

@@ -36,7 +36,7 @@ struct baobzi_input_t {
     int split_multi_eval BAOBZI_DEFAULT(1);
     int min_depth BAOBZI_DEFAULT(0);
     int max_depth BAOBZI_DEFAULT(50);
-    baobzi_tol_t tol_type BAOBZI_DEFAULT(BAOBZI_TOL_RELATIVE_MAX);
+    int tol_type BAOBZI_DEFAULT(BAOBZI_TOL_RELATIVE_MAX);
     int n_samples_per_dim BAOBZI_DEFAULT(8);
 };
 
