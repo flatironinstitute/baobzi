@@ -1,2 +1,26 @@
 [build-system]
-requires = ["setuptools", "wheel", "scikit-build", "cmake", "ninja"]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "baobzi"
+version = "0.9.6"
+description = "An adaptive fast function approximator based on tree search"
+readme = "README.md"
+authors = [
+  { name = "Robert Blackwell", email = "rblackwell@flatironinstitute.org" }
+]
+license = { file = "LICENSE" }
+requires-python = ">=3.7"
+dependencies = ["numpy"]
+urls = { Homepage = "https://github.com/flatironinstitute/baobzi" }
+
+[tool.setuptools.packages.find]
+where = ["src/python"]
+
+[tool.setuptools.package-data]
+baobzi = [
+  "*.so",
+  "*.dylib",
+  "*.dll"
+]

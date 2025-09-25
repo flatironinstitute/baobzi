@@ -9,7 +9,10 @@
 #include <cstdlib>
 #include <iostream>
 
+#ifdef BAOBZI_CPU_DISPATCH
 #include <dlfcn.h>
+#include <libgen.h>
+#endif
 
 const struct baobzi_input_t baobzi_input_default;
 
@@ -62,9 +65,23 @@ std::string isa_to_string(baobzi::baobzi_isa_t isa) {
     }
 }
 
+void *dlopen_relative(const std::string &relative_name, int flags) {
+    Dl_info info;
+    if (dladdr((void *)&dlopen_relative, &info) == 0) {
+        std::fprintf(stderr, "dladdr failed\n");
+        return nullptr;
+    }
+    std::string path(info.dli_fname);
+    std::vector<char> buf(path.begin(), path.end());
+    buf.push_back('\0');
+    char *dir = dirname(buf.data());
+    std::string libpath = std::string(dir) + "/" + relative_name;
+    return dlopen(libpath.c_str(), flags);
+}
+
 static const auto [init_func, eval_multi_func, stats_func, free_func] = []() {
     const auto libstr = "libbaobzi_" + isa_to_string(get_baobzi_isa()) + ".so";
-    void *handle = dlopen(libstr.c_str(), RTLD_NOW);
+    void *handle = dlopen_relative(libstr, RTLD_NOW);
     if (!handle)
         std::cerr << "Error: unable to open " << libstr << " with dlopen: " << dlerror() << "\n";
 

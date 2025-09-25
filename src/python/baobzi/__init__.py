@@ -1,37 +1,36 @@
-from ctypes import CDLL, CFUNCTYPE, POINTER, c_double, c_void_p, c_int, c_char_p, Structure, pointer
-from ctypes.util import find_library
+from ctypes import CDLL, CFUNCTYPE, POINTER, c_double, c_void_p, c_int, Structure, pointer
+import os
+import sys
 import numpy as np
 
-baobzi_path = find_library('baobzi')
-
-if not baobzi_path:
-    import os
-    from sys import platform
-    libroot = os.path.sep.join(os.path.realpath(__file__).split(os.path.sep)[:-5])
-    if platform == 'linux':
-        extension = ".so"
-    elif platform == 'darwin':
-        extension = ".dylib"
-    elif platform == 'win32':
-        extension = '.dll'
+def _find_baobzi_lib():
+    pkg_dir = os.path.dirname(__file__)
+    if sys.platform == "linux":
+        libname = "libbaobzi.so"
+    elif sys.platform == "darwin":
+        libname = "libbaobzi.dylib"
+    elif sys.platform == "win32":
+        libname = "libbaobzi.dll"
     else:
-        raise RuntimeError("Invalid operating platform found.")
-    lib = os.path.join(libroot, "lib", "libbaobzi" + extension)
-    lib64 = os.path.join(libroot, "lib64", "libbaobzi" + extension)
-    if os.path.exists(lib):
-        baobzi_path = lib
-    elif os.path.exists(lib64):
-        baobzi_path = lib64
+        raise RuntimeError("Unsupported platform")
+    # Look in package directory
+    candidate = os.path.join(pkg_dir, libname)
+    if os.path.exists(candidate):
+        return candidate
+    # Optionally, look in lib/ or lib64/ subdirs
+    for subdir in ["lib", "lib64"]:
+        candidate = os.path.join(pkg_dir, "..", "..", subdir, libname)
+        if os.path.exists(candidate):
+            return candidate
+    raise OSError("Unable to find 'libbaobzi' in package data.")
 
-if not baobzi_path:
-    raise OSError("Unable to find 'libbaobzi'. Add path to its containing directory to your LD_LIBRARY_PATH variable.")
-
+baobzi_path = _find_baobzi_lib()
 libbaobzi = CDLL(baobzi_path)
 
 INPUT_FUNC = CFUNCTYPE(None, POINTER(c_double), POINTER(c_double), c_void_p)
 
 def _make_callback(pyfunc, m, n):
-    def callback(x_ptr, y_ptr, data):
+    def callback(x_ptr, y_ptr, _):
         # Convert input pointer to numpy array
         x = np.ctypeslib.as_array(x_ptr, shape=(m,))
         # Call the Python function
