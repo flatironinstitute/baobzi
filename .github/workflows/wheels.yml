@@ -16,17 +16,18 @@ jobs:
         include:
           - os: ubuntu-22.04
             cmake_args: "-DBAOBZI_CPU_DISPATCH=on"
+            cibw_archs: "x86_64"
           - os: macos-14
             cmake_args: "-DBAOBZI_CPU_DISPATCH=off"
+            cibw_archs: "universal2"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.12.0
         env:
-          CIBW_ARCHS: auto64
-          CMAKE_ARGS: ${{ matrix.cmake_args}}
-          CMAKE_BUILD_PARALLEL_LEVEL: 1
+          CIBW_ARCHS: ${{ matrix.cibw_archs }}
+          CMAKE_ARGS: ${{ matrix.cmake_args }}
       - uses: actions/upload-artifact@v4
         with:
           name: build_wheels_${{ matrix.os }}
