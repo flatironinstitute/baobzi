@@ -45,22 +45,10 @@ option(BAOBZI_BUILD_TESTS "Build tests" ON)
 option(BAOBZI_BUILD_MATLAB "Build MATLAB bindings" OFF)
 option(BAOBZI_BUILD_FORTRAN "Build Fortran bindings" OFF)
 option(BAOBZI_CPU_DISPATCH "Use CPU dispatch for generic binary" OFF)
-option(BAOBZI_SET_ARCH "Attempt to set architecture flags without dispatch" ON)
 
 # Needed for ND polyfit performance
 add_compile_options(-funroll-loops -funsafe-math-optimizations)
 add_link_options(-funroll-loops -funsafe-math-optimizations)
-
-if (BAOBZI_SET_ARCH)
-  if(${CMAKE_SYSTEM_PROCESSOR} STREQUAL "arm64" AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "AppleClang")
-    set(NATIVE_ARCH_FLAG -mcpu=apple-m1)
-  else()
-    set(NATIVE_ARCH_FLAG -march=native)
-  endif()
-  if (NOT BAOBZI_CPU_DISPATCH)
-    add_compile_options(${NATIVE_ARCH_FLAG})
-  endif()
-endif()
 
 if (BAOBZI_CPU_DISPATCH)
   add_compile_options(-DBAOBZI_CPU_DISPATCH)
