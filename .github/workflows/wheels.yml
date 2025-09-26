@@ -17,26 +17,33 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-22.04
-            cmake_args: >-
-              -DBAOBZI_CPU_DISPATCH=on
-              -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++"
+          - os: ubuntu-latest
             cibw_archs: "x86_64"
-          - os: macos-14
-            cmake_args: "-DBAOBZI_CPU_DISPATCH=off"
+          - os: macos-latest
             cibw_archs: "universal2"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
 
-      - name: Build shared objects with CMake
+      - name: Build shared objects and wheel (Linux only)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          cmake -B build -S . ${COMMON_CMAKE_ARGS} ${{ matrix.cmake_args }}
-          cmake --build build --config Release --parallel
-          cp build/*.{so,dylib,dll} src/python/baobzi/ 2>/dev/null || true
+          docker run --rm -e PLAT=manylinux_2_28_x86_64 -v $PWD:/io quay.io/pypa/manylinux_2_28_x86_64 bash -c "
+            cd /io
+            cmake -B build -S . ${COMMON_CMAKE_ARGS} -DCMAKE_SHARED_LINKER_FLAGS='-static-libgcc -static-libstdc++' -DBAOBZI_CPU_DISPATCH=on
+            cmake --build build --config Release --parallel
+            cp -v build/*.so src/python/baobzi/
+            /opt/python/cp311-cp311/bin/pip install build
+            /opt/python/cp311-cp311/bin/python -m build --wheel
+          "
 
-      - name: Build wheel
-        run: pipx run build --wheel
+      - name: Build wheel (macOS only)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cmake -B build -S . ${COMMON_CMAKE_ARGS} -DBAOBZI_CPU_DISPATCH=off
+          cmake --build build --config Release --parallel
+          cp -v build/*.dylib src/python/baobzi/
+          pipx run build --wheel
 
       - uses: actions/upload-artifact@v4
         with:
