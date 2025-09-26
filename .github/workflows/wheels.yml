@@ -18,7 +18,9 @@ jobs:
       matrix:
         include:
           - os: ubuntu-22.04
-            cmake_args: "-DBAOBZI_CPU_DISPATCH=on"
+            cmake_args: >-
+              -DBAOBZI_CPU_DISPATCH=on
+              -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++"
             cibw_archs: "x86_64"
           - os: macos-14
             cmake_args: "-DBAOBZI_CPU_DISPATCH=off"
