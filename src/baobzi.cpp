@@ -22,12 +22,12 @@ namespace baobzi {
 baobzi::baobzi_isa_t get_baobzi_isa() {
     auto iset = baobzi_isa_t::GENERIC;
 
-    if (__builtin_cpu_supports("avx"))
-        iset = baobzi_isa_t::AVX;
-    if (__builtin_cpu_supports("avx2"))
-        iset = baobzi_isa_t::AVX2;
-    if (__builtin_cpu_supports("avx512f"))
-        iset = baobzi_isa_t::AVX512;
+    if (__builtin_cpu_supports("x86-64-v2"))
+        iset = baobzi_isa_t::X86_64_V2;
+    if (__builtin_cpu_supports("x86-64-v3"))
+        iset = baobzi_isa_t::X86_64_V3;
+    if (__builtin_cpu_supports("x86-64-v4"))
+        iset = baobzi_isa_t::X86_64_V4;
 
     const char *iset_str_const = getenv("BAOBZI_ARCH");
     if (iset_str_const) {
@@ -35,16 +35,17 @@ baobzi::baobzi_isa_t get_baobzi_isa() {
         std::transform(iset_str.begin(), iset_str.end(), iset_str.begin(),
                        [](unsigned char c) { return std::tolower(c); });
 
-        if (iset_str == "generic")
+        if (iset_str == "generic" || iset_str == "x86_64")
             iset = baobzi_isa_t::GENERIC;
-        else if (iset_str == "sse4.2")
-            iset = baobzi_isa_t::AVX;
-        else if (iset_str == "avx2")
-            iset = baobzi_isa_t::AVX2;
-        else if (iset_str == "avx512")
-            iset = baobzi_isa_t::AVX512;
+        else if (iset_str == "x86_64_v2")
+            iset = baobzi_isa_t::X86_64_V2;
+        else if (iset_str == "x86_64_v3")
+            iset = baobzi_isa_t::X86_64_V3;
+        else if (iset_str == "x86_64_v4")
+            iset = baobzi_isa_t::X86_64_V4;
         else
-            std::cerr << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
+            std::cerr
+                << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, X86_64_V2, X86_64_V3, X86_64_V4\n";
     }
 
     return iset;
@@ -53,13 +54,13 @@ baobzi::baobzi_isa_t get_baobzi_isa() {
 std::string isa_to_string(baobzi::baobzi_isa_t isa) {
     switch (isa) {
     case baobzi::baobzi_isa_t::GENERIC:
-        return "generic";
-    case baobzi::baobzi_isa_t::AVX:
-        return "avx";
-    case baobzi::baobzi_isa_t::AVX2:
-        return "avx2";
-    case baobzi::baobzi_isa_t::AVX512:
-        return "avx512";
+        return "x86_64";
+    case baobzi::baobzi_isa_t::X86_64_V2:
+        return "x86_64_v2";
+    case baobzi::baobzi_isa_t::X86_64_V3:
+        return "x86_64_v3";
+    case baobzi::baobzi_isa_t::X86_64_V4:
+        return "x86_64_v4";
     default:
         throw std::runtime_error("Unknown baobzi ISA");
     }

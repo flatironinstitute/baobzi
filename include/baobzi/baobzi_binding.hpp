@@ -6,9 +6,9 @@
 namespace baobzi {
 typedef enum {
     GENERIC = 0,
-    AVX = 1,
-    AVX2 = 2,
-    AVX512 = 3,
+    X86_64_V2 = 1,
+    X86_64_V3 = 2,
+    X86_64_V4 = 3,
 } baobzi_isa_t;
 
 template <baobzi_isa_t ISA>
