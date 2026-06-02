@@ -1,40 +1,33 @@
-#include "baobzi.h"
+#ifdef BAOBZI_CPU_DISPATCH
+#include <baobzi/baobzi_binding.hpp>
+#else
+#include <baobzi/baobzi_binding_impl.hpp>
+#endif
 
-#include "baobzi_template.hpp"
-
+#include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
-#include <limits>
-#include <msgpack.hpp>
-#include <sstream>
-#include <stdexcept>
-#include <tuple>
+
+#ifdef BAOBZI_CPU_DISPATCH
+#include <dlfcn.h>
+#include <libgen.h>
+#endif
 
 const struct baobzi_input_t baobzi_input_default;
 
-inline std::string file_to_string(const std::string &path) {
-    std::ostringstream buf;
-    std::ifstream input(path.c_str());
-    buf << input.rdbuf();
-    return buf.str();
-}
+namespace baobzi {
 
-extern "C" {
-
-int get_iset() {
-    enum ISET { GENERIC, AVX, AVX2, AVX512 };
-
-    int iset = ISET::GENERIC;
 #ifdef BAOBZI_CPU_DISPATCH
-    if (__builtin_cpu_supports("avx"))
-        iset = ISET::AVX;
-    if (__builtin_cpu_supports("avx2"))
-        iset = ISET::AVX2;
-    if (__builtin_cpu_supports("avx512f"))
-        iset = ISET::AVX512;
+baobzi::baobzi_isa_t get_baobzi_isa() {
+    auto iset = baobzi_isa_t::GENERIC;
+
+    if (__builtin_cpu_supports("x86-64-v2"))
+        iset = baobzi_isa_t::X86_64_V2;
+    if (__builtin_cpu_supports("x86-64-v3"))
+        iset = baobzi_isa_t::X86_64_V3;
+    if (__builtin_cpu_supports("x86-64-v4"))
+        iset = baobzi_isa_t::X86_64_V4;
 
     const char *iset_str_const = getenv("BAOBZI_ARCH");
     if (iset_str_const) {
@@ -42,109 +35,89 @@ int get_iset() {
         std::transform(iset_str.begin(), iset_str.end(), iset_str.begin(),
                        [](unsigned char c) { return std::tolower(c); });
 
-        if (iset_str == "generic")
-            iset = ISET::GENERIC;
-        else if (iset_str == "avx")
-            iset = ISET::AVX;
-        else if (iset_str == "avx2")
-            iset = ISET::AVX2;
-        else if (iset_str == "avx512")
-            iset = ISET::AVX512;
+        if (iset_str == "generic" || iset_str == "x86_64")
+            iset = baobzi_isa_t::GENERIC;
+        else if (iset_str == "x86_64_v2")
+            iset = baobzi_isa_t::X86_64_V2;
+        else if (iset_str == "x86_64_v3")
+            iset = baobzi_isa_t::X86_64_V3;
+        else if (iset_str == "x86_64_v4")
+            iset = baobzi_isa_t::X86_64_V4;
         else
-            std::cerr << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, AVX, AVX2, AVX512\n";
+            std::cerr
+                << "Error: unable to parse BAOBZI_ARCH. Valid options are: GENERIC, X86_64_V2, X86_64_V3, X86_64_V4\n";
     }
-#endif
 
     return iset;
 }
 
-void baobzi_eval(const baobzi_t func, const double *x, double *y) { func->eval(func->obj, x, y); }
-
-void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
-    func->eval_multi(func->obj, x, res, ntrg);
+std::string isa_to_string(baobzi::baobzi_isa_t isa) {
+    switch (isa) {
+    case baobzi::baobzi_isa_t::GENERIC:
+        return "x86_64";
+    case baobzi::baobzi_isa_t::X86_64_V2:
+        return "x86_64_v2";
+    case baobzi::baobzi_isa_t::X86_64_V3:
+        return "x86_64_v3";
+    case baobzi::baobzi_isa_t::X86_64_V4:
+        return "x86_64_v4";
+    default:
+        throw std::runtime_error("Unknown baobzi ISA");
+    }
 }
 
-void baobzi_save(const baobzi_t func, const char *filename) { func->save(func->obj, filename); }
-
-baobzi_header_t read_header(const char *addr, const std::size_t buflen, std::size_t *offset) {
-    msgpack::object_handle oh;
-    msgpack::unpack(oh, addr, buflen, *offset); // actually increments offset
-    return oh.get().as<baobzi_header_t>();
-}
-
-baobzi_t baobzi_restore(const char *filename_cstr) {
-    std::string filename(filename_cstr);
-    baobzi_t res = (baobzi_t)malloc(sizeof(baobzi_struct));
-    res->obj = nullptr;
-
-    try {
-        std::size_t offset = 0;
-        std::string filedata_str = file_to_string(filename);
-        baobzi_header_t header = read_header(filedata_str.data(), filedata_str.size(), &offset);
-
-        msgpack::object_handle oh;
-        msgpack::unpack(oh, filedata_str.data(), filedata_str.size(), offset);
-        msgpack::object obj = oh.get();
-
-        res->DIM = header.dim;
-        res->ORDER = header.order;
-
-        auto [dim, order, version] = std::make_tuple(header.dim, header.order, header.version);
-
-        if (version != BAOBZI_HEADER_VERSION) {
-            free(res);
-            return nullptr;
-        }
-
-        int iset = get_iset();
-        switch (BAOBZI_JOIN(header.dim, header.order, iset)) {
-#include "baobzi/baobzi_cases_restore.h"
-        default: {
-            std::cerr << "BAOBZI ERROR: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << dim
-                      << ", " << order << ")\n";
-            free(res);
-            return nullptr;
-            break;
-        }
-        }
-    } catch (std::exception &e) {
-        std::cerr << "Baobzi restore error: Unable to restore from \'" << filename << "'" << std::endl;
-        free(res);
+void *dlopen_relative(const std::string &relative_name, int flags) {
+    Dl_info info;
+    if (dladdr((void *)&dlopen_relative, &info) == 0) {
+        std::fprintf(stderr, "dladdr failed\n");
         return nullptr;
     }
-    return res;
+    std::string path(info.dli_fname);
+    std::vector<char> buf(path.begin(), path.end());
+    buf.push_back('\0');
+    char *dir = dirname(buf.data());
+    std::string libpath = std::string(dir) + "/" + relative_name;
+    return dlopen(libpath.c_str(), flags);
 }
 
-void baobzi_stats(baobzi_t func) {
-    if (!func)
-        return;
-    func->stats(func->obj);
-}
+static const auto [init_func, eval_multi_func, stats_func, free_func] = []() {
+    const auto libstr = "libbaobzi_" + isa_to_string(get_baobzi_isa()) + ".so";
+    void *handle = dlopen_relative(libstr, RTLD_NOW);
+    if (!handle)
+        std::cerr << "Error: unable to open " << libstr << " with dlopen: " << dlerror() << "\n";
 
-baobzi_t baobzi_free(baobzi_t func) {
-    if (!func)
-        return nullptr;
-    if (func->obj)
-        func->free(func->obj);
-    free(func);
-    return nullptr;
-}
+    auto init_func = (decltype(::baobzi_init) *)dlsym(handle, "baobzi_init");
+    auto eval_multi_func = (decltype(::baobzi_eval_multi) *)dlsym(handle, "baobzi_eval_multi");
+    auto stats_func = (decltype(::baobzi_stats) *)dlsym(handle, "baobzi_stats");
+    auto free_func = (decltype(::baobzi_free) *)dlsym(handle, "baobzi_free");
 
-bool is_valid_func(const baobzi_input_t *input, const double *point) {
-    if (!input->func)
-        return false;
+    return std::tuple{init_func, eval_multi_func, stats_func, free_func};
+}();
 
-    double res[input->output_dim];
-    try {
-        input->func(point, res, input->data);
-    } catch (std::exception(e)) {
-        return false;
-    }
+#else
+static const auto init_func = baobzi::baobzi_init<baobzi::baobzi_isa_t::GENERIC>;
+static const auto eval_multi_func = baobzi::baobzi_eval_multi<baobzi::baobzi_isa_t::GENERIC>;
+static const auto stats_func = baobzi::baobzi_stats<baobzi::baobzi_isa_t::GENERIC>;
+static const auto free_func = baobzi::baobzi_free<baobzi::baobzi_isa_t::GENERIC>;
+#endif
+} // namespace baobzi
 
-    return true;
-}
-
+extern "C" {
 baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const double *half_length) {
+    const auto is_valid_func = [](const baobzi_input_t *input, const double *point) {
+        if (!input->func)
+            return false;
+
+        std::vector<double> res(input->output_dim);
+        try {
+            input->func(point, res.data(), input->data);
+        } catch (std::exception(e)) {
+            return false;
+        }
+
+        return true;
+    };
+
     if (input->tol <= 0.0) {
         std::cerr << "Baobzi error: Unable to initialize Baobzi due to invalid 'tol' parameter. Please supply "
                      "something greater than zero.\n";
@@ -156,30 +129,16 @@ baobzi_t baobzi_init(const baobzi_input_t *input, const double *center, const do
         return nullptr;
     }
 
-    baobzi_t res;
-    try {
-        res = (baobzi_t)malloc(sizeof(baobzi_struct));
-        res->DIM = input->dim;
-        res->ORDER = input->order;
-        res->OUTPUT_DIM = input->output_dim;
-
-        int iset = get_iset();
-
-        switch (BAOBZI_JOIN(res->DIM, res->ORDER, iset)) {
-#include "baobzi/baobzi_cases.h"
-        default: {
-            std::cerr << "Baobzi error: Unable to initialize Baobzi function with variables (DIM, ORDER): (" << res->DIM
-                      << ", " << res->ORDER << ")\n";
-
-            free(res);
-            return nullptr;
-        }
-        }
-    } catch (std::exception &e) {
-        std::cerr << e.what() << std::endl;
-        free(res);
-        return nullptr;
-    }
-    return res;
+    return baobzi::init_func(input, center, half_length);
 }
+
+void baobzi_eval(const baobzi_t func, const double *x, double *y) { return baobzi::eval_multi_func(func, x, y, 1); }
+
+void baobzi_eval_multi(const baobzi_t func, const double *x, double *res, int ntrg) {
+    return baobzi::eval_multi_func(func, x, res, ntrg);
+}
+
+void baobzi_stats(baobzi_t func) { return baobzi::stats_func(func); }
+
+baobzi_t baobzi_free(baobzi_t func) { return baobzi::free_func(func); }
 }
